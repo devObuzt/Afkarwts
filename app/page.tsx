@@ -192,14 +192,19 @@ export default function Home() {
     setIsSending(true);
     setNotice("");
 
-    const formData = new FormData();
-    formData.set("memberId", String(selectedMemberId));
-    formData.set("caption", messageText);
-    formData.set("file", mediaFile);
+    const params = new URLSearchParams({
+      memberId: String(selectedMemberId),
+      caption: messageText,
+      filename: mediaFile.name,
+      mimeType: mediaFile.type || "application/octet-stream"
+    });
 
-    const response = await fetch("/api/messages/send-media", {
+    const response = await fetch(`/api/messages/send-media?${params.toString()}`, {
       method: "POST",
-      body: formData
+      headers: {
+        "Content-Type": mediaFile.type || "application/octet-stream"
+      },
+      body: mediaFile
     });
 
     const payload = await response.json();

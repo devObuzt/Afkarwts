@@ -7,23 +7,33 @@ export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   try {
-    const formData = await request.formData();
-    const memberId = Number(formData.get("memberId"));
-    const caption = String(formData.get("caption") ?? "").trim();
-    const file = formData.get("file");
+    const contentType = request.headers.get("content-type") || "application/octet-stream";
+    if (contentType.includes("multipart/form-data")) {
+      return NextResponse.json(
+        { error: "This upload format is no longer supported. Refresh the page and try again." },
+        { status: 400 }
+      );
+    }
+
+    const url = new URL(request.url);
+    const memberId = Number(url.searchParams.get("memberId"));
+    const caption = (url.searchParams.get("caption") ?? "").trim();
+    const originalFilename = url.searchParams.get("filename") || "file";
+    const mimeType = url.searchParams.get("mimeType") || contentType;
+    const contentLength = Number(request.headers.get("content-length") ?? 0);
 
     if (!Number.isInteger(memberId)) {
       return NextResponse.json({ error: "Invalid member id." }, { status: 400 });
     }
 
-    if (!(file instanceof File)) {
+    if (!contentLength) {
       return NextResponse.json({ error: "A media file is required." }, { status: 400 });
     }
 
-    if (file.size > MAX_MEDIA_BYTES) {
+    if (contentLength > MAX_MEDIA_BYTES) {
       return NextResponse.json(
         {
-          error: `This file is ${formatBytes(file.size)}. The maximum supported size is ${MAX_MEDIA_LABEL}.`
+          error: `This file is ${formatBytes(contentLength)}. The maximum supported size is ${MAX_MEDIA_LABEL}.`
         },
         { status: 400 }
       );
@@ -34,12 +44,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Member not found." }, { status: 404 });
     }
 
-    const mimeType = file.type || "application/octet-stream";
     const mediaKind = mediaKindFromMime(mimeType);
-    const bytes = new Uint8Array(await file.arrayBuffer());
+    const bytes = new Uint8Array(await request.arrayBuffer());
     const storedFilename = createStoredMediaFilename({
       mimeType,
-      originalName: file.name
+      originalName: originalFilename
     });
     const mediaUrl = writeMediaFile(storedFilename, bytes);
 
@@ -47,25 +56,25 @@ export async function POST(request: Request) {
       memberId,
       direction: "outgoing",
       messageType: mediaKind,
-      body: caption || file.name || mediaKind,
+      body: caption || originalFilename || mediaKind,
       status: "pending",
       mediaUrl,
       mediaMimeType: mimeType,
-      mediaFilename: file.name || storedFilename
+      mediaFilename: originalFilename || storedFilename
     });
 
     try {
       const mediaId = await uploadWhatsAppMedia({
         bytes,
         mimeType,
-        filename: file.name || storedFilename
+        filename: originalFilename || storedFilename
       });
       const whatsappMessageId = await sendWhatsAppMedia({
         member,
         mediaId,
         kind: mediaKind,
         caption,
-        filename: file.name || storedFilename
+        filename: originalFilename || storedFilename
       });
       const message = updateMessageStatus(pending.id, {
         status: "accepted",
