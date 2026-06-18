@@ -167,6 +167,27 @@ textarea:focus {
   text-align: left;
 }
 
+.memberNameRow {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.member .unreadBadge {
+  align-items: center;
+  background: var(--green-strong);
+  border-radius: 999px;
+  color: white;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 700;
+  height: 22px;
+  justify-content: center;
+  min-width: 22px;
+  padding: 0 7px;
+}
+
 .member.active {
   background: #e6f4ef;
   border-color: var(--green);

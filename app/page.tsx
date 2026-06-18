@@ -34,6 +34,7 @@ type Member = {
   name: string;
   phone: string;
   notes: string;
+  unreadCount: number;
   createdAt: string;
 };
 
@@ -142,6 +143,13 @@ export default function Home() {
 
     const payload = (await response.json()) as { messages: Message[] };
     setMessages(payload.messages);
+
+    const readResponse = await fetch(`/api/members/${memberId}/read`, { method: "POST" });
+    if (readResponse.ok) {
+      setMembers((currentMembers) =>
+        currentMembers.map((member) => (member.id === memberId ? { ...member, unreadCount: 0 } : member))
+      );
+    }
   }
 
   useEffect(() => {
@@ -157,6 +165,7 @@ export default function Home() {
     void loadMessages(selectedMemberId);
     const interval = window.setInterval(() => {
       void loadMessages(selectedMemberId);
+      void loadMembers();
     }, 3000);
 
     return () => window.clearInterval(interval);
@@ -365,7 +374,10 @@ export default function Home() {
               onClick={() => setSelectedMemberId(member.id)}
               type="button"
             >
-              <strong>{member.name}</strong>
+              <span className="memberNameRow">
+                <strong>{member.name}</strong>
+                {member.unreadCount > 0 ? <span className="unreadBadge">{member.unreadCount}</span> : null}
+              </span>
               <span>{member.phone}</span>
             </button>
           ))}

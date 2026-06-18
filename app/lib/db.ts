@@ -7,6 +7,8 @@ export type Member = {
   name: string;
   phone: string;
   notes: string;
+  lastReadMessageId: number | null;
+  unreadCount: number;
   createdAt: string;
 };
 
@@ -30,6 +32,8 @@ type DbMember = {
   name: string;
   phone: string;
   notes: string;
+  last_read_message_id?: number | null;
+  unread_count?: number;
   created_at: string;
 };
 
@@ -62,6 +66,7 @@ function getDb() {
         name TEXT NOT NULL,
         phone TEXT NOT NULL UNIQUE,
         notes TEXT NOT NULL DEFAULT '',
+        last_read_message_id INTEGER,
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
 
@@ -86,6 +91,7 @@ function getDb() {
     `);
     migrateMessageStatuses(db);
     migrateMediaColumns(db);
+    migrateMemberReadColumn(db);
     globalForDb.__afkarDb = db;
   }
 
@@ -133,6 +139,8 @@ function mapMember(row: DbMember): Member {
     name: row.name,
     phone: row.phone,
     notes: row.notes,
+    lastReadMessageId: row.last_read_message_id ?? null,
+    unreadCount: row.unread_count ?? 0,
     createdAt: row.created_at
   };
 }
@@ -171,6 +179,12 @@ function migrateMediaColumns(db: DatabaseSync) {
     if (!hasColumn(db, "messages", column)) {
       db.exec(`ALTER TABLE messages ADD COLUMN ${column} ${definition}`);
     }
+  }
+}
+
+function migrateMemberReadColumn(db: DatabaseSync) {
+  if (!hasColumn(db, "members", "last_read_message_id")) {
+    db.exec("ALTER TABLE members ADD COLUMN last_read_message_id INTEGER");
   }
 }
 
@@ -215,7 +229,20 @@ export function phoneForWhatsApp(phone: string) {
 
 export function listMembers() {
   const rows = getDb()
-    .prepare("SELECT * FROM members ORDER BY created_at DESC")
+    .prepare(
+      `SELECT
+        members.*,
+        COUNT(messages.id) AS unread_count
+      FROM members
+      LEFT JOIN messages
+        ON messages.member_id = members.id
+        AND messages.direction = 'incoming'
+        AND messages.id > COALESCE(members.last_read_message_id, 0)
+      GROUP BY members.id
+      ORDER BY
+        MAX(CASE WHEN messages.id IS NOT NULL THEN messages.id ELSE 0 END) DESC,
+        members.created_at DESC`
+    )
     .all() as DbMember[];
   return rows.map(mapMember);
 }
@@ -241,8 +268,33 @@ export function createMember(input: { name: string; phone: string; notes?: strin
 }
 
 export function getMember(id: number) {
-  const row = getDb().prepare("SELECT * FROM members WHERE id = ?").get(id) as DbMember | undefined;
+  const row = getDb()
+    .prepare(
+      `SELECT
+        members.*,
+        COUNT(messages.id) AS unread_count
+      FROM members
+      LEFT JOIN messages
+        ON messages.member_id = members.id
+        AND messages.direction = 'incoming'
+        AND messages.id > COALESCE(members.last_read_message_id, 0)
+      WHERE members.id = ?
+      GROUP BY members.id`
+    )
+    .get(id) as DbMember | undefined;
   return row ? mapMember(row) : null;
+}
+
+export function markMemberMessagesRead(memberId: number) {
+  const latestIncoming = getDb()
+    .prepare("SELECT MAX(id) AS id FROM messages WHERE member_id = ? AND direction = 'incoming'")
+    .get(memberId) as { id: number | null } | undefined;
+
+  getDb()
+    .prepare("UPDATE members SET last_read_message_id = COALESCE(?, last_read_message_id) WHERE id = ?")
+    .run(latestIncoming?.id ?? null, memberId);
+
+  return getMember(memberId);
 }
 
 export function findOrCreateMemberByPhone(input: { phone: string; profileName?: string }) {
