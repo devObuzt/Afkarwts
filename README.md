@@ -44,4 +44,4 @@ Use the same value from `WHATSAPP_VERIFY_TOKEN` as the webhook verify token.
 
 WhatsApp may require approved template messages to start conversations outside the allowed customer service window. Set `WHATSAPP_TEMPLATE_NAME` and `WHATSAPP_TEMPLATE_LANGUAGE`, then use the "Send template" button to start the conversation. After the member replies, use normal text messages.
 
-Media files are stored under `APP_DATA_DIR/media`. On Railway, attach a volume or use object storage before relying on media persistence across restarts or redeploys.
+Media files are capped at 64 MB and stored under `APP_DATA_DIR/media`. On Railway, attach a volume or use object storage before relying on media persistence across restarts or redeploys.

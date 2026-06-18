@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createMessage, findOrCreateMemberByPhone, updateMessageStatusByWhatsAppId, type Message } from "@/app/lib/db";
-import { createStoredMediaFilename, writeMediaFile } from "@/app/lib/media-store";
+import { createStoredMediaFilename, formatBytes, MAX_MEDIA_BYTES, MAX_MEDIA_LABEL, writeMediaFile } from "@/app/lib/media-store";
 import { downloadWhatsAppMedia, getWhatsAppMediaInfo } from "@/app/lib/whatsapp";
 
 export const runtime = "nodejs";
@@ -97,6 +97,19 @@ export async function POST(request: Request) {
 
           try {
             const mediaInfo = await getWhatsAppMediaInfo(media.id);
+            if (mediaInfo.file_size && mediaInfo.file_size > MAX_MEDIA_BYTES) {
+              createMessage({
+                memberId: member.id,
+                direction: "incoming",
+                messageType: incoming.type,
+                body: media.caption || `Incoming ${incoming.type}`,
+                whatsappMessageId: incoming.id ?? null,
+                status: "failed",
+                error: `This file is ${formatBytes(mediaInfo.file_size)}. The maximum supported size is ${MAX_MEDIA_LABEL}.`
+              });
+              continue;
+            }
+
             const bytes = await downloadWhatsAppMedia(mediaInfo.url);
             const storedFilename = createStoredMediaFilename({
               messageId: incoming.id ?? media.id,

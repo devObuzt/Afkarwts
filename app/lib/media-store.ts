@@ -1,6 +1,9 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
+export const MAX_MEDIA_BYTES = 64 * 1024 * 1024;
+export const MAX_MEDIA_LABEL = "64 MB";
+
 const extensionByMime: Record<string, string> = {
   "image/jpeg": "jpg",
   "image/png": "png",
@@ -57,4 +60,16 @@ export function writeMediaFile(filename: string, bytes: Uint8Array) {
 export function readMediaFile(filename: string) {
   const safeName = safeMediaFilename(filename);
   return readFileSync(path.join(getMediaDir(), safeName));
+}
+
+export function formatBytes(bytes: number) {
+  if (bytes >= 1024 * 1024) {
+    return `${Math.round((bytes / (1024 * 1024)) * 10) / 10} MB`;
+  }
+
+  if (bytes >= 1024) {
+    return `${Math.round((bytes / 1024) * 10) / 10} KB`;
+  }
+
+  return `${bytes} B`;
 }

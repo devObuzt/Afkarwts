@@ -2,6 +2,21 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
+const maxMediaBytes = 64 * 1024 * 1024;
+const maxMediaLabel = "64 MB";
+
+function formatFileSize(bytes: number) {
+  if (bytes >= 1024 * 1024) {
+    return `${Math.round((bytes / (1024 * 1024)) * 10) / 10} MB`;
+  }
+
+  if (bytes >= 1024) {
+    return `${Math.round((bytes / 1024) * 10) / 10} KB`;
+  }
+
+  return `${bytes} B`;
+}
+
 type Member = {
   id: number;
   name: string;
@@ -194,6 +209,17 @@ export default function Home() {
     setIsSending(false);
   }
 
+  function selectMediaFile(file: File | null) {
+    if (file && file.size > maxMediaBytes) {
+      setMediaFile(null);
+      setNotice(`This file is ${formatFileSize(file.size)}. The maximum supported size is ${maxMediaLabel}.`);
+      return;
+    }
+
+    setNotice("");
+    setMediaFile(file);
+  }
+
   function renderMessageContent(message: Message) {
     if (message.messageType === "image" && message.mediaUrl) {
       return (
@@ -337,7 +363,7 @@ export default function Home() {
               File
               <input
                 disabled={!selectedMember}
-                onChange={(event) => setMediaFile(event.target.files?.[0] ?? null)}
+                onChange={(event) => selectMediaFile(event.target.files?.[0] ?? null)}
                 type="file"
               />
             </label>

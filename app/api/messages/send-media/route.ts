@@ -1,11 +1,9 @@
 import { NextResponse } from "next/server";
-import { createStoredMediaFilename, writeMediaFile } from "@/app/lib/media-store";
+import { createStoredMediaFilename, formatBytes, MAX_MEDIA_BYTES, MAX_MEDIA_LABEL, writeMediaFile } from "@/app/lib/media-store";
 import { createMessage, getMember, updateMessageStatus } from "@/app/lib/db";
 import { mediaKindFromMime, sendWhatsAppMedia, uploadWhatsAppMedia } from "@/app/lib/whatsapp";
 
 export const runtime = "nodejs";
-
-const maxUploadBytes = 16 * 1024 * 1024;
 
 export async function POST(request: Request) {
   try {
@@ -22,8 +20,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "A media file is required." }, { status: 400 });
     }
 
-    if (file.size > maxUploadBytes) {
-      return NextResponse.json({ error: "File is too large for this MVP. Keep it under 16 MB." }, { status: 400 });
+    if (file.size > MAX_MEDIA_BYTES) {
+      return NextResponse.json(
+        {
+          error: `This file is ${formatBytes(file.size)}. The maximum supported size is ${MAX_MEDIA_LABEL}.`
+        },
+        { status: 400 }
+      );
     }
 
     const member = getMember(memberId);
