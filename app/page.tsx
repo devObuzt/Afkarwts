@@ -35,6 +35,10 @@ const statusLabels: Record<Message["status"], string> = {
   failed: "failed"
 };
 
+function isVideoMessage(message: Message) {
+  return message.messageType === "video" || Boolean(message.mediaMimeType?.startsWith("video/"));
+}
+
 export default function Home() {
   const [members, setMembers] = useState<Member[]>([]);
   const [selectedMemberId, setSelectedMemberId] = useState<number | null>(null);
@@ -200,10 +204,13 @@ export default function Home() {
       );
     }
 
-    if (message.messageType === "video" && message.mediaUrl) {
+    if (isVideoMessage(message) && message.mediaUrl) {
       return (
         <>
-          <video className="mediaPreview" controls src={message.mediaUrl} />
+          <video className="mediaPreview" controls playsInline preload="metadata" src={message.mediaUrl} />
+          <a className="documentLink" href={message.mediaUrl} rel="noreferrer" target="_blank">
+            Open video
+          </a>
           {message.body ? <p>{message.body}</p> : null}
         </>
       );

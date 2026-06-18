@@ -119,7 +119,7 @@ export function mediaKindFromMime(mimeType: string): OutboundMediaKind {
     return "image";
   }
 
-  if (mimeType.startsWith("video/")) {
+  if (mimeType === "video/mp4" || mimeType === "video/3gpp") {
     return "video";
   }
 

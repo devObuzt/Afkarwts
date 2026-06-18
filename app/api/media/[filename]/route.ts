@@ -10,6 +10,7 @@ const mimeByExtension: Record<string, string> = {
   webp: "image/webp",
   mp4: "video/mp4",
   "3gp": "video/3gpp",
+  mov: "video/quicktime",
   pdf: "application/pdf"
 };
 
@@ -23,6 +24,7 @@ export async function GET(_request: Request, context: { params: Promise<{ filena
     return new Response(bytes, {
       headers: {
         "Content-Type": mimeByExtension[extension] || "application/octet-stream",
+        "Content-Disposition": `inline; filename="${filename}"`,
         "Cache-Control": "private, max-age=3600"
       }
     });
