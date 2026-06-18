@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createStoredMediaFilename, formatBytes, MAX_MEDIA_BYTES, MAX_MEDIA_LABEL, writeMediaFile } from "@/app/lib/media-store";
 import { createMessage, getMember, updateMessageStatus } from "@/app/lib/db";
-import { mediaKindFromMime, sendWhatsAppMedia, uploadWhatsAppMedia } from "@/app/lib/whatsapp";
+import { mediaKindFromMime, sendWhatsAppMedia, uploadMimeForWhatsApp, uploadWhatsAppMedia } from "@/app/lib/whatsapp";
 
 export const runtime = "nodejs";
 
@@ -66,7 +66,7 @@ export async function POST(request: Request) {
     try {
       const mediaId = await uploadWhatsAppMedia({
         bytes,
-        mimeType,
+        mimeType: uploadMimeForWhatsApp({ mimeType, kind: mediaKind }),
         filename: originalFilename || storedFilename
       });
       const whatsappMessageId = await sendWhatsAppMedia({

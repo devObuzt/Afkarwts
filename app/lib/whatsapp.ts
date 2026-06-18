@@ -143,6 +143,14 @@ export function mediaKindFromMime(mimeType: string, byteLength = 0): OutboundMed
   return "document";
 }
 
+export function uploadMimeForWhatsApp(input: { mimeType: string; kind: OutboundMediaKind }) {
+  if (input.kind === "document" && (input.mimeType.startsWith("image/") || input.mimeType.startsWith("video/"))) {
+    return "application/octet-stream";
+  }
+
+  return input.mimeType;
+}
+
 export async function uploadWhatsAppMedia(input: { bytes: Uint8Array; mimeType: string; filename: string }) {
   const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
   const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
