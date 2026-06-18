@@ -1,6 +1,6 @@
-import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { getDataDir } from "./media-store";
 
 export type Member = {
   id: number;
@@ -14,10 +14,14 @@ export type Message = {
   id: number;
   memberId: number;
   direction: "incoming" | "outgoing";
+  messageType: "text" | "image" | "video" | "document";
   body: string;
   whatsappMessageId: string | null;
   status: "received" | "pending" | "accepted" | "sent" | "delivered" | "read" | "failed";
   error: string | null;
+  mediaUrl: string | null;
+  mediaMimeType: string | null;
+  mediaFilename: string | null;
   createdAt: string;
 };
 
@@ -33,10 +37,14 @@ type DbMessage = {
   id: number;
   member_id: number;
   direction: "incoming" | "outgoing";
+  message_type: Message["messageType"];
   body: string;
   whatsapp_message_id: string | null;
   status: Message["status"];
   error: string | null;
+  media_url: string | null;
+  media_mime_type: string | null;
+  media_filename: string | null;
   created_at: string;
 };
 
@@ -46,8 +54,7 @@ const globalForDb = globalThis as typeof globalThis & {
 
 function getDb() {
   if (!globalForDb.__afkarDb) {
-    const dataDir = process.env.APP_DATA_DIR || path.join(process.cwd(), "data");
-    mkdirSync(dataDir, { recursive: true });
+    const dataDir = getDataDir();
     const db = new DatabaseSync(path.join(dataDir, "app.sqlite"));
     db.exec(`
       CREATE TABLE IF NOT EXISTS members (
@@ -62,10 +69,14 @@ function getDb() {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         member_id INTEGER NOT NULL,
         direction TEXT NOT NULL CHECK (direction IN ('incoming', 'outgoing')),
+        message_type TEXT NOT NULL DEFAULT 'text' CHECK (message_type IN ('text', 'image', 'video', 'document')),
         body TEXT NOT NULL,
         whatsapp_message_id TEXT,
         status TEXT NOT NULL CHECK (status IN ('received', 'pending', 'accepted', 'sent', 'delivered', 'read', 'failed')),
         error TEXT,
+        media_url TEXT,
+        media_mime_type TEXT,
+        media_filename TEXT,
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE
       );
@@ -74,6 +85,7 @@ function getDb() {
       ON messages(member_id, created_at);
     `);
     migrateMessageStatuses(db);
+    migrateMediaColumns(db);
     globalForDb.__afkarDb = db;
   }
 
@@ -130,12 +142,36 @@ function mapMessage(row: DbMessage): Message {
     id: row.id,
     memberId: row.member_id,
     direction: row.direction,
+    messageType: row.message_type ?? "text",
     body: row.body,
     whatsappMessageId: row.whatsapp_message_id,
     status: row.status,
     error: row.error,
+    mediaUrl: row.media_url,
+    mediaMimeType: row.media_mime_type,
+    mediaFilename: row.media_filename,
     createdAt: row.created_at
   };
+}
+
+function hasColumn(db: DatabaseSync, table: string, column: string) {
+  const rows = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+  return rows.some((row) => row.name === column);
+}
+
+function migrateMediaColumns(db: DatabaseSync) {
+  const additions = [
+    ["message_type", "TEXT NOT NULL DEFAULT 'text'"],
+    ["media_url", "TEXT"],
+    ["media_mime_type", "TEXT"],
+    ["media_filename", "TEXT"]
+  ] as const;
+
+  for (const [column, definition] of additions) {
+    if (!hasColumn(db, "messages", column)) {
+      db.exec(`ALTER TABLE messages ADD COLUMN ${column} ${definition}`);
+    }
+  }
 }
 
 export function normalizePhone(phone: string) {
@@ -243,22 +279,30 @@ export function listMessages(memberId: number) {
 export function createMessage(input: {
   memberId: number;
   direction: Message["direction"];
+  messageType?: Message["messageType"];
   body: string;
   whatsappMessageId?: string | null;
   status: Message["status"];
   error?: string | null;
+  mediaUrl?: string | null;
+  mediaMimeType?: string | null;
+  mediaFilename?: string | null;
 }) {
   const result = getDb()
     .prepare(
-      "INSERT INTO messages (member_id, direction, body, whatsapp_message_id, status, error) VALUES (?, ?, ?, ?, ?, ?)"
+      "INSERT INTO messages (member_id, direction, message_type, body, whatsapp_message_id, status, error, media_url, media_mime_type, media_filename) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     )
     .run(
       input.memberId,
       input.direction,
+      input.messageType ?? "text",
       input.body,
       input.whatsappMessageId ?? null,
       input.status,
-      input.error ?? null
+      input.error ?? null,
+      input.mediaUrl ?? null,
+      input.mediaMimeType ?? null,
+      input.mediaFilename ?? null
     );
 
   const row = getDb().prepare("SELECT * FROM messages WHERE id = ?").get(Number(result.lastInsertRowid)) as DbMessage;

@@ -1,7 +1,17 @@
 import { NextResponse } from "next/server";
 import { createMessage, findOrCreateMemberByPhone, updateMessageStatusByWhatsAppId, type Message } from "@/app/lib/db";
+import { createStoredMediaFilename, writeMediaFile } from "@/app/lib/media-store";
+import { downloadWhatsAppMedia, getWhatsAppMediaInfo } from "@/app/lib/whatsapp";
 
 export const runtime = "nodejs";
+
+type IncomingMedia = {
+  id?: string;
+  mime_type?: string;
+  caption?: string;
+  filename?: string;
+  sha256?: string;
+};
 
 type WhatsAppWebhookPayload = {
   entry?: Array<{
@@ -15,8 +25,11 @@ type WhatsAppWebhookPayload = {
           from?: string;
           id?: string;
           timestamp?: string;
-          type?: string;
+          type?: "text" | "image" | "video" | "document" | string;
           text?: { body?: string };
+          image?: { id?: string; mime_type?: string; caption?: string; sha256?: string };
+          video?: { id?: string; mime_type?: string; caption?: string; sha256?: string };
+          document?: { id?: string; mime_type?: string; caption?: string; filename?: string; sha256?: string };
         }>;
         statuses?: Array<{
           id?: string;
@@ -55,7 +68,7 @@ export async function POST(request: Request) {
       );
 
       for (const incoming of value?.messages ?? []) {
-        if (!incoming.from || incoming.type !== "text" || !incoming.text?.body) {
+        if (!incoming.from) {
           continue;
         }
 
@@ -64,13 +77,58 @@ export async function POST(request: Request) {
           profileName: contactsByWaId.get(incoming.from)
         });
 
-        createMessage({
-          memberId: member.id,
-          direction: "incoming",
-          body: incoming.text.body,
-          whatsappMessageId: incoming.id ?? null,
-          status: "received"
-        });
+        if (incoming.type === "text" && incoming.text?.body) {
+          createMessage({
+            memberId: member.id,
+            direction: "incoming",
+            messageType: "text",
+            body: incoming.text.body,
+            whatsappMessageId: incoming.id ?? null,
+            status: "received"
+          });
+          continue;
+        }
+
+        if (incoming.type === "image" || incoming.type === "video" || incoming.type === "document") {
+          const media = incoming[incoming.type] as IncomingMedia | undefined;
+          if (!media?.id) {
+            continue;
+          }
+
+          try {
+            const mediaInfo = await getWhatsAppMediaInfo(media.id);
+            const bytes = await downloadWhatsAppMedia(mediaInfo.url);
+            const storedFilename = createStoredMediaFilename({
+              messageId: incoming.id ?? media.id,
+              mimeType: media.mime_type || mediaInfo.mime_type,
+              originalName: incoming.type === "document" ? media.filename : undefined
+            });
+            const mediaUrl = writeMediaFile(storedFilename, bytes);
+            const filename = incoming.type === "document" ? media.filename ?? storedFilename : storedFilename;
+
+            createMessage({
+              memberId: member.id,
+              direction: "incoming",
+              messageType: incoming.type,
+              body: media.caption || filename,
+              whatsappMessageId: incoming.id ?? null,
+              status: "received",
+              mediaUrl,
+              mediaMimeType: media.mime_type || mediaInfo.mime_type,
+              mediaFilename: filename
+            });
+          } catch (error) {
+            createMessage({
+              memberId: member.id,
+              direction: "incoming",
+              messageType: incoming.type,
+              body: media.caption || `Incoming ${incoming.type}`,
+              whatsappMessageId: incoming.id ?? null,
+              status: "failed",
+              error: error instanceof Error ? error.message : "Could not download incoming media."
+            });
+          }
+        }
       }
 
       for (const statusUpdate of value?.statuses ?? []) {

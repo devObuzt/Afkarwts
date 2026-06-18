@@ -14,10 +14,14 @@ type Message = {
   id: number;
   memberId: number;
   direction: "incoming" | "outgoing";
+  messageType: "text" | "image" | "video" | "document";
   body: string;
   whatsappMessageId: string | null;
   status: "received" | "pending" | "accepted" | "sent" | "delivered" | "read" | "failed";
   error: string | null;
+  mediaUrl: string | null;
+  mediaMimeType: string | null;
+  mediaFilename: string | null;
   createdAt: string;
 };
 
@@ -37,6 +41,7 @@ export default function Home() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [memberForm, setMemberForm] = useState({ name: "", phone: "", notes: "" });
   const [messageText, setMessageText] = useState("");
+  const [mediaFile, setMediaFile] = useState<File | null>(null);
   const [notice, setNotice] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [isSendingTemplate, setIsSendingTemplate] = useState(false);
@@ -155,6 +160,69 @@ export default function Home() {
     setIsSendingTemplate(false);
   }
 
+  async function sendMedia() {
+    if (!selectedMemberId || !mediaFile) {
+      return;
+    }
+
+    setIsSending(true);
+    setNotice("");
+
+    const formData = new FormData();
+    formData.set("memberId", String(selectedMemberId));
+    formData.set("caption", messageText);
+    formData.set("file", mediaFile);
+
+    const response = await fetch("/api/messages/send-media", {
+      method: "POST",
+      body: formData
+    });
+
+    const payload = await response.json();
+    if (!response.ok) {
+      setNotice(payload.error ?? "Media send failed.");
+    } else {
+      setMessageText("");
+      setMediaFile(null);
+    }
+
+    await loadMessages(selectedMemberId);
+    setIsSending(false);
+  }
+
+  function renderMessageContent(message: Message) {
+    if (message.messageType === "image" && message.mediaUrl) {
+      return (
+        <>
+          <img alt={message.mediaFilename ?? message.body} className="mediaPreview" src={message.mediaUrl} />
+          {message.body ? <p>{message.body}</p> : null}
+        </>
+      );
+    }
+
+    if (message.messageType === "video" && message.mediaUrl) {
+      return (
+        <>
+          <video className="mediaPreview" controls src={message.mediaUrl} />
+          {message.body ? <p>{message.body}</p> : null}
+        </>
+      );
+    }
+
+    if (message.messageType === "document" && message.mediaUrl) {
+      return (
+        <>
+          <a className="documentLink" href={message.mediaUrl} rel="noreferrer" target="_blank">
+            {message.mediaFilename || message.body || "Open file"}
+          </a>
+          {message.body && message.body !== message.mediaFilename ? <p>{message.body}</p> : null}
+        </>
+      );
+    }
+
+    return <p>{message.body}</p>;
+  }
+
   return (
     <main className="shell">
       <aside className="sidebar">
@@ -233,7 +301,7 @@ export default function Home() {
             messages.length ? (
               messages.map((message) => (
                 <article className={`bubble ${message.direction}`} key={message.id}>
-                  <p>{message.body}</p>
+                  {renderMessageContent(message)}
                   <footer>
                     <span>{new Date(message.createdAt).toLocaleString()}</span>
                     <span>{statusLabels[message.status]}</span>
@@ -250,18 +318,39 @@ export default function Home() {
         </div>
 
         <form className="composer" onSubmit={sendMessage}>
-          <textarea
-            disabled={!selectedMember}
-            value={messageText}
-            onChange={(event) => setMessageText(event.target.value)}
-            placeholder={selectedMember ? "Write a WhatsApp message" : "Select a member first"}
-            rows={3}
-          />
+          <div className="composerInput">
+            <textarea
+              disabled={!selectedMember}
+              value={messageText}
+              onChange={(event) => setMessageText(event.target.value)}
+              placeholder={mediaFile ? "Add a caption" : selectedMember ? "Write a WhatsApp message" : "Select a member first"}
+              rows={3}
+            />
+            <label className="filePicker">
+              File
+              <input
+                disabled={!selectedMember}
+                onChange={(event) => setMediaFile(event.target.files?.[0] ?? null)}
+                type="file"
+              />
+            </label>
+            {mediaFile ? (
+              <div className="selectedFile">
+                <span>{mediaFile.name}</span>
+                <button onClick={() => setMediaFile(null)} type="button">
+                  Clear
+                </button>
+              </div>
+            ) : null}
+          </div>
           <div className="composerActions">
             <button disabled={!selectedMember || isSendingTemplate} onClick={sendTemplate} type="button">
               {isSendingTemplate ? "Starting..." : "Send template"}
             </button>
-            <button disabled={!selectedMember || isSending || !messageText.trim()} type="submit">
+            <button disabled={!selectedMember || isSending || !mediaFile} onClick={sendMedia} type="button">
+              {isSending && mediaFile ? "Sending..." : "Send file"}
+            </button>
+            <button disabled={!selectedMember || isSending || !messageText.trim() || Boolean(mediaFile)} type="submit">
               {isSending ? "Sending..." : "Send text"}
             </button>
           </div>
