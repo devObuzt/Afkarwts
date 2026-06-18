@@ -113,6 +113,7 @@ export default function Home() {
   const [memberForm, setMemberForm] = useState({ name: "", phone: "", notes: "" });
   const [messageText, setMessageText] = useState("");
   const [mediaFile, setMediaFile] = useState<File | null>(null);
+  const [mediaError, setMediaError] = useState("");
   const [notice, setNotice] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [isSendingTemplate, setIsSendingTemplate] = useState(false);
@@ -237,7 +238,7 @@ export default function Home() {
   }
 
   async function sendMedia() {
-    if (!selectedMemberId || !mediaFile) {
+    if (!selectedMemberId || !mediaFile || mediaError) {
       return;
     }
 
@@ -265,6 +266,7 @@ export default function Home() {
     } else {
       setMessageText("");
       setMediaFile(null);
+      setMediaError("");
     }
 
     await loadMessages(selectedMemberId);
@@ -273,13 +275,8 @@ export default function Home() {
 
   function selectMediaFile(file: File | null) {
     const validationError = file ? validateSelectedFile(file) : "";
-    if (file && validationError) {
-      setMediaFile(null);
-      setNotice(validationError);
-      return;
-    }
-
     setNotice("");
+    setMediaError(validationError);
     setMediaFile(file);
   }
 
@@ -439,7 +436,14 @@ export default function Home() {
                   {mediaFile.name}
                   {mediaDeliveryNote(mediaFile) ? <small>{mediaDeliveryNote(mediaFile)}</small> : null}
                 </span>
-                <button onClick={() => setMediaFile(null)} type="button">
+                {mediaError ? <small>{mediaError}</small> : null}
+                <button
+                  onClick={() => {
+                    setMediaFile(null);
+                    setMediaError("");
+                  }}
+                  type="button"
+                >
                   Clear
                 </button>
               </div>
@@ -449,7 +453,7 @@ export default function Home() {
             <button disabled={!selectedMember || isSendingTemplate} onClick={sendTemplate} type="button">
               {isSendingTemplate ? "Starting..." : "Send template"}
             </button>
-            <button disabled={!selectedMember || isSending || !mediaFile} onClick={sendMedia} type="button">
+            <button disabled={!selectedMember || isSending || !mediaFile || Boolean(mediaError)} onClick={sendMedia} type="button">
               {isSending && mediaFile ? "Sending..." : "Send file"}
             </button>
             <button disabled={!selectedMember || isSending || !messageText.trim() || Boolean(mediaFile)} type="submit">
