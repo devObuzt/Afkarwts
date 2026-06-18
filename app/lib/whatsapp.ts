@@ -7,6 +7,10 @@ type WhatsAppSendResponse = {
     type?: string;
     code?: number;
     error_subcode?: number;
+    error_data?: {
+      details?: string;
+    };
+    fbtrace_id?: string;
   };
 };
 
@@ -19,6 +23,19 @@ type WhatsAppMediaInfo = {
 };
 
 export type OutboundMediaKind = "image" | "video" | "document";
+export const WHATSAPP_IMAGE_BYTES = 5 * 1024 * 1024;
+export const WHATSAPP_VIDEO_BYTES = 16 * 1024 * 1024;
+
+function whatsAppErrorMessage(payload: WhatsAppSendResponse, fallback: string) {
+  const message = payload.error?.message;
+  const details = payload.error?.error_data?.details;
+
+  if (message && details) {
+    return `${message}: ${details}`;
+  }
+
+  return message || fallback;
+}
 
 export async function sendWhatsAppText(member: Member, body: string) {
   const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
@@ -114,12 +131,12 @@ export async function sendWhatsAppTemplate(member: Member) {
   };
 }
 
-export function mediaKindFromMime(mimeType: string): OutboundMediaKind {
-  if (mimeType.startsWith("image/")) {
+export function mediaKindFromMime(mimeType: string, byteLength = 0): OutboundMediaKind {
+  if (mimeType.startsWith("image/") && byteLength <= WHATSAPP_IMAGE_BYTES) {
     return "image";
   }
 
-  if (mimeType === "video/mp4" || mimeType === "video/3gpp") {
+  if ((mimeType === "video/mp4" || mimeType === "video/3gpp") && byteLength <= WHATSAPP_VIDEO_BYTES) {
     return "video";
   }
 
@@ -151,10 +168,10 @@ export async function uploadWhatsAppMedia(input: { bytes: Uint8Array; mimeType: 
     body: formData
   });
 
-  const payload = (await response.json()) as { id?: string; error?: { message?: string } };
+  const payload = (await response.json()) as WhatsAppSendResponse & { id?: string };
 
   if (!response.ok || !payload.id) {
-    throw new Error(payload.error?.message || `WhatsApp media upload failed with ${response.status}`);
+    throw new Error(whatsAppErrorMessage(payload, `WhatsApp media upload failed with ${response.status}`));
   }
 
   return payload.id;
@@ -204,7 +221,7 @@ export async function sendWhatsAppMedia(input: {
   const payload = (await response.json()) as WhatsAppSendResponse;
 
   if (!response.ok) {
-    throw new Error(payload.error?.message || `WhatsApp API failed with ${response.status}`);
+    throw new Error(whatsAppErrorMessage(payload, `WhatsApp API failed with ${response.status}`));
   }
 
   const messageId = payload.messages?.[0]?.id;

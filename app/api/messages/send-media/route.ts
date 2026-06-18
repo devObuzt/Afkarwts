@@ -44,8 +44,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Member not found." }, { status: 404 });
     }
 
-    const mediaKind = mediaKindFromMime(mimeType);
     const bytes = new Uint8Array(await request.arrayBuffer());
+    const mediaKind = mediaKindFromMime(mimeType, bytes.byteLength);
     const storedFilename = createStoredMediaFilename({
       mimeType,
       originalName: originalFilename

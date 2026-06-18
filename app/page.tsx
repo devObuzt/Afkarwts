@@ -4,6 +4,8 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 
 const maxMediaBytes = 64 * 1024 * 1024;
 const maxMediaLabel = "64 MB";
+const whatsappImageBytes = 5 * 1024 * 1024;
+const whatsappVideoBytes = 16 * 1024 * 1024;
 
 function formatFileSize(bytes: number) {
   if (bytes >= 1024 * 1024) {
@@ -52,6 +54,22 @@ const statusLabels: Record<Message["status"], string> = {
 
 function isVideoMessage(message: Message) {
   return message.messageType === "video" || Boolean(message.mediaMimeType?.startsWith("video/"));
+}
+
+function mediaDeliveryNote(file: File) {
+  if (file.type.startsWith("image/") && file.size > whatsappImageBytes) {
+    return "Images over 5 MB will be sent as a file.";
+  }
+
+  if ((file.type === "video/mp4" || file.type === "video/3gpp") && file.size > whatsappVideoBytes) {
+    return "Videos over 16 MB will be sent as a file.";
+  }
+
+  if (file.type === "video/quicktime") {
+    return "MOV videos will be sent as a file.";
+  }
+
+  return "";
 }
 
 export default function Home() {
@@ -382,7 +400,10 @@ export default function Home() {
             </label>
             {mediaFile ? (
               <div className="selectedFile">
-                <span>{mediaFile.name}</span>
+                <span>
+                  {mediaFile.name}
+                  {mediaDeliveryNote(mediaFile) ? <small>{mediaDeliveryNote(mediaFile)}</small> : null}
+                </span>
                 <button onClick={() => setMediaFile(null)} type="button">
                   Clear
                 </button>

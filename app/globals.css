@@ -323,9 +323,16 @@ textarea:focus {
 
 .selectedFile span {
   color: var(--muted);
+  display: grid;
+  gap: 2px;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+}
+
+.selectedFile small {
+  color: var(--danger);
+  font-size: 12px;
 }
 
 .selectedFile button {
