@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createStoredMediaFilename, formatBytes, MAX_MEDIA_BYTES, MAX_MEDIA_LABEL, writeMediaFile } from "@/app/lib/media-store";
 import { createMessage, getMember, updateMessageStatus } from "@/app/lib/db";
-import { mediaKindFromMime, sendWhatsAppMedia, uploadMimeForWhatsApp, uploadWhatsAppMedia } from "@/app/lib/whatsapp";
+import { mediaKindFromMime, sendWhatsAppMedia, uploadWhatsAppMedia, validateOutboundMediaForWhatsApp } from "@/app/lib/whatsapp";
 
 export const runtime = "nodejs";
 
@@ -45,6 +45,11 @@ export async function POST(request: Request) {
     }
 
     const bytes = new Uint8Array(await request.arrayBuffer());
+    const validationError = validateOutboundMediaForWhatsApp({ mimeType, byteLength: bytes.byteLength });
+    if (validationError) {
+      return NextResponse.json({ error: validationError }, { status: 400 });
+    }
+
     const mediaKind = mediaKindFromMime(mimeType, bytes.byteLength);
     const storedFilename = createStoredMediaFilename({
       mimeType,
@@ -66,7 +71,7 @@ export async function POST(request: Request) {
     try {
       const mediaId = await uploadWhatsAppMedia({
         bytes,
-        mimeType: uploadMimeForWhatsApp({ mimeType, kind: mediaKind }),
+        mimeType,
         filename: originalFilename || storedFilename
       });
       const whatsappMessageId = await sendWhatsAppMedia({

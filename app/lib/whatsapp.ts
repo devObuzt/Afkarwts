@@ -1,3 +1,4 @@
+import { formatBytes, MAX_MEDIA_BYTES, MAX_MEDIA_LABEL } from "./media-store";
 import { phoneForWhatsApp, type Member } from "./db";
 
 type WhatsAppSendResponse = {
@@ -25,6 +26,17 @@ type WhatsAppMediaInfo = {
 export type OutboundMediaKind = "image" | "video" | "document";
 export const WHATSAPP_IMAGE_BYTES = 5 * 1024 * 1024;
 export const WHATSAPP_VIDEO_BYTES = 16 * 1024 * 1024;
+
+const documentMimeTypes = new Set([
+  "application/pdf",
+  "text/plain",
+  "application/msword",
+  "application/vnd.ms-excel",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+]);
 
 function whatsAppErrorMessage(payload: WhatsAppSendResponse, fallback: string) {
   const message = payload.error?.message;
@@ -143,12 +155,36 @@ export function mediaKindFromMime(mimeType: string, byteLength = 0): OutboundMed
   return "document";
 }
 
-export function uploadMimeForWhatsApp(input: { mimeType: string; kind: OutboundMediaKind }) {
-  if (input.kind === "document" && (input.mimeType.startsWith("image/") || input.mimeType.startsWith("video/"))) {
-    return "application/octet-stream";
+export function validateOutboundMediaForWhatsApp(input: { mimeType: string; byteLength: number }) {
+  if (input.mimeType === "video/quicktime") {
+    return "MOV is not supported by WhatsApp Cloud API. Convert it to MP4 and keep it under 16 MB.";
   }
 
-  return input.mimeType;
+  if (input.mimeType === "video/mp4" || input.mimeType === "video/3gpp") {
+    if (input.byteLength > WHATSAPP_VIDEO_BYTES) {
+      return `This video is ${formatBytes(input.byteLength)}. WhatsApp Cloud API supports videos up to 16 MB.`;
+    }
+
+    return null;
+  }
+
+  if (input.mimeType === "image/jpeg" || input.mimeType === "image/png" || input.mimeType === "image/webp") {
+    if (input.byteLength > WHATSAPP_IMAGE_BYTES) {
+      return `This image is ${formatBytes(input.byteLength)}. WhatsApp Cloud API supports images up to 5 MB.`;
+    }
+
+    return null;
+  }
+
+  if (documentMimeTypes.has(input.mimeType)) {
+    if (input.byteLength > MAX_MEDIA_BYTES) {
+      return `This file is ${formatBytes(input.byteLength)}. The maximum supported size is ${MAX_MEDIA_LABEL}.`;
+    }
+
+    return null;
+  }
+
+  return "This file type is not supported by WhatsApp Cloud API.";
 }
 
 export async function uploadWhatsAppMedia(input: { bytes: Uint8Array; mimeType: string; filename: string }) {
