@@ -199,6 +199,20 @@ textarea:focus {
   padding: 9px 12px;
 }
 
+.logoutButton {
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  font-weight: 700;
+  padding: 9px 12px;
+}
+
+.logoutButton:hover {
+  border-color: var(--green);
+  color: var(--green-strong);
+}
+
 .notice {
   background: #fff3f0;
   border-bottom: 1px solid #f0c8bd;
@@ -318,6 +332,56 @@ textarea:focus {
   background: transparent;
   color: var(--danger);
   padding: 0;
+}
+
+.loginShell {
+  align-items: center;
+  display: grid;
+  min-height: 100vh;
+  padding: 24px;
+}
+
+.loginPanel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 16px;
+  justify-self: center;
+  max-width: 420px;
+  padding: 24px;
+  width: 100%;
+}
+
+.loginPanel h1,
+.loginPanel p {
+  margin: 0;
+}
+
+.loginPanel h1 {
+  font-size: 24px;
+}
+
+.loginPanel p {
+  color: var(--muted);
+}
+
+.loginPanel button {
+  background: var(--green-strong);
+  border-radius: 8px;
+  color: white;
+  font-weight: 700;
+  padding: 11px 14px;
+}
+
+.loginPanel button:disabled {
+  background: #9aa29d;
+  cursor: not-allowed;
+}
+
+.loginNotice {
+  border: 1px solid #f0c8bd;
+  border-radius: 8px;
 }
 
 @media (max-width: 820px) {

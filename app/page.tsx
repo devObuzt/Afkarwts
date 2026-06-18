@@ -179,6 +179,11 @@ export default function Home() {
     setIsSendingTemplate(false);
   }
 
+  async function logout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    window.location.href = "/login";
+  }
+
   async function sendMedia() {
     if (!selectedMemberId || !mediaFile) {
       return;
@@ -321,6 +326,9 @@ export default function Home() {
                 <h2>{selectedMember.name}</h2>
               </div>
               <div className="phoneBadge">{selectedMember.phone}</div>
+              <button className="logoutButton" onClick={logout} type="button">
+                Logout
+              </button>
             </>
           ) : (
             <h2>Add a member to start</h2>

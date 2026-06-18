@@ -25,6 +25,8 @@ cp .env.example .env
 - `WHATSAPP_TEMPLATE_NAME`
 - `WHATSAPP_TEMPLATE_LANGUAGE`
 - `APP_DATA_DIR`
+- `Admin_User`
+- `Admin_Pass`
 
 4. Run the app:
 
