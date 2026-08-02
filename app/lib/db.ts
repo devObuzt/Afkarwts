@@ -9,6 +9,14 @@ export type Member = {
   notes: string;
   lastReadMessageId: number | null;
   unreadCount: number;
+  groupIds: number[];
+  createdAt: string;
+};
+
+export type Group = {
+  id: number;
+  name: string;
+  memberCount: number;
   createdAt: string;
 };
 
@@ -92,6 +100,7 @@ function getDb() {
     migrateMessageStatuses(db);
     migrateMediaColumns(db);
     migrateMemberReadColumn(db);
+    migrateGroupTables(db);
     globalForDb.__afkarDb = db;
   }
 
@@ -133,7 +142,7 @@ function migrateMessageStatuses(db: DatabaseSync) {
   `);
 }
 
-function mapMember(row: DbMember): Member {
+function mapMember(row: DbMember, groupIds?: number[]): Member {
   return {
     id: row.id,
     name: row.name,
@@ -141,8 +150,16 @@ function mapMember(row: DbMember): Member {
     notes: row.notes,
     lastReadMessageId: row.last_read_message_id ?? null,
     unreadCount: row.unread_count ?? 0,
+    groupIds: groupIds ?? memberGroupIds(row.id),
     createdAt: row.created_at
   };
+}
+
+function memberGroupIds(memberId: number) {
+  const rows = getDb()
+    .prepare("SELECT group_id FROM member_groups WHERE member_id = ?")
+    .all(memberId) as Array<{ group_id: number }>;
+  return rows.map((row) => row.group_id);
 }
 
 function mapMessage(row: DbMessage): Message {
@@ -186,6 +203,41 @@ function migrateMemberReadColumn(db: DatabaseSync) {
   if (!hasColumn(db, "members", "last_read_message_id")) {
     db.exec("ALTER TABLE members ADD COLUMN last_read_message_id INTEGER");
   }
+}
+
+function migrateGroupTables(db: DatabaseSync) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS groups (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL UNIQUE,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS member_groups (
+      member_id INTEGER NOT NULL,
+      group_id INTEGER NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (member_id, group_id),
+      FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE,
+      FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_member_groups_group ON member_groups(group_id);
+  `);
+}
+
+function memberGroupIdMap() {
+  const rows = getDb().prepare("SELECT member_id, group_id FROM member_groups").all() as Array<{
+    member_id: number;
+    group_id: number;
+  }>;
+  const map = new Map<number, number[]>();
+  for (const row of rows) {
+    const list = map.get(row.member_id) ?? [];
+    list.push(row.group_id);
+    map.set(row.member_id, list);
+  }
+  return map;
 }
 
 export function normalizePhone(phone: string) {
@@ -244,7 +296,8 @@ export function listMembers() {
         members.created_at DESC`
     )
     .all() as DbMember[];
-  return rows.map(mapMember);
+  const groupMap = memberGroupIdMap();
+  return rows.map((row) => mapMember(row, groupMap.get(row.id) ?? []));
 }
 
 export function createMember(input: { name: string; phone: string; notes?: string }) {
@@ -371,6 +424,102 @@ export function updateMessageStatus(
 
   const row = getDb().prepare("SELECT * FROM messages WHERE id = ?").get(id) as DbMessage;
   return mapMessage(row);
+}
+
+export function listGroups(): Group[] {
+  const rows = getDb()
+    .prepare(
+      `SELECT groups.*, COUNT(member_groups.member_id) AS member_count
+       FROM groups
+       LEFT JOIN member_groups ON member_groups.group_id = groups.id
+       GROUP BY groups.id
+       ORDER BY groups.name COLLATE NOCASE ASC`
+    )
+    .all() as Array<{ id: number; name: string; member_count: number; created_at: string }>;
+
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    memberCount: row.member_count,
+    createdAt: row.created_at
+  }));
+}
+
+export function createGroup(name: string): Group {
+  const trimmed = name.trim();
+  if (!trimmed) {
+    throw new Error("Group name is required.");
+  }
+
+  const existing = getDb().prepare("SELECT id FROM groups WHERE name = ?").get(trimmed) as
+    | { id: number }
+    | undefined;
+  if (existing) {
+    throw new Error("A group with this name already exists.");
+  }
+
+  const result = getDb().prepare("INSERT INTO groups (name) VALUES (?)").run(trimmed);
+  return {
+    id: Number(result.lastInsertRowid),
+    name: trimmed,
+    memberCount: 0,
+    createdAt: new Date().toISOString()
+  };
+}
+
+export function renameGroup(id: number, name: string) {
+  const trimmed = name.trim();
+  if (!trimmed) {
+    throw new Error("Group name is required.");
+  }
+  getDb().prepare("UPDATE groups SET name = ? WHERE id = ?").run(trimmed, id);
+}
+
+export function deleteGroup(id: number) {
+  getDb().prepare("DELETE FROM member_groups WHERE group_id = ?").run(id);
+  getDb().prepare("DELETE FROM groups WHERE id = ?").run(id);
+}
+
+export function getGroup(id: number) {
+  const row = getDb().prepare("SELECT * FROM groups WHERE id = ?").get(id) as
+    | { id: number; name: string; created_at: string }
+    | undefined;
+  return row ? { id: row.id, name: row.name, createdAt: row.created_at } : null;
+}
+
+export function addMembersToGroup(groupId: number, memberIds: number[]) {
+  const insert = getDb().prepare(
+    "INSERT OR IGNORE INTO member_groups (member_id, group_id) VALUES (?, ?)"
+  );
+  for (const memberId of memberIds) {
+    insert.run(memberId, groupId);
+  }
+}
+
+export function removeMemberFromGroup(groupId: number, memberId: number) {
+  getDb().prepare("DELETE FROM member_groups WHERE group_id = ? AND member_id = ?").run(groupId, memberId);
+}
+
+export function listGroupMembers(groupId: number): Member[] {
+  const rows = getDb()
+    .prepare(
+      `SELECT members.*, 0 AS unread_count
+       FROM members
+       INNER JOIN member_groups ON member_groups.member_id = members.id
+       WHERE member_groups.group_id = ?
+       ORDER BY members.name COLLATE NOCASE ASC`
+    )
+    .all(groupId) as DbMember[];
+  const groupMap = memberGroupIdMap();
+  return rows.map((row) => mapMember(row, groupMap.get(row.id) ?? []));
+}
+
+export function findMemberByPhone(phone: string) {
+  const normalized = normalizePhone(phone);
+  const row = getDb().prepare("SELECT * FROM members WHERE phone = ?").get(normalized) as
+    | DbMember
+    | undefined;
+  return row ? mapMember(row) : null;
 }
 
 export function updateMessageStatusByWhatsAppId(
