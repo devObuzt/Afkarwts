@@ -90,12 +90,19 @@ export async function sendWhatsAppText(member: Member, body: string) {
   return messageId;
 }
 
-export async function sendWhatsAppTemplate(member: Member) {
+export type TemplateSendOptions = {
+  name?: string;
+  language?: string;
+  bodyParams?: string[];
+};
+
+export async function sendWhatsAppTemplate(member: Member, options: TemplateSendOptions = {}) {
   const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
   const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
   const apiVersion = process.env.WHATSAPP_API_VERSION || "v23.0";
-  const templateName = process.env.WHATSAPP_TEMPLATE_NAME;
-  const templateLanguage = process.env.WHATSAPP_TEMPLATE_LANGUAGE || "en_US";
+  const templateName = options.name || process.env.WHATSAPP_TEMPLATE_NAME;
+  const templateLanguage = options.language || process.env.WHATSAPP_TEMPLATE_LANGUAGE || "en_US";
+  const bodyParams = options.bodyParams ?? [];
 
   if (!accessToken || !phoneNumberId) {
     throw new Error("WhatsApp environment variables are missing.");
@@ -103,6 +110,22 @@ export async function sendWhatsAppTemplate(member: Member) {
 
   if (!templateName) {
     throw new Error("WHATSAPP_TEMPLATE_NAME is missing.");
+  }
+
+  const template: Record<string, unknown> = {
+    name: templateName,
+    language: {
+      code: templateLanguage
+    }
+  };
+
+  if (bodyParams.length) {
+    template.components = [
+      {
+        type: "body",
+        parameters: bodyParams.map((text) => ({ type: "text", text }))
+      }
+    ];
   }
 
   const response = await fetch(`https://graph.facebook.com/${apiVersion}/${phoneNumberId}/messages`, {
@@ -116,12 +139,7 @@ export async function sendWhatsAppTemplate(member: Member) {
       recipient_type: "individual",
       to: phoneForWhatsApp(member.phone),
       type: "template",
-      template: {
-        name: templateName,
-        language: {
-          code: templateLanguage
-        }
-      }
+      template
     })
   });
 
@@ -141,6 +159,95 @@ export async function sendWhatsAppTemplate(member: Member) {
     templateName,
     templateLanguage
   };
+}
+
+export type WhatsAppTemplate = {
+  name: string;
+  language: string;
+  category: string;
+  bodyText: string;
+  headerText: string | null;
+  paramCount: number;
+  hasMediaHeader: boolean;
+};
+
+type TemplateComponent = {
+  type?: string;
+  format?: string;
+  text?: string;
+};
+
+type TemplateListResponse = {
+  data?: Array<{
+    name?: string;
+    status?: string;
+    language?: string;
+    category?: string;
+    components?: TemplateComponent[];
+  }>;
+  paging?: { next?: string };
+  error?: { message?: string };
+};
+
+function countBodyParams(text: string) {
+  let max = 0;
+  for (const match of text.matchAll(/\{\{(\d+)\}\}/g)) {
+    max = Math.max(max, Number(match[1]));
+  }
+  return max;
+}
+
+export async function listWhatsAppTemplates(): Promise<WhatsAppTemplate[]> {
+  const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
+  const apiVersion = process.env.WHATSAPP_API_VERSION || "v23.0";
+  const wabaId = process.env.WHATSAPP_WABA_ID;
+
+  if (!accessToken) {
+    throw new Error("WHATSAPP_ACCESS_TOKEN is missing.");
+  }
+
+  if (!wabaId) {
+    throw new Error("WHATSAPP_WABA_ID is missing. Add it to the environment to list templates.");
+  }
+
+  const response = await fetch(
+    `https://graph.facebook.com/${apiVersion}/${wabaId}/message_templates?fields=name,status,language,category,components&limit=200`,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`
+      }
+    }
+  );
+
+  const payload = (await response.json()) as TemplateListResponse;
+
+  if (!response.ok) {
+    throw new Error(payload.error?.message || `Template list failed with ${response.status}`);
+  }
+
+  const templates: WhatsAppTemplate[] = [];
+
+  for (const item of payload.data ?? []) {
+    if (item.status !== "APPROVED" || !item.name || !item.language) {
+      continue;
+    }
+
+    const body = item.components?.find((component) => component.type === "BODY");
+    const header = item.components?.find((component) => component.type === "HEADER");
+    const bodyText = body?.text ?? "";
+
+    templates.push({
+      name: item.name,
+      language: item.language,
+      category: item.category ?? "",
+      bodyText,
+      headerText: header?.format === "TEXT" ? header.text ?? null : null,
+      paramCount: countBodyParams(bodyText),
+      hasMediaHeader: Boolean(header && header.format && header.format !== "TEXT")
+    });
+  }
+
+  return templates;
 }
 
 export function mediaKindFromMime(mimeType: string, byteLength = 0): OutboundMediaKind {

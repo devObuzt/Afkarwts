@@ -69,7 +69,33 @@ type BulkResult = {
 
 type ImportRow = { name: string; phone: string; notes: string };
 
-type ModalKind = "addMember" | "import" | "groups" | "bulk" | null;
+type Template = {
+  name: string;
+  language: string;
+  category: string;
+  bodyText: string;
+  headerText: string | null;
+  paramCount: number;
+  hasMediaHeader: boolean;
+};
+
+type TemplateSelection = {
+  name: string;
+  language: string;
+  bodyParams: string[];
+  preview: string;
+};
+
+type ModalKind = "addMember" | "import" | "groups" | "bulk" | "template" | null;
+
+function renderTemplatePreview(template: Template, params: string[]) {
+  let text = template.bodyText;
+  for (let index = 1; index <= template.paramCount; index += 1) {
+    const value = params[index - 1]?.trim();
+    text = text.split(`{{${index}}}`).join(value || `{{${index}}}`);
+  }
+  return (template.headerText ? `${template.headerText}\n` : "") + text;
+}
 
 const avatarPalette = ["#0f5c44", "#7c5c2e", "#2e5a7c", "#6b4d7c", "#7c3e3e", "#3e6b52", "#8a6a2f", "#42636f"];
 
@@ -342,13 +368,20 @@ export default function Home() {
     setIsSending(false);
   }
 
-  async function sendTemplate() {
+  async function sendTemplate(selection: TemplateSelection | null) {
     if (!selectedMemberId) return;
     setIsSendingTemplate(true);
+    setModal(null);
     const response = await fetch("/api/messages/send-template", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ memberId: selectedMemberId })
+      body: JSON.stringify({
+        memberId: selectedMemberId,
+        templateName: selection?.name,
+        templateLanguage: selection?.language,
+        bodyParams: selection?.bodyParams ?? [],
+        bodyPreview: selection?.preview
+      })
     });
     const payload = await response.json();
     if (!response.ok) {
@@ -635,8 +668,8 @@ export default function Home() {
             <button
               className="iconButton templateButton"
               disabled={!selectedMember || isSendingTemplate}
-              onClick={() => void sendTemplate()}
-              title="Send opening template"
+              onClick={() => setModal("template")}
+              title="Send a template"
               type="button"
             >
               <Icon path={icons.zap} />
@@ -701,6 +734,13 @@ export default function Home() {
           onDone={async () => {
             await loadMembers();
           }}
+        />
+      ) : null}
+      {modal === "template" && selectedMember ? (
+        <TemplatePickerModal
+          memberName={selectedMember.name}
+          onClose={() => setModal(null)}
+          onSend={(selection) => void sendTemplate(selection)}
         />
       ) : null}
     </main>
@@ -1049,6 +1089,167 @@ function GroupsModal({ groups, onChanged, onClose }: { groups: Group[]; onChange
   );
 }
 
+/* ---------- template selector ---------- */
+
+function TemplateSelector({
+  onChange
+}: {
+  onChange: (selection: TemplateSelection | null, state: { loading: boolean; error: string }) => void;
+}) {
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [selectedName, setSelectedName] = useState("");
+  const [params, setParams] = useState<string[]>([]);
+
+  const selected = templates.find((template) => template.name === selectedName) ?? null;
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await fetch("/api/templates");
+        const payload = await response.json();
+        if (cancelled) return;
+        if (!response.ok) {
+          setError(payload.error ?? "Could not load templates.");
+        } else {
+          setTemplates(payload.templates);
+          if (payload.templates.length === 1) {
+            setSelectedName(payload.templates[0].name);
+          }
+        }
+      } catch {
+        if (!cancelled) setError("Could not load templates.");
+      }
+      if (!cancelled) setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!selected) {
+      onChange(null, { loading, error });
+      return;
+    }
+    const filled = selected.paramCount === 0 || params.slice(0, selected.paramCount).every((param) => param?.trim());
+    onChange(
+      filled
+        ? {
+            name: selected.name,
+            language: selected.language,
+            bodyParams: params.slice(0, selected.paramCount).map((param) => param.trim()),
+            preview: renderTemplatePreview(selected, params)
+          }
+        : null,
+      { loading, error }
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedName, params, templates.length, loading, error]);
+
+  if (loading) {
+    return <p className="hint">Loading templates from WhatsApp…</p>;
+  }
+
+  if (error) {
+    return <div className="notice">{error}</div>;
+  }
+
+  if (!templates.length) {
+    return <p className="hint">No approved templates found on this WhatsApp account yet.</p>;
+  }
+
+  return (
+    <div className="templateList">
+      {templates.map((template) => (
+        <div key={`${template.name}-${template.language}`}>
+          <button
+            className={selectedName === template.name ? "templateOption active" : "templateOption"}
+            onClick={() => {
+              setSelectedName(template.name);
+              setParams([]);
+            }}
+            type="button"
+          >
+            <span className="templateName">
+              {template.name}
+              <em>{template.language} · {template.category.toLowerCase()}</em>
+            </span>
+            <span className="templateBody" dir="auto">
+              {template.headerText ? <strong>{template.headerText}<br /></strong> : null}
+              {template.bodyText.length > 220 ? `${template.bodyText.slice(0, 220)}…` : template.bodyText}
+            </span>
+            {template.hasMediaHeader ? <span className="templateWarn">Has a media header — may need attachment in Meta.</span> : null}
+          </button>
+          {selectedName === template.name && template.paramCount > 0 ? (
+            <div className="templateParams">
+              {Array.from({ length: template.paramCount }, (_, index) => (
+                <label key={index}>
+                  {"Value for {{"}{index + 1}{"}}"}
+                  <input
+                    dir="auto"
+                    onChange={(event) => {
+                      const next = [...params];
+                      next[index] = event.target.value;
+                      setParams(next);
+                    }}
+                    value={params[index] ?? ""}
+                  />
+                </label>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function TemplatePickerModal({
+  memberName,
+  onClose,
+  onSend
+}: {
+  memberName: string;
+  onClose: () => void;
+  onSend: (selection: TemplateSelection | null) => void;
+}) {
+  const [selection, setSelection] = useState<TemplateSelection | null>(null);
+  const [state, setState] = useState({ loading: true, error: "" });
+
+  return (
+    <Modal onClose={onClose} title={`Send template to ${memberName}`} wide>
+      <div className="modalBody">
+        <TemplateSelector
+          onChange={(nextSelection, nextState) => {
+            setSelection(nextSelection);
+            setState(nextState);
+          }}
+        />
+        {selection ? (
+          <div className="templatePreview" dir="auto">
+            {selection.preview}
+          </div>
+        ) : null}
+        <div className="modalActions">
+          <button className="secondary" onClick={onClose} type="button">Cancel</button>
+          {state.error ? (
+            <button onClick={() => onSend(null)} type="button">
+              Send default opening template
+            </button>
+          ) : (
+            <button disabled={!selection || state.loading} onClick={() => selection && onSend(selection)} type="button">
+              Send template
+            </button>
+          )}
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 /* ---------- bulk send ---------- */
 
 function BulkModal({ groups, onClose, onDone }: { groups: Group[]; onClose: () => void; onDone: () => Promise<void> }) {
@@ -1058,6 +1259,8 @@ function BulkModal({ groups, onClose, onDone }: { groups: Group[]; onClose: () =
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [results, setResults] = useState<{ sent: number; failed: number; results: BulkResult[] } | null>(null);
+  const [templateSelection, setTemplateSelection] = useState<TemplateSelection | null>(null);
+  const [templateState, setTemplateState] = useState({ loading: true, error: "" });
 
   const selectedGroup = groups.find((group) => group.id === groupId) ?? null;
 
@@ -1069,7 +1272,15 @@ function BulkModal({ groups, onClose, onDone }: { groups: Group[]; onClose: () =
       const response = await fetch("/api/messages/bulk", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ groupId, mode, text })
+        body: JSON.stringify({
+          groupId,
+          mode,
+          text,
+          templateName: templateSelection?.name,
+          templateLanguage: templateSelection?.language,
+          bodyParams: templateSelection?.bodyParams ?? [],
+          bodyPreview: templateSelection?.preview
+        })
       });
       const payload = await response.json();
       if (!response.ok) {
@@ -1134,19 +1345,33 @@ function BulkModal({ groups, onClose, onDone }: { groups: Group[]; onClose: () =
                   value={text}
                 />
                 <p className="hint warning">
-                  Free text only reaches members who wrote to you in the last 24 hours. For everyone else, use the template.
+                  Free text only reaches members who wrote to you in the last 24 hours. For everyone else, use a template.
                 </p>
               </>
             ) : (
-              <p className="hint">
-                Sends the approved opening template — works for every member, any time.
-              </p>
+              <>
+                <p className="hint">
+                  Approved templates reach every member, any time. Pick one:
+                </p>
+                <TemplateSelector
+                  onChange={(nextSelection, nextState) => {
+                    setTemplateSelection(nextSelection);
+                    setTemplateState(nextState);
+                  }}
+                />
+              </>
             )}
             {error ? <div className="notice">{error}</div> : null}
             <div className="modalActions">
               <button className="secondary" onClick={onClose} type="button">Cancel</button>
               <button
-                disabled={busy || !groupId || (mode === "text" && !text.trim()) || (selectedGroup?.memberCount ?? 0) === 0}
+                disabled={
+                  busy ||
+                  !groupId ||
+                  (mode === "text" && !text.trim()) ||
+                  (mode === "template" && !templateSelection && (templateState.loading || !templateState.error)) ||
+                  (selectedGroup?.memberCount ?? 0) === 0
+                }
                 onClick={() => void submit()}
                 type="button"
               >

@@ -20,10 +20,18 @@ export async function POST(request: Request) {
       memberIds?: number[];
       mode?: "template" | "text";
       text?: string;
+      templateName?: string;
+      templateLanguage?: string;
+      bodyParams?: string[];
+      bodyPreview?: string;
     };
 
     const mode = body.mode === "text" ? "text" : "template";
     const text = body.text?.trim() ?? "";
+    const bodyParams = (body.bodyParams ?? []).map((param) => String(param));
+    const templateStoredBody =
+      body.bodyPreview?.trim() ||
+      (body.templateName ? `Template: ${body.templateName}` : "Template message");
 
     if (mode === "text" && !text) {
       return NextResponse.json({ error: "Message text is required." }, { status: 400 });
@@ -60,13 +68,17 @@ export async function POST(request: Request) {
       const pending = createMessage({
         memberId: member.id,
         direction: "outgoing",
-        body: mode === "template" ? "Template message" : text,
+        body: mode === "template" ? templateStoredBody : text,
         status: "pending"
       });
 
       try {
         if (mode === "template") {
-          const sent = await sendWhatsAppTemplate(member);
+          const sent = await sendWhatsAppTemplate(member, {
+            name: body.templateName,
+            language: body.templateLanguage,
+            bodyParams
+          });
           updateMessageStatus(pending.id, { status: "accepted", whatsappMessageId: sent.messageId });
         } else {
           const whatsappMessageId = await sendWhatsAppText(member, text);

@@ -6,7 +6,13 @@ export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as { memberId?: number };
+    const body = (await request.json()) as {
+      memberId?: number;
+      templateName?: string;
+      templateLanguage?: string;
+      bodyParams?: string[];
+      bodyPreview?: string;
+    };
     const memberId = Number(body.memberId);
 
     if (!Number.isInteger(memberId)) {
@@ -18,25 +24,29 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Member not found." }, { status: 404 });
     }
 
+    const bodyParams = (body.bodyParams ?? []).map((param) => String(param));
+    const storedBody =
+      body.bodyPreview?.trim() ||
+      (body.templateName ? `Template: ${body.templateName}` : "Template message");
+
     const pending = createMessage({
       memberId,
       direction: "outgoing",
-      body: "Template message",
+      body: storedBody,
       status: "pending"
     });
 
     try {
-      const result = await sendWhatsAppTemplate(member);
+      const result = await sendWhatsAppTemplate(member, {
+        name: body.templateName,
+        language: body.templateLanguage,
+        bodyParams
+      });
       const message = updateMessageStatus(pending.id, {
         status: "accepted",
         whatsappMessageId: result.messageId
       });
-      return NextResponse.json({
-        message: {
-          ...message,
-          body: `Template: ${result.templateName} (${result.templateLanguage})`
-        }
-      });
+      return NextResponse.json({ message });
     } catch (error) {
       const message = updateMessageStatus(pending.id, {
         status: "failed",
