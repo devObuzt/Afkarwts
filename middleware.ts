@@ -3,6 +3,8 @@ import { AUTH_COOKIE, isValidSessionToken } from "@/app/lib/auth";
 
 const publicPrefixes = [
   "/login",
+  "/privacy",
+  "/terms",
   "/api/auth/login",
   "/api/webhook/whatsapp",
   "/_next",

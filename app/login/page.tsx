@@ -63,6 +63,11 @@ export default function LoginPage() {
         <button disabled={isSubmitting || !username || !password} type="submit">
           {isSubmitting ? "Signing in..." : "Sign in"}
         </button>
+        <div className="loginFooter">
+          <a href="/privacy">Privacy Policy</a>
+          <span>·</span>
+          <a href="/terms">Terms of Service</a>
+        </div>
       </form>
     </main>
   );
