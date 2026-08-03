@@ -24,7 +24,7 @@ export type Message = {
   id: number;
   memberId: number;
   direction: "incoming" | "outgoing";
-  messageType: "text" | "image" | "video" | "document";
+  messageType: "text" | "image" | "video" | "document" | "audio";
   body: string;
   whatsappMessageId: string | null;
   status: "received" | "pending" | "accepted" | "sent" | "delivered" | "read" | "failed";
@@ -82,7 +82,7 @@ function getDb() {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         member_id INTEGER NOT NULL,
         direction TEXT NOT NULL CHECK (direction IN ('incoming', 'outgoing')),
-        message_type TEXT NOT NULL DEFAULT 'text' CHECK (message_type IN ('text', 'image', 'video', 'document')),
+        message_type TEXT NOT NULL DEFAULT 'text' CHECK (message_type IN ('text', 'image', 'video', 'document', 'audio')),
         body TEXT NOT NULL,
         whatsapp_message_id TEXT,
         status TEXT NOT NULL CHECK (status IN ('received', 'pending', 'accepted', 'sent', 'delivered', 'read', 'failed')),
@@ -101,6 +101,7 @@ function getDb() {
     migrateMediaColumns(db);
     migrateMemberReadColumn(db);
     migrateGroupTables(db);
+    migrateAudioMessageType(db);
     globalForDb.__afkarDb = db;
   }
 
@@ -203,6 +204,46 @@ function migrateMemberReadColumn(db: DatabaseSync) {
   if (!hasColumn(db, "members", "last_read_message_id")) {
     db.exec("ALTER TABLE members ADD COLUMN last_read_message_id INTEGER");
   }
+}
+
+function migrateAudioMessageType(db: DatabaseSync) {
+  const row = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'messages'").get() as
+    | { sql: string }
+    | undefined;
+
+  // Only tables created with a message_type CHECK that predates 'audio' need a rebuild.
+  if (!row?.sql || !row.sql.includes("'document'") || row.sql.includes("'audio'")) {
+    return;
+  }
+
+  db.exec(`
+    ALTER TABLE messages RENAME TO messages_audio_old;
+
+    CREATE TABLE messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      member_id INTEGER NOT NULL,
+      direction TEXT NOT NULL CHECK (direction IN ('incoming', 'outgoing')),
+      message_type TEXT NOT NULL DEFAULT 'text' CHECK (message_type IN ('text', 'image', 'video', 'document', 'audio')),
+      body TEXT NOT NULL,
+      whatsapp_message_id TEXT,
+      status TEXT NOT NULL CHECK (status IN ('received', 'pending', 'accepted', 'sent', 'delivered', 'read', 'failed')),
+      error TEXT,
+      media_url TEXT,
+      media_mime_type TEXT,
+      media_filename TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE
+    );
+
+    INSERT INTO messages (id, member_id, direction, message_type, body, whatsapp_message_id, status, error, media_url, media_mime_type, media_filename, created_at)
+    SELECT id, member_id, direction, message_type, body, whatsapp_message_id, status, error, media_url, media_mime_type, media_filename, created_at
+    FROM messages_audio_old;
+
+    DROP TABLE messages_audio_old;
+
+    CREATE INDEX IF NOT EXISTS idx_messages_member_created
+    ON messages(member_id, created_at);
+  `);
 }
 
 function migrateGroupTables(db: DatabaseSync) {

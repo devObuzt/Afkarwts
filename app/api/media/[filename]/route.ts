@@ -11,7 +11,13 @@ const mimeByExtension: Record<string, string> = {
   mp4: "video/mp4",
   "3gp": "video/3gpp",
   mov: "video/quicktime",
-  pdf: "application/pdf"
+  pdf: "application/pdf",
+  mp3: "audio/mpeg",
+  m4a: "audio/mp4",
+  aac: "audio/aac",
+  amr: "audio/amr",
+  ogg: "audio/ogg",
+  opus: "audio/ogg"
 };
 
 export async function GET(_request: Request, context: { params: Promise<{ filename: string }> }) {

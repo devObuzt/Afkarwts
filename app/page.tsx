@@ -6,6 +6,8 @@ const maxMediaBytes = 64 * 1024 * 1024;
 const maxMediaLabel = "64 MB";
 const whatsappImageBytes = 5 * 1024 * 1024;
 const whatsappVideoBytes = 16 * 1024 * 1024;
+const whatsappAudioBytes = 16 * 1024 * 1024;
+const whatsappAudioMimeTypes = new Set(["audio/aac", "audio/mp4", "audio/mpeg", "audio/amr", "audio/ogg"]);
 const whatsappDocumentMimeTypes = new Set([
   "application/pdf",
   "text/plain",
@@ -48,7 +50,7 @@ type Message = {
   id: number;
   memberId: number;
   direction: "incoming" | "outgoing";
-  messageType: "text" | "image" | "video" | "document";
+  messageType: "text" | "image" | "video" | "document" | "audio";
   body: string;
   whatsappMessageId: string | null;
   status: "received" | "pending" | "accepted" | "sent" | "delivered" | "read" | "failed";
@@ -132,6 +134,15 @@ function validateSelectedFile(file: File) {
   if (file.type === "image/jpeg" || file.type === "image/png" || file.type === "image/webp") {
     if (file.size > whatsappImageBytes) {
       return `This image is ${formatFileSize(file.size)}. WhatsApp supports images up to 5 MB.`;
+    }
+    return "";
+  }
+  if (file.type.startsWith("audio/")) {
+    if (!whatsappAudioMimeTypes.has(file.type)) {
+      return "This audio format is not supported by WhatsApp. Use MP3, M4A/AAC, OGG, or AMR.";
+    }
+    if (file.size > whatsappAudioBytes) {
+      return `This audio file is ${formatFileSize(file.size)}. WhatsApp supports audio up to 16 MB.`;
     }
     return "";
   }
@@ -221,7 +232,8 @@ const icons = {
   trash: "M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6",
   check: "M20 6 9 17l-5-5",
   clock: "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Zm0-16v6l4 2",
-  alert: "M12 8v4m0 4h.01M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Z"
+  alert: "M12 8v4m0 4h.01M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Z",
+  mic: "M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3ZM19 10v2a7 7 0 0 1-14 0v-2M12 19v3M8 22h8"
 };
 
 function StatusTicks({ status }: { status: Message["status"] }) {
@@ -449,6 +461,16 @@ export default function Home() {
         </>
       );
     }
+    if (message.messageType === "audio" && message.mediaUrl) {
+      return (
+        <>
+          <span className="audioLabel">
+            <Icon path={icons.mic} size={13} /> {message.body || "Voice message"}
+          </span>
+          <audio className="audioPlayer" controls preload="metadata" src={message.mediaUrl} />
+        </>
+      );
+    }
     if (message.messageType === "document" && message.mediaUrl) {
       return (
         <>
@@ -628,6 +650,9 @@ export default function Home() {
             <div className="selectedFile">
               <span>
                 {mediaFile.name} · {formatFileSize(mediaFile.size)}
+                {!mediaError && mediaFile.type.startsWith("audio/") ? (
+                  <small className="softNote">Audio is delivered without a caption on WhatsApp.</small>
+                ) : null}
                 {mediaError ? <small>{mediaError}</small> : null}
               </span>
               <button className="iconButton" onClick={() => { setMediaFile(null); setMediaError(""); }} type="button">

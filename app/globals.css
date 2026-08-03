@@ -532,6 +532,29 @@ label {
   max-width: 100%;
 }
 
+.audioLabel {
+  align-items: center;
+  color: var(--muted);
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 600;
+  gap: 6px;
+  margin: 2px 0 2px;
+}
+
+.audioPlayer {
+  display: block;
+  height: 40px;
+  margin: 2px 0 4px;
+  max-width: 100%;
+  width: 280px;
+}
+
+.selectedFile .softNote {
+  color: var(--muted);
+  display: block;
+}
+
 .documentLink {
   align-items: center;
   background: rgba(15, 92, 68, 0.07);

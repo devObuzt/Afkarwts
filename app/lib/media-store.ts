@@ -11,7 +11,12 @@ const extensionByMime: Record<string, string> = {
   "video/mp4": "mp4",
   "video/3gpp": "3gp",
   "video/quicktime": "mov",
-  "application/pdf": "pdf"
+  "application/pdf": "pdf",
+  "audio/mpeg": "mp3",
+  "audio/mp4": "m4a",
+  "audio/aac": "aac",
+  "audio/amr": "amr",
+  "audio/ogg": "ogg"
 };
 
 export function getDataDir() {
@@ -31,7 +36,8 @@ export function safeMediaFilename(filename: string) {
 }
 
 export function extensionForMime(mimeType: string, fallbackName?: string) {
-  const fromMime = extensionByMime[mimeType];
+  const cleanMime = mimeType.split(";")[0].trim().toLowerCase();
+  const fromMime = extensionByMime[cleanMime];
   if (fromMime) {
     return fromMime;
   }

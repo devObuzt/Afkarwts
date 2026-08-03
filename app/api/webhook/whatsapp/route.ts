@@ -11,6 +11,7 @@ type IncomingMedia = {
   caption?: string;
   filename?: string;
   sha256?: string;
+  voice?: boolean;
 };
 
 type WhatsAppWebhookPayload = {
@@ -25,11 +26,12 @@ type WhatsAppWebhookPayload = {
           from?: string;
           id?: string;
           timestamp?: string;
-          type?: "text" | "image" | "video" | "document" | string;
+          type?: "text" | "image" | "video" | "document" | "audio" | string;
           text?: { body?: string };
           image?: { id?: string; mime_type?: string; caption?: string; sha256?: string };
           video?: { id?: string; mime_type?: string; caption?: string; sha256?: string };
           document?: { id?: string; mime_type?: string; caption?: string; filename?: string; sha256?: string };
+          audio?: { id?: string; mime_type?: string; sha256?: string; voice?: boolean };
         }>;
         statuses?: Array<{
           id?: string;
@@ -89,7 +91,12 @@ export async function POST(request: Request) {
           continue;
         }
 
-        if (incoming.type === "image" || incoming.type === "video" || incoming.type === "document") {
+        if (
+          incoming.type === "image" ||
+          incoming.type === "video" ||
+          incoming.type === "document" ||
+          incoming.type === "audio"
+        ) {
           const media = incoming[incoming.type] as IncomingMedia | undefined;
           if (!media?.id) {
             continue;
@@ -118,12 +125,13 @@ export async function POST(request: Request) {
             });
             const mediaUrl = writeMediaFile(storedFilename, bytes);
             const filename = incoming.type === "document" ? media.filename ?? storedFilename : storedFilename;
+            const audioLabel = media.voice ? "Voice message" : "Audio message";
 
             createMessage({
               memberId: member.id,
               direction: "incoming",
               messageType: incoming.type,
-              body: media.caption || filename,
+              body: incoming.type === "audio" ? audioLabel : media.caption || filename,
               whatsappMessageId: incoming.id ?? null,
               status: "received",
               mediaUrl,

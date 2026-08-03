@@ -23,9 +23,12 @@ type WhatsAppMediaInfo = {
   id: string;
 };
 
-export type OutboundMediaKind = "image" | "video" | "document";
+export type OutboundMediaKind = "image" | "video" | "document" | "audio";
 export const WHATSAPP_IMAGE_BYTES = 5 * 1024 * 1024;
 export const WHATSAPP_VIDEO_BYTES = 16 * 1024 * 1024;
+export const WHATSAPP_AUDIO_BYTES = 16 * 1024 * 1024;
+
+const audioMimeTypes = new Set(["audio/aac", "audio/mp4", "audio/mpeg", "audio/amr", "audio/ogg"]);
 
 const documentMimeTypes = new Set([
   "application/pdf",
@@ -259,6 +262,10 @@ export function mediaKindFromMime(mimeType: string, byteLength = 0): OutboundMed
     return "video";
   }
 
+  if (audioMimeTypes.has(mimeType) && byteLength <= WHATSAPP_AUDIO_BYTES) {
+    return "audio";
+  }
+
   return "document";
 }
 
@@ -278,6 +285,18 @@ export function validateOutboundMediaForWhatsApp(input: { mimeType: string; byte
   if (input.mimeType === "image/jpeg" || input.mimeType === "image/png" || input.mimeType === "image/webp") {
     if (input.byteLength > WHATSAPP_IMAGE_BYTES) {
       return `This image is ${formatBytes(input.byteLength)}. WhatsApp Cloud API supports images up to 5 MB.`;
+    }
+
+    return null;
+  }
+
+  if (input.mimeType.startsWith("audio/")) {
+    if (!audioMimeTypes.has(input.mimeType)) {
+      return "This audio format is not supported by WhatsApp. Use MP3, M4A/AAC, OGG, or AMR.";
+    }
+
+    if (input.byteLength > WHATSAPP_AUDIO_BYTES) {
+      return `This audio file is ${formatBytes(input.byteLength)}. WhatsApp Cloud API supports audio up to 16 MB.`;
     }
 
     return null;
@@ -343,8 +362,9 @@ export async function sendWhatsAppMedia(input: {
     throw new Error("WhatsApp environment variables are missing.");
   }
 
+  // WhatsApp does not support captions on audio messages.
   const mediaPayload: Record<string, string> = { id: input.mediaId };
-  if (input.caption && input.kind !== "document") {
+  if (input.caption && (input.kind === "image" || input.kind === "video")) {
     mediaPayload.caption = input.caption;
   }
   if (input.kind === "document") {
