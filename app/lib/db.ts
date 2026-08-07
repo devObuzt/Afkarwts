@@ -398,20 +398,22 @@ export function normalizeImportPhone(raw: string) {
 }
 
 export function listMembers() {
+  // Ordered by latest activity in the conversation (any direction), newest first.
   const rows = getDb()
     .prepare(
       `SELECT
         members.*,
-        COUNT(messages.id) AS unread_count
+        (
+          SELECT COUNT(*) FROM messages
+          WHERE messages.member_id = members.id
+            AND messages.direction = 'incoming'
+            AND messages.id > COALESCE(members.last_read_message_id, 0)
+        ) AS unread_count,
+        (
+          SELECT MAX(id) FROM messages WHERE messages.member_id = members.id
+        ) AS last_message_id
       FROM members
-      LEFT JOIN messages
-        ON messages.member_id = members.id
-        AND messages.direction = 'incoming'
-        AND messages.id > COALESCE(members.last_read_message_id, 0)
-      GROUP BY members.id
-      ORDER BY
-        MAX(CASE WHEN messages.id IS NOT NULL THEN messages.id ELSE 0 END) DESC,
-        members.created_at DESC`
+      ORDER BY COALESCE(last_message_id, 0) DESC, members.created_at DESC`
     )
     .all() as DbMember[];
   const groupMap = memberGroupIdMap();
