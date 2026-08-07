@@ -938,6 +938,26 @@ label {
   color: var(--green-900);
 }
 
+.bulkOptions {
+  display: grid;
+  gap: 10px;
+}
+
+.checkboxRow {
+  align-items: center;
+  color: #414b44;
+  display: flex;
+  font-size: 13px;
+  font-weight: 600;
+  gap: 8px;
+}
+
+.checkboxRow input {
+  accent-color: var(--green-700);
+  height: 16px;
+  width: 16px;
+}
+
 .bulkResults {
   display: grid;
   gap: 4px;

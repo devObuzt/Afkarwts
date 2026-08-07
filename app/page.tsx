@@ -34,6 +34,9 @@ type Member = {
   name: string;
   phone: string;
   notes: string;
+  city: string;
+  joined: string;
+  service: string;
   unreadCount: number;
   groupIds: number[];
   createdAt: string;
@@ -69,7 +72,7 @@ type BulkResult = {
   error: string | null;
 };
 
-type ImportRow = { name: string; phone: string; notes: string };
+type ImportRow = { name: string; phone: string; notes: string; city?: string; joined?: string; service?: string };
 
 type Template = {
   name: string;
@@ -174,25 +177,74 @@ function timeLabel(value: string) {
 }
 
 function parseCsv(raw: string): ImportRow[] {
-  const rows: ImportRow[] = [];
   const lines = raw.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  if (!lines.length) {
+    return [];
+  }
 
-  for (const line of lines) {
+  const splitLine = (line: string) => {
     const delimiter = line.includes("\t") ? "\t" : line.includes(";") ? ";" : ",";
-    const cells = line.split(delimiter).map((cell) => cell.trim().replace(/^"|"$/g, ""));
-    rows.push({ name: cells[0] ?? "", phone: cells[1] ?? "", notes: cells[2] ?? "" });
-  }
+    return line.split(delimiter).map((cell) => cell.trim().replace(/^"|"$/g, ""));
+  };
 
-  if (rows.length && /name|phone|اسم|رقم/i.test(`${rows[0].name} ${rows[0].phone}`)) {
-    rows.shift();
-  }
+  const header = splitLine(lines[0]).map((cell) => cell.toLowerCase());
+  const isHeaderRow = header.some((cell) => /phone|name|اسم|رقم/.test(cell));
 
-  // Single-column files: the only cell is the phone number.
-  return rows.map((row) => {
-    if (!row.phone && /^[+\d][\d\s()-]{6,}$/.test(row.name)) {
-      return { name: "", phone: row.name, notes: row.notes };
+  let rows: ImportRow[] = [];
+
+  if (isHeaderRow && header.some((cell) => cell.includes("phone"))) {
+    // Header-mapped format, e.g. Phone Number, First Name, Last Name, City, CT, Service
+    const col = (matcher: (cell: string) => boolean) => header.findIndex(matcher);
+    const phoneIdx = col((cell) => cell.includes("phone") || cell.includes("رقم"));
+    const firstIdx = col((cell) => cell.includes("first") || cell === "name" || cell.includes("الاسم الاول"));
+    const lastIdx = col((cell) => cell.includes("last") || cell.includes("الاسم الاخير"));
+    const cityIdx = col((cell) => cell.includes("city") || cell.includes("مدينة"));
+    const joinedIdx = col((cell) => cell === "ct" || cell.includes("join") || cell.includes("تاريخ"));
+    const serviceIdx = col((cell) => cell.includes("service") || cell.includes("خدمة"));
+    const notesIdx = col((cell) => cell.includes("note") || cell.includes("ملاحظ"));
+
+    rows = lines.slice(1).map((line) => {
+      const cells = splitLine(line);
+      const first = firstIdx >= 0 ? cells[firstIdx] ?? "" : "";
+      const last = lastIdx >= 0 ? cells[lastIdx] ?? "" : "";
+      return {
+        name: [first, last].filter(Boolean).join(" "),
+        phone: phoneIdx >= 0 ? cells[phoneIdx] ?? "" : "",
+        notes: notesIdx >= 0 ? cells[notesIdx] ?? "" : "",
+        city: cityIdx >= 0 ? cells[cityIdx] ?? "" : "",
+        joined: joinedIdx >= 0 ? cells[joinedIdx] ?? "" : "",
+        service: serviceIdx >= 0 ? cells[serviceIdx] ?? "" : ""
+      };
+    });
+  } else {
+    // Simple positional format: Name, Phone, Notes (or phone-only lines)
+    rows = lines.map((line) => {
+      const cells = splitLine(line);
+      return { name: cells[0] ?? "", phone: cells[1] ?? "", notes: cells[2] ?? "" };
+    });
+    if (rows.length && /name|phone|اسم|رقم/i.test(`${rows[0].name} ${rows[0].phone}`)) {
+      rows.shift();
     }
-    return row;
+    rows = rows.map((row) => {
+      if (!row.phone && /^[+\d][\d\s()-]{6,}$/.test(row.name)) {
+        return { ...row, name: "", phone: row.name };
+      }
+      return row;
+    });
+  }
+
+  // De-duplicate inside the file by phone digits.
+  const seen = new Set<string>();
+  return rows.filter((row) => {
+    const key = row.phone.replace(/[^\d]/g, "").replace(/^0+/, "").replace(/^97[02]/, "");
+    if (!key) {
+      return Boolean(row.name);
+    }
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
   });
 }
 
@@ -590,7 +642,11 @@ export default function Home() {
             </span>
             <div className="headerMeta">
               <h2 dir="auto">{selectedMember.name}</h2>
-              <p>{selectedMember.phone}</p>
+              <p>
+                {[selectedMember.phone, selectedMember.city, selectedMember.service, selectedMember.joined]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
             </div>
             <div className="headerGroups">
               {groups.map((group) => {
@@ -881,6 +937,7 @@ function ImportModal({ groups, onClose, onDone }: { groups: Group[]; onClose: ()
   const [groupId, setGroupId] = useState<number | "">("");
   const [newGroupName, setNewGroupName] = useState("");
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState("");
   const [error, setError] = useState("");
   const [result, setResult] = useState<{ created: number; existing: number; failed: Array<{ row: ImportRow; error: string }> } | null>(null);
 
@@ -909,20 +966,31 @@ function ImportModal({ groups, onClose, onDone }: { groups: Group[]; onClose: ()
         targetGroupId = groupPayload.group.id;
       }
 
-      const response = await fetch("/api/members/import", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rows, groupId: targetGroupId })
-      });
-      const payload = await response.json();
-      if (!response.ok) {
-        throw new Error(payload.error ?? "Import failed.");
+      // Large files are imported in batches so thousands of rows work reliably.
+      const batchSize = 400;
+      const totals = { created: 0, existing: 0, failed: [] as Array<{ row: ImportRow; error: string }> };
+      for (let start = 0; start < rows.length; start += batchSize) {
+        const batch = rows.slice(start, start + batchSize);
+        setProgress(`Importing ${Math.min(start + batch.length, rows.length)} / ${rows.length}…`);
+        const response = await fetch("/api/members/import", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ rows: batch, groupId: targetGroupId })
+        });
+        const payload = await response.json();
+        if (!response.ok) {
+          throw new Error(payload.error ?? "Import failed.");
+        }
+        totals.created += payload.created;
+        totals.existing += payload.existing;
+        totals.failed.push(...payload.failed);
       }
-      setResult(payload);
+      setResult(totals);
       await onDone();
     } catch (importError) {
       setError(importError instanceof Error ? importError.message : "Import failed.");
     }
+    setProgress("");
     setBusy(false);
   }
 
@@ -1006,7 +1074,7 @@ function ImportModal({ groups, onClose, onDone }: { groups: Group[]; onClose: ()
             <div className="modalActions">
               <button className="secondary" onClick={onClose} type="button">Cancel</button>
               <button disabled={busy || !rows.length} onClick={() => void submit()} type="button">
-                {busy ? "Importing…" : `Import ${rows.length} members`}
+                {busy ? progress || "Importing…" : `Import ${rows.length} members`}
               </button>
             </div>
           </>
@@ -1283,9 +1351,17 @@ function BulkModal({ groups, onClose, onDone }: { groups: Group[]; onClose: () =
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [results, setResults] = useState<{ sent: number; failed: number; results: BulkResult[] } | null>(null);
+  const [results, setResults] = useState<{
+    sent: number;
+    failed: number;
+    skipped?: number;
+    remaining?: number;
+    results: BulkResult[];
+  } | null>(null);
   const [templateSelection, setTemplateSelection] = useState<TemplateSelection | null>(null);
   const [templateState, setTemplateState] = useState({ loading: true, error: "" });
+  const [skipAlreadySent, setSkipAlreadySent] = useState(true);
+  const [maxRecipients, setMaxRecipients] = useState(250);
 
   const selectedGroup = groups.find((group) => group.id === groupId) ?? null;
 
@@ -1304,7 +1380,9 @@ function BulkModal({ groups, onClose, onDone }: { groups: Group[]; onClose: () =
           templateName: templateSelection?.name,
           templateLanguage: templateSelection?.language,
           bodyParams: templateSelection?.bodyParams ?? [],
-          bodyPreview: templateSelection?.preview
+          bodyPreview: templateSelection?.preview,
+          skipAlreadySent,
+          maxRecipients
         })
       });
       const payload = await response.json();
@@ -1327,7 +1405,15 @@ function BulkModal({ groups, onClose, onDone }: { groups: Group[]; onClose: () =
             <div className="importSummary">
               <div><strong>{results.sent}</strong><span>sent</span></div>
               <div className={results.failed ? "bad" : ""}><strong>{results.failed}</strong><span>failed</span></div>
+              <div><strong>{results.skipped ?? 0}</strong><span>already got it</span></div>
+              <div><strong>{results.remaining ?? 0}</strong><span>left for next batch</span></div>
             </div>
+            {(results.remaining ?? 0) > 0 ? (
+              <p className="hint warning">
+                {results.remaining} members still have not received this message — run Bulk send again
+                (tomorrow if you hit the daily limit) with the same template and they will be picked up automatically.
+              </p>
+            ) : null}
             <div className="bulkResults">
               {results.results.map((result) => (
                 <div className={result.ok ? "bulkRow" : "bulkRow bad"} key={result.memberId}>
@@ -1386,6 +1472,26 @@ function BulkModal({ groups, onClose, onDone }: { groups: Group[]; onClose: () =
                 />
               </>
             )}
+            <div className="bulkOptions">
+              <label className="checkboxRow">
+                <input
+                  checked={skipAlreadySent}
+                  onChange={(event) => setSkipAlreadySent(event.target.checked)}
+                  type="checkbox"
+                />
+                <span>Skip members who already received this exact message</span>
+              </label>
+              <label>
+                Max recipients in this batch
+                <input
+                  max={1000}
+                  min={1}
+                  onChange={(event) => setMaxRecipients(Math.max(1, Math.min(1000, Number(event.target.value) || 250)))}
+                  type="number"
+                  value={maxRecipients}
+                />
+              </label>
+            </div>
             {error ? <div className="notice">{error}</div> : null}
             <div className="modalActions">
               <button className="secondary" onClick={onClose} type="button">Cancel</button>
@@ -1400,7 +1506,11 @@ function BulkModal({ groups, onClose, onDone }: { groups: Group[]; onClose: () =
                 onClick={() => void submit()}
                 type="button"
               >
-                {busy ? "Sending…" : selectedGroup ? `Send to ${selectedGroup.memberCount} members` : "Send"}
+                {busy
+                  ? "Sending…"
+                  : selectedGroup
+                    ? `Send to up to ${Math.min(maxRecipients, selectedGroup.memberCount)} of ${selectedGroup.memberCount}`
+                    : "Send"}
               </button>
             </div>
           </>

@@ -7,6 +7,9 @@ export type Member = {
   name: string;
   phone: string;
   notes: string;
+  city: string;
+  joined: string;
+  service: string;
   lastReadMessageId: number | null;
   unreadCount: number;
   groupIds: number[];
@@ -40,6 +43,9 @@ type DbMember = {
   name: string;
   phone: string;
   notes: string;
+  city?: string | null;
+  joined?: string | null;
+  service?: string | null;
   last_read_message_id?: number | null;
   unread_count?: number;
   created_at: string;
@@ -74,6 +80,9 @@ function getDb() {
         name TEXT NOT NULL,
         phone TEXT NOT NULL UNIQUE,
         notes TEXT NOT NULL DEFAULT '',
+        city TEXT NOT NULL DEFAULT '',
+        joined TEXT NOT NULL DEFAULT '',
+        service TEXT NOT NULL DEFAULT '',
         last_read_message_id INTEGER,
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
@@ -100,6 +109,7 @@ function getDb() {
     migrateMessageStatuses(db);
     migrateMediaColumns(db);
     migrateMemberReadColumn(db);
+    migrateMemberProfileColumns(db);
     migrateGroupTables(db);
     migrateAudioMessageType(db);
     globalForDb.__afkarDb = db;
@@ -149,6 +159,9 @@ function mapMember(row: DbMember, groupIds?: number[]): Member {
     name: row.name,
     phone: row.phone,
     notes: row.notes,
+    city: row.city ?? "",
+    joined: row.joined ?? "",
+    service: row.service ?? "",
     lastReadMessageId: row.last_read_message_id ?? null,
     unreadCount: row.unread_count ?? 0,
     groupIds: groupIds ?? memberGroupIds(row.id),
@@ -203,6 +216,14 @@ function migrateMediaColumns(db: DatabaseSync) {
 function migrateMemberReadColumn(db: DatabaseSync) {
   if (!hasColumn(db, "members", "last_read_message_id")) {
     db.exec("ALTER TABLE members ADD COLUMN last_read_message_id INTEGER");
+  }
+}
+
+function migrateMemberProfileColumns(db: DatabaseSync) {
+  for (const column of ["city", "joined", "service"] as const) {
+    if (!hasColumn(db, "members", column)) {
+      db.exec(`ALTER TABLE members ADD COLUMN ${column} TEXT NOT NULL DEFAULT ''`);
+    }
   }
 }
 
@@ -320,6 +341,30 @@ export function phoneForWhatsApp(phone: string) {
   return phone.replace(/[^\d]/g, "");
 }
 
+// Accepts local formats commonly found in exports: "0526993229", "526993229",
+// "972526993229", "+972 52-699-3229" — all normalize to +972...
+export function normalizeImportPhone(raw: string) {
+  const digits = raw.replace(/[^\d]/g, "");
+
+  if (!digits) {
+    return "";
+  }
+
+  if (digits.startsWith("972") || digits.startsWith("970")) {
+    return `+${digits}`;
+  }
+
+  if (digits.startsWith("0") && digits.length >= 9 && digits.length <= 10) {
+    return `+972${digits.slice(1)}`;
+  }
+
+  if (digits.startsWith("5") && digits.length === 9) {
+    return `+972${digits}`;
+  }
+
+  return normalizePhone(raw);
+}
+
 export function listMembers() {
   const rows = getDb()
     .prepare(
@@ -341,7 +386,14 @@ export function listMembers() {
   return rows.map((row) => mapMember(row, groupMap.get(row.id) ?? []));
 }
 
-export function createMember(input: { name: string; phone: string; notes?: string }) {
+export function createMember(input: {
+  name: string;
+  phone: string;
+  notes?: string;
+  city?: string;
+  joined?: string;
+  service?: string;
+}) {
   const name = input.name.trim();
   const phone = normalizePhone(input.phone);
   const notes = input.notes?.trim() ?? "";
@@ -355,10 +407,17 @@ export function createMember(input: { name: string; phone: string; notes?: strin
   }
 
   const result = getDb()
-    .prepare("INSERT INTO members (name, phone, notes) VALUES (?, ?, ?)")
-    .run(name, phone, notes);
+    .prepare("INSERT INTO members (name, phone, notes, city, joined, service) VALUES (?, ?, ?, ?, ?, ?)")
+    .run(name, phone, notes, input.city?.trim() ?? "", input.joined?.trim() ?? "", input.service?.trim() ?? "");
 
   return getMember(Number(result.lastInsertRowid));
+}
+
+export function listMemberIdsWithOutgoingBody(body: string) {
+  const rows = getDb()
+    .prepare("SELECT DISTINCT member_id FROM messages WHERE direction = 'outgoing' AND body = ?")
+    .all(body) as Array<{ member_id: number }>;
+  return new Set(rows.map((row) => row.member_id));
 }
 
 export function getMember(id: number) {

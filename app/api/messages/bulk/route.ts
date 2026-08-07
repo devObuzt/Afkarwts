@@ -1,5 +1,12 @@
 import { NextResponse } from "next/server";
-import { createMessage, getGroup, getMember, listGroupMembers, updateMessageStatus } from "@/app/lib/db";
+import {
+  createMessage,
+  getGroup,
+  getMember,
+  listGroupMembers,
+  listMemberIdsWithOutgoingBody,
+  updateMessageStatus
+} from "@/app/lib/db";
 import { sendWhatsAppTemplate, sendWhatsAppText } from "@/app/lib/whatsapp";
 
 export const runtime = "nodejs";
@@ -24,6 +31,8 @@ export async function POST(request: Request) {
       templateLanguage?: string;
       bodyParams?: string[];
       bodyPreview?: string;
+      skipAlreadySent?: boolean;
+      maxRecipients?: number;
     };
 
     const mode = body.mode === "text" ? "text" : "template";
@@ -51,14 +60,30 @@ export async function POST(request: Request) {
         .filter((member): member is NonNullable<typeof member> => Boolean(member));
     }
 
-    if (!members.length) {
-      return NextResponse.json({ error: "No recipients found." }, { status: 400 });
+    const totalInGroup = members.length;
+    const sendBody = mode === "template" ? templateStoredBody : text;
+
+    let skipped = 0;
+    if (body.skipAlreadySent !== false && sendBody) {
+      const alreadySent = listMemberIdsWithOutgoingBody(sendBody);
+      const before = members.length;
+      members = members.filter((member) => !alreadySent.has(member.id));
+      skipped = before - members.length;
     }
 
-    if (members.length > 250) {
+    const maxRecipients = Math.min(
+      Math.max(1, Number(body.maxRecipients) || 250),
+      1000
+    );
+    const remainingAfterBatch = Math.max(0, members.length - maxRecipients);
+    members = members.slice(0, maxRecipients);
+
+    if (!members.length) {
       return NextResponse.json(
-        { error: "Bulk send is limited to 250 recipients at a time (WhatsApp daily limit)." },
-        { status: 400 }
+        skipped > 0
+          ? { sent: 0, failed: 0, skipped, remaining: 0, results: [], done: true }
+          : { error: "No recipients found." },
+        { status: skipped > 0 ? 200 : 400 }
       );
     }
 
@@ -93,7 +118,14 @@ export async function POST(request: Request) {
     }
 
     const sent = results.filter((result) => result.ok).length;
-    return NextResponse.json({ sent, failed: results.length - sent, results });
+    return NextResponse.json({
+      sent,
+      failed: results.length - sent,
+      skipped,
+      remaining: remainingAfterBatch,
+      total: totalInGroup,
+      results
+    });
   } catch {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
