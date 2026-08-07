@@ -152,7 +152,8 @@ function validateSelectedFile(file: File) {
     return "";
   }
   if (file.type.startsWith("audio/")) {
-    if (!whatsappAudioMimeTypes.has(file.type)) {
+    const baseType = file.type.split(";")[0].trim();
+    if (!whatsappAudioMimeTypes.has(baseType)) {
       return "This audio format is not supported by WhatsApp. Use MP3, M4A/AAC, OGG, or AMR.";
     }
     if (file.size > whatsappAudioBytes) {
@@ -342,6 +343,24 @@ export default function Home() {
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordSeconds, setRecordSeconds] = useState(0);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const recordChunksRef = useRef<Blob[]>([]);
+  const recordTimerRef = useRef<number | null>(null);
+  const recordCancelledRef = useRef(false);
+
+  const mediaPreviewUrl = useMemo(
+    () => (mediaFile && mediaFile.type.startsWith("audio/") ? URL.createObjectURL(mediaFile) : null),
+    [mediaFile]
+  );
+
+  useEffect(() => {
+    return () => {
+      if (mediaPreviewUrl) URL.revokeObjectURL(mediaPreviewUrl);
+    };
+  }, [mediaPreviewUrl]);
+
   const selectedMember = useMemo(
     () => members.find((member) => member.id === selectedMemberId) ?? null,
     [members, selectedMemberId]
@@ -476,7 +495,7 @@ export default function Home() {
       memberId: String(selectedMemberId),
       caption: messageText,
       filename: mediaFile.name,
-      mimeType: mediaFile.type || "application/octet-stream"
+      mimeType: mediaFile.type.split(";")[0].trim() || "application/octet-stream"
     });
     const response = await fetch(`/api/messages/send-media?${params.toString()}`, {
       method: "POST",
@@ -498,6 +517,55 @@ export default function Home() {
   function selectMediaFile(file: File | null) {
     setMediaError(file ? validateSelectedFile(file) : "");
     setMediaFile(file);
+  }
+
+  function recordingFormat() {
+    if (typeof MediaRecorder === "undefined") return null;
+    if (MediaRecorder.isTypeSupported("audio/mp4")) {
+      return { recorderMime: "audio/mp4", fileMime: "audio/mp4", extension: "m4a" };
+    }
+    if (MediaRecorder.isTypeSupported("audio/ogg;codecs=opus")) {
+      return { recorderMime: "audio/ogg;codecs=opus", fileMime: "audio/ogg", extension: "ogg" };
+    }
+    return null;
+  }
+
+  async function startRecording() {
+    const format = recordingFormat();
+    if (!format) {
+      flash("Voice recording is not supported in this browser — attach an audio file instead.");
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream, { mimeType: format.recorderMime });
+      recordChunksRef.current = [];
+      recordCancelledRef.current = false;
+      recorder.ondataavailable = (event) => {
+        if (event.data.size) recordChunksRef.current.push(event.data);
+      };
+      recorder.onstop = () => {
+        stream.getTracks().forEach((track) => track.stop());
+        setIsRecording(false);
+        if (recordTimerRef.current) window.clearInterval(recordTimerRef.current);
+        if (recordCancelledRef.current) return;
+        const blob = new Blob(recordChunksRef.current, { type: format.fileMime });
+        const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+        selectMediaFile(new File([blob], `voice-${stamp}.${format.extension}`, { type: format.fileMime }));
+      };
+      recorderRef.current = recorder;
+      recorder.start();
+      setRecordSeconds(0);
+      setIsRecording(true);
+      recordTimerRef.current = window.setInterval(() => setRecordSeconds((seconds) => seconds + 1), 1000);
+    } catch {
+      flash("Microphone access was blocked — allow it in the browser and try again.");
+    }
+  }
+
+  function stopRecording(cancel: boolean) {
+    recordCancelledRef.current = cancel;
+    recorderRef.current?.stop();
   }
 
   async function toggleMemberGroup(member: Member, groupId: number) {
@@ -723,6 +791,9 @@ export default function Home() {
             <div className="selectedFile">
               <span>
                 {mediaFile.name} · {formatFileSize(mediaFile.size)}
+                {mediaPreviewUrl && !mediaError ? (
+                  <audio className="chipAudioPreview" controls preload="metadata" src={mediaPreviewUrl} />
+                ) : null}
                 {!mediaError && mediaFile.type.startsWith("audio/") ? (
                   <small className="softNote">Audio is delivered without a caption on WhatsApp.</small>
                 ) : null}
@@ -730,6 +801,21 @@ export default function Home() {
               </span>
               <button className="iconButton" onClick={() => { setMediaFile(null); setMediaError(""); }} type="button">
                 <Icon path={icons.x} size={14} />
+              </button>
+            </div>
+          ) : null}
+          {isRecording ? (
+            <div className="recordingBar">
+              <span className="recordDot" />
+              <span className="recordTime">
+                {Math.floor(recordSeconds / 60)}:{String(recordSeconds % 60).padStart(2, "0")}
+              </span>
+              <span className="recordHint">Recording voice message…</span>
+              <button className="iconButton danger" onClick={() => stopRecording(true)} title="Cancel" type="button">
+                <Icon path={icons.trash} size={16} />
+              </button>
+              <button className="sendButton" onClick={() => stopRecording(false)} title="Use recording" type="button">
+                <Icon path={icons.check} size={17} />
               </button>
             </div>
           ) : null}
@@ -772,6 +858,17 @@ export default function Home() {
             >
               <Icon path={icons.zap} />
             </button>
+            {!messageText.trim() && !mediaFile && !isRecording ? (
+              <button
+                className="iconButton micButton"
+                disabled={!selectedMember}
+                onClick={() => void startRecording()}
+                title="Record a voice message"
+                type="button"
+              >
+                <Icon path={icons.mic} />
+              </button>
+            ) : null}
             {mediaFile ? (
               <button
                 className="sendButton"
