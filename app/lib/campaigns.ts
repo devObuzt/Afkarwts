@@ -12,7 +12,7 @@ import {
   updateCampaignStatus,
   type Campaign
 } from "./db";
-import { sendWhatsAppTemplate, sendWhatsAppText } from "./whatsapp";
+import { getMessagingLimit, sendWhatsAppTemplate, sendWhatsAppText } from "./whatsapp";
 import { sendTelegramMessage } from "./telegram";
 
 const globalForRunner = globalThis as typeof globalThis & {
@@ -48,7 +48,10 @@ export async function runCampaignBatch(campaignId: number) {
   const members = listGroupMembers(campaign.groupId);
   const already = listMemberIdsWithOutgoingBody(storedBody);
   const targets = members.filter((member) => !already.has(member.id));
-  const batch = targets.slice(0, campaign.dailyLimit);
+  // Never exceed the current Meta allowance, even if the campaign was created
+  // when the tier was higher.
+  const limit = await getMessagingLimit();
+  const batch = targets.slice(0, Math.min(campaign.dailyLimit, limit.dailyLimit));
 
   markCampaignRun(campaign.id);
 

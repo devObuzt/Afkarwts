@@ -164,6 +164,74 @@ export async function sendWhatsAppTemplate(member: Member, options: TemplateSend
   };
 }
 
+const TIER_LIMITS: Record<string, number> = {
+  TIER_50: 50,
+  TIER_250: 250,
+  TIER_1K: 1000,
+  TIER_10K: 10000,
+  TIER_100K: 100000,
+  TIER_UNLIMITED: 1000000
+};
+
+export type MessagingLimit = {
+  dailyLimit: number;
+  suggested: number;
+  tier: string | null;
+  quality: string | null;
+  source: "meta" | "env";
+};
+
+let limitCache: { value: MessagingLimit; at: number } | null = null;
+
+// Business-initiated conversation limit per 24h. Meta only exposes the tier on
+// some accounts; when absent we fall back to WHATSAPP_DAILY_LIMIT (default 1000
+// — the starting tier for verified businesses). Suggested default is 70%.
+export async function getMessagingLimit(): Promise<MessagingLimit> {
+  if (limitCache && Date.now() - limitCache.at < 60 * 60 * 1000) {
+    return limitCache.value;
+  }
+
+  const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
+  const apiVersion = process.env.WHATSAPP_API_VERSION || "v23.0";
+  const wabaId = process.env.WHATSAPP_WABA_ID;
+  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+
+  let tier: string | null = null;
+  let quality: string | null = null;
+
+  if (accessToken && wabaId) {
+    try {
+      const response = await fetch(
+        `https://graph.facebook.com/${apiVersion}/${wabaId}/phone_numbers?fields=id,messaging_limit_tier,quality_rating`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      const payload = (await response.json()) as {
+        data?: Array<{ id?: string; messaging_limit_tier?: string; quality_rating?: string }>;
+      };
+      const entry =
+        payload.data?.find((item) => item.id === phoneNumberId) ?? payload.data?.[0];
+      tier = entry?.messaging_limit_tier ?? null;
+      quality = entry?.quality_rating ?? null;
+    } catch {
+      // keep fallback
+    }
+  }
+
+  const envLimit = Number(process.env.WHATSAPP_DAILY_LIMIT) || 1000;
+  const dailyLimit = tier && TIER_LIMITS[tier] ? TIER_LIMITS[tier] : envLimit;
+
+  const value: MessagingLimit = {
+    dailyLimit,
+    suggested: Math.max(1, Math.floor(dailyLimit * 0.7)),
+    tier,
+    quality,
+    source: tier && TIER_LIMITS[tier] ? "meta" : "env"
+  };
+
+  limitCache = { value, at: Date.now() };
+  return value;
+}
+
 export type WhatsAppTemplate = {
   name: string;
   language: string;

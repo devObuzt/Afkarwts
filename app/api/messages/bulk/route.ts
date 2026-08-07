@@ -7,7 +7,7 @@ import {
   listMemberIdsWithOutgoingBody,
   updateMessageStatus
 } from "@/app/lib/db";
-import { sendWhatsAppTemplate, sendWhatsAppText } from "@/app/lib/whatsapp";
+import { getMessagingLimit, sendWhatsAppTemplate, sendWhatsAppText } from "@/app/lib/whatsapp";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -71,9 +71,10 @@ export async function POST(request: Request) {
       skipped = before - members.length;
     }
 
+    const limit = await getMessagingLimit();
     const maxRecipients = Math.min(
-      Math.max(1, Number(body.maxRecipients) || 250),
-      1000
+      Math.max(1, Number(body.maxRecipients) || limit.suggested),
+      limit.dailyLimit
     );
     const remainingAfterBatch = Math.max(0, members.length - maxRecipients);
     members = members.slice(0, maxRecipients);

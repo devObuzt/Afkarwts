@@ -1477,10 +1477,33 @@ function BulkModal({ groups, onClose, onDone }: { groups: Group[]; onClose: () =
   const [templateState, setTemplateState] = useState({ loading: true, error: "" });
   const [skipAlreadySent, setSkipAlreadySent] = useState(true);
   const [maxRecipients, setMaxRecipients] = useState(250);
+  const [metaLimit, setMetaLimit] = useState<{ dailyLimit: number; suggested: number; quality: string | null } | null>(null);
   const [autoCampaign, setAutoCampaign] = useState(false);
   const [campaignStarted, setCampaignStarted] = useState<{ estimatedDays: number; total: number } | null>(null);
 
   const selectedGroup = groups.find((group) => group.id === groupId) ?? null;
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await fetch("/api/limits");
+        if (!response.ok) return;
+        const payload = await response.json();
+        if (!cancelled && payload.limit) {
+          setMetaLimit(payload.limit);
+          setMaxRecipients(payload.limit.suggested);
+        }
+      } catch {
+        // keep static default
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const capLimit = metaLimit?.dailyLimit ?? 1000;
 
   async function startCampaign() {
     if (!groupId) return;
@@ -1669,13 +1692,22 @@ function BulkModal({ groups, onClose, onDone }: { groups: Group[]; onClose: () =
               <label>
                 {autoCampaign ? "Daily batch size" : "Max recipients in this batch"}
                 <input
-                  max={1000}
+                  max={capLimit}
                   min={1}
-                  onChange={(event) => setMaxRecipients(Math.max(1, Math.min(1000, Number(event.target.value) || 250)))}
+                  onChange={(event) =>
+                    setMaxRecipients(Math.max(1, Math.min(capLimit, Number(event.target.value) || 1)))
+                  }
                   type="number"
                   value={maxRecipients}
                 />
               </label>
+              {metaLimit ? (
+                <p className="hint">
+                  WhatsApp allows <strong>{metaLimit.dailyLimit}</strong> business-initiated conversations per day
+                  {metaLimit.quality ? ` (quality: ${metaLimit.quality.toLowerCase()})` : ""} — suggested batch is 70% ={" "}
+                  <strong>{metaLimit.suggested}</strong>. You can lower it, but not exceed the limit.
+                </p>
+              ) : null}
               {autoCampaign && selectedGroup ? (
                 <p className="hint">
                   ≈ {Math.max(1, Math.ceil(selectedGroup.memberCount / Math.max(1, maxRecipients)))} days for{" "}

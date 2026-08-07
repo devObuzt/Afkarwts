@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createCampaign, getGroup, listCampaigns, listGroupMembers } from "@/app/lib/db";
 import { campaignProgress, runCampaignBatch } from "@/app/lib/campaigns";
+import { getMessagingLimit } from "@/app/lib/whatsapp";
 
 export const runtime = "nodejs";
 
@@ -44,7 +45,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "This group has no members." }, { status: 400 });
     }
 
-    const dailyLimit = Math.min(Math.max(1, Number(body.dailyLimit) || 250), 1000);
+    const limit = await getMessagingLimit();
+    const dailyLimit = Math.min(Math.max(1, Number(body.dailyLimit) || limit.suggested), limit.dailyLimit);
     const label = mode === "template" ? body.templateName || "template" : "free text";
 
     const campaign = createCampaign({
