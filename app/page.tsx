@@ -91,7 +91,18 @@ type TemplateSelection = {
   preview: string;
 };
 
-type ModalKind = "addMember" | "import" | "groups" | "bulk" | "template" | null;
+type CampaignInfo = {
+  id: number;
+  label: string;
+  groupName: string;
+  mode: "template" | "text";
+  dailyLimit: number;
+  status: "active" | "paused" | "done";
+  lastRunAt: string | null;
+  progress: { total: number; delivered: number; remaining: number; daysLeft: number };
+};
+
+type ModalKind = "addMember" | "import" | "groups" | "bulk" | "template" | "campaigns" | null;
 
 function renderTemplatePreview(template: Template, params: string[]) {
   let text = template.bodyText;
@@ -281,6 +292,9 @@ const icons = {
   x: "M18 6 6 18M6 6l12 12",
   back: "m15 18-6-6 6-6",
   tag: "M12 2H2v10l9.29 9.29a1 1 0 0 0 1.42 0l8.58-8.58a1 1 0 0 0 0-1.42L12 2ZM7 7h.01",
+  calendar: "M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z",
+  play: "m6 3 14 9-14 9V3Z",
+  pause: "M6 4h4v16H6zM14 4h4v16h-4z",
   trash: "M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6",
   check: "M20 6 9 17l-5-5",
   clock: "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Zm0-16v6l4 2",
@@ -603,6 +617,9 @@ export default function Home() {
           <button onClick={() => setModal("bulk")} type="button">
             <Icon path={icons.megaphone} size={15} /> Bulk send
           </button>
+          <button onClick={() => setModal("campaigns")} type="button">
+            <Icon path={icons.calendar} size={15} /> Campaigns
+          </button>
         </div>
 
         <section className="memberList" aria-label="Members">
@@ -817,6 +834,7 @@ export default function Home() {
           }}
         />
       ) : null}
+      {modal === "campaigns" ? <CampaignsModal onClose={() => setModal(null)} /> : null}
       {modal === "template" && selectedMember ? (
         <TemplatePickerModal
           memberName={selectedMember.name}
@@ -1182,6 +1200,103 @@ function GroupsModal({ groups, onChanged, onClose }: { groups: Group[]; onChange
   );
 }
 
+/* ---------- campaigns ---------- */
+
+function CampaignsModal({ onClose }: { onClose: () => void }) {
+  const [campaigns, setCampaigns] = useState<CampaignInfo[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  async function load() {
+    const response = await fetch("/api/campaigns");
+    if (response.ok) {
+      const payload = await response.json();
+      setCampaigns(payload.campaigns);
+    }
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    void load();
+    const interval = window.setInterval(() => void load(), 5000);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  async function action(campaignId: number, act: "pause" | "resume" | "run-now") {
+    await fetch(`/api/campaigns/${campaignId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: act })
+    });
+    await load();
+  }
+
+  const statusLabel: Record<CampaignInfo["status"], string> = {
+    active: "Active",
+    paused: "Paused",
+    done: "Completed"
+  };
+
+  return (
+    <Modal onClose={onClose} title="Campaigns" wide>
+      <div className="modalBody">
+        {loading ? <p className="hint">Loading…</p> : null}
+        {!loading && !campaigns.length ? (
+          <p className="hint">
+            No campaigns yet. Start one from <strong>Bulk send</strong> → &quot;Auto-campaign&quot; — batches go out
+            daily on their own and you get a Telegram report after each one.
+          </p>
+        ) : null}
+        {campaigns.map((campaign) => {
+          const percent = campaign.progress.total
+            ? Math.round((campaign.progress.delivered / campaign.progress.total) * 100)
+            : 0;
+          return (
+            <div className="campaignRow" key={campaign.id}>
+              <div className="campaignHead">
+                <strong dir="auto">{campaign.label}</strong>
+                <span className={`campaignStatus ${campaign.status}`}>{statusLabel[campaign.status]}</span>
+              </div>
+              <div className="progressTrack">
+                <div className="progressFill" style={{ width: `${percent}%` }} />
+              </div>
+              <div className="campaignMeta">
+                <span>
+                  {campaign.progress.delivered} / {campaign.progress.total} delivered
+                  {campaign.progress.remaining > 0
+                    ? ` · ${campaign.progress.remaining} left (~${campaign.progress.daysLeft}d)`
+                    : ""}
+                </span>
+                <span>
+                  {campaign.dailyLimit}/day
+                  {campaign.lastRunAt ? ` · last batch ${new Date(campaign.lastRunAt).toLocaleString()}` : ""}
+                </span>
+              </div>
+              {campaign.status !== "done" ? (
+                <div className="campaignActions">
+                  {campaign.status === "active" ? (
+                    <>
+                      <button className="secondary" onClick={() => void action(campaign.id, "pause")} type="button">
+                        <Icon path={icons.pause} size={13} /> Pause
+                      </button>
+                      <button className="secondary" onClick={() => void action(campaign.id, "run-now")} type="button">
+                        <Icon path={icons.play} size={13} /> Send next batch now
+                      </button>
+                    </>
+                  ) : (
+                    <button className="secondary" onClick={() => void action(campaign.id, "resume")} type="button">
+                      <Icon path={icons.play} size={13} /> Resume
+                    </button>
+                  )}
+                </div>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+    </Modal>
+  );
+}
+
 /* ---------- template selector ---------- */
 
 function TemplateSelector({
@@ -1362,11 +1477,51 @@ function BulkModal({ groups, onClose, onDone }: { groups: Group[]; onClose: () =
   const [templateState, setTemplateState] = useState({ loading: true, error: "" });
   const [skipAlreadySent, setSkipAlreadySent] = useState(true);
   const [maxRecipients, setMaxRecipients] = useState(250);
+  const [autoCampaign, setAutoCampaign] = useState(false);
+  const [campaignStarted, setCampaignStarted] = useState<{ estimatedDays: number; total: number } | null>(null);
 
   const selectedGroup = groups.find((group) => group.id === groupId) ?? null;
 
+  async function startCampaign() {
+    if (!groupId) return;
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch("/api/campaigns", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          groupId,
+          mode,
+          text,
+          templateName: templateSelection?.name,
+          templateLanguage: templateSelection?.language,
+          bodyParams: templateSelection?.bodyParams ?? [],
+          bodyPreview: templateSelection?.preview,
+          dailyLimit: maxRecipients
+        })
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Could not start campaign.");
+      }
+      setCampaignStarted({
+        estimatedDays: Math.max(1, (payload.estimatedDays ?? 0) + 1),
+        total: payload.campaign?.progress?.remaining ?? 0
+      });
+      await onDone();
+    } catch (campaignError) {
+      setError(campaignError instanceof Error ? campaignError.message : "Could not start campaign.");
+    }
+    setBusy(false);
+  }
+
   async function submit() {
     if (!groupId) return;
+    if (autoCampaign) {
+      await startCampaign();
+      return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -1395,6 +1550,24 @@ function BulkModal({ groups, onClose, onDone }: { groups: Group[]; onClose: () =
       setError(bulkError instanceof Error ? bulkError.message : "Bulk send failed.");
     }
     setBusy(false);
+  }
+
+  if (campaignStarted) {
+    return (
+      <Modal onClose={onClose} title="Campaign started 🚀" wide>
+        <div className="modalBody">
+          <p className="hint">
+            The first batch is being sent right now. The remaining <strong>{campaignStarted.total}</strong> members
+            will receive it automatically, one batch of {maxRecipients} per day — done in about{" "}
+            <strong>{campaignStarted.estimatedDays} {campaignStarted.estimatedDays === 1 ? "day" : "days"}</strong>.
+            Track it any time under <strong>Campaigns</strong>.
+          </p>
+          <div className="modalActions">
+            <button onClick={onClose} type="button">Done</button>
+          </div>
+        </div>
+      </Modal>
+    );
   }
 
   return (
@@ -1473,16 +1646,28 @@ function BulkModal({ groups, onClose, onDone }: { groups: Group[]; onClose: () =
               </>
             )}
             <div className="bulkOptions">
-              <label className="checkboxRow">
+              <label className="checkboxRow highlight">
                 <input
-                  checked={skipAlreadySent}
-                  onChange={(event) => setSkipAlreadySent(event.target.checked)}
+                  checked={autoCampaign}
+                  onChange={(event) => setAutoCampaign(event.target.checked)}
                   type="checkbox"
                 />
-                <span>Skip members who already received this exact message</span>
+                <span>
+                  Auto-campaign: send a batch every day automatically until everyone got it
+                </span>
               </label>
+              {!autoCampaign ? (
+                <label className="checkboxRow">
+                  <input
+                    checked={skipAlreadySent}
+                    onChange={(event) => setSkipAlreadySent(event.target.checked)}
+                    type="checkbox"
+                  />
+                  <span>Skip members who already received this exact message</span>
+                </label>
+              ) : null}
               <label>
-                Max recipients in this batch
+                {autoCampaign ? "Daily batch size" : "Max recipients in this batch"}
                 <input
                   max={1000}
                   min={1}
@@ -1491,6 +1676,12 @@ function BulkModal({ groups, onClose, onDone }: { groups: Group[]; onClose: () =
                   value={maxRecipients}
                 />
               </label>
+              {autoCampaign && selectedGroup ? (
+                <p className="hint">
+                  ≈ {Math.max(1, Math.ceil(selectedGroup.memberCount / Math.max(1, maxRecipients)))} days for{" "}
+                  {selectedGroup.memberCount} members. A Telegram report arrives after every daily batch.
+                </p>
+              ) : null}
             </div>
             {error ? <div className="notice">{error}</div> : null}
             <div className="modalActions">
@@ -1507,10 +1698,12 @@ function BulkModal({ groups, onClose, onDone }: { groups: Group[]; onClose: () =
                 type="button"
               >
                 {busy
-                  ? "Sending…"
-                  : selectedGroup
-                    ? `Send to up to ${Math.min(maxRecipients, selectedGroup.memberCount)} of ${selectedGroup.memberCount}`
-                    : "Send"}
+                  ? autoCampaign ? "Starting campaign…" : "Sending…"
+                  : autoCampaign
+                    ? "Start auto-campaign"
+                    : selectedGroup
+                      ? `Send to up to ${Math.min(maxRecipients, selectedGroup.memberCount)} of ${selectedGroup.memberCount}`
+                      : "Send"}
               </button>
             </div>
           </>

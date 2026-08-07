@@ -228,7 +228,7 @@ label {
 .sidebarActions {
   display: grid;
   gap: 8px;
-  grid-template-columns: 1fr 1fr 1.3fr;
+  grid-template-columns: 1fr 1fr;
 }
 
 .sidebarActions button {
@@ -956,6 +956,95 @@ label {
   accent-color: var(--green-700);
   height: 16px;
   width: 16px;
+}
+
+.checkboxRow.highlight {
+  background: var(--green-tint);
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.campaignRow {
+  border: 1px solid var(--line-soft);
+  border-radius: 12px;
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+}
+
+.campaignHead {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.campaignStatus {
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 3px 10px;
+}
+
+.campaignStatus.active {
+  background: var(--green-soft);
+  color: var(--green-900);
+}
+
+.campaignStatus.paused {
+  background: #fdf6e3;
+  color: #7a6224;
+}
+
+.campaignStatus.done {
+  background: var(--bg);
+  color: var(--muted);
+}
+
+.progressTrack {
+  background: var(--line-soft);
+  border-radius: 999px;
+  height: 8px;
+  overflow: hidden;
+}
+
+.progressFill {
+  background: var(--green-500);
+  border-radius: 999px;
+  height: 100%;
+  transition: width 0.4s ease;
+}
+
+.campaignMeta {
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 12px;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.campaignActions {
+  display: flex;
+  gap: 8px;
+}
+
+.campaignActions button {
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: #414b44;
+  display: inline-flex;
+  font-size: 12.5px;
+  font-weight: 600;
+  gap: 6px;
+  padding: 7px 12px;
+}
+
+.campaignActions button:hover {
+  border-color: var(--green-500);
+  color: var(--green-700);
 }
 
 .bulkResults {

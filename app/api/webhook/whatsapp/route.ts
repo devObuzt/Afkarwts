@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createMessage, findOrCreateMemberByPhone, updateMessageStatusByWhatsAppId, type Message } from "@/app/lib/db";
 import { createStoredMediaFilename, formatBytes, MAX_MEDIA_BYTES, MAX_MEDIA_LABEL, writeMediaFile } from "@/app/lib/media-store";
 import { downloadWhatsAppMedia, getWhatsAppMediaInfo } from "@/app/lib/whatsapp";
+import "@/app/lib/scheduler";
 
 export const runtime = "nodejs";
 

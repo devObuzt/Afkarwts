@@ -111,6 +111,7 @@ function getDb() {
     migrateMemberReadColumn(db);
     migrateMemberProfileColumns(db);
     migrateGroupTables(db);
+    migrateCampaignTables(db);
     migrateAudioMessageType(db);
     globalForDb.__afkarDb = db;
   }
@@ -267,6 +268,37 @@ function migrateAudioMessageType(db: DatabaseSync) {
   `);
 }
 
+function migrateCampaignTables(db: DatabaseSync) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS campaigns (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      group_id INTEGER NOT NULL,
+      label TEXT NOT NULL DEFAULT '',
+      mode TEXT NOT NULL CHECK (mode IN ('template', 'text')),
+      text TEXT NOT NULL DEFAULT '',
+      template_name TEXT,
+      template_language TEXT,
+      body_params TEXT NOT NULL DEFAULT '[]',
+      body_preview TEXT NOT NULL DEFAULT '',
+      daily_limit INTEGER NOT NULL DEFAULT 250,
+      status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'paused', 'done')),
+      last_run_at TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS campaign_runs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      campaign_id INTEGER NOT NULL,
+      sent INTEGER NOT NULL DEFAULT 0,
+      failed INTEGER NOT NULL DEFAULT 0,
+      remaining INTEGER NOT NULL DEFAULT 0,
+      ran_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE CASCADE
+    );
+  `);
+}
+
 function migrateGroupTables(db: DatabaseSync) {
   db.exec(`
     CREATE TABLE IF NOT EXISTS groups (
@@ -411,6 +443,166 @@ export function createMember(input: {
     .run(name, phone, notes, input.city?.trim() ?? "", input.joined?.trim() ?? "", input.service?.trim() ?? "");
 
   return getMember(Number(result.lastInsertRowid));
+}
+
+export type Campaign = {
+  id: number;
+  groupId: number;
+  label: string;
+  mode: "template" | "text";
+  text: string;
+  templateName: string | null;
+  templateLanguage: string | null;
+  bodyParams: string[];
+  bodyPreview: string;
+  dailyLimit: number;
+  status: "active" | "paused" | "done";
+  lastRunAt: string | null;
+  createdAt: string;
+};
+
+export type CampaignRun = {
+  id: number;
+  campaignId: number;
+  sent: number;
+  failed: number;
+  remaining: number;
+  ranAt: string;
+};
+
+type DbCampaign = {
+  id: number;
+  group_id: number;
+  label: string;
+  mode: "template" | "text";
+  text: string;
+  template_name: string | null;
+  template_language: string | null;
+  body_params: string;
+  body_preview: string;
+  daily_limit: number;
+  status: Campaign["status"];
+  last_run_at: string | null;
+  created_at: string;
+};
+
+function mapCampaign(row: DbCampaign): Campaign {
+  let bodyParams: string[] = [];
+  try {
+    bodyParams = JSON.parse(row.body_params);
+  } catch {
+    bodyParams = [];
+  }
+  return {
+    id: row.id,
+    groupId: row.group_id,
+    label: row.label,
+    mode: row.mode,
+    text: row.text,
+    templateName: row.template_name,
+    templateLanguage: row.template_language,
+    bodyParams,
+    bodyPreview: row.body_preview,
+    dailyLimit: row.daily_limit,
+    status: row.status,
+    lastRunAt: row.last_run_at,
+    createdAt: row.created_at
+  };
+}
+
+export function createCampaign(input: {
+  groupId: number;
+  label: string;
+  mode: "template" | "text";
+  text?: string;
+  templateName?: string | null;
+  templateLanguage?: string | null;
+  bodyParams?: string[];
+  bodyPreview?: string;
+  dailyLimit: number;
+}) {
+  const result = getDb()
+    .prepare(
+      `INSERT INTO campaigns (group_id, label, mode, text, template_name, template_language, body_params, body_preview, daily_limit)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+    .run(
+      input.groupId,
+      input.label,
+      input.mode,
+      input.text ?? "",
+      input.templateName ?? null,
+      input.templateLanguage ?? null,
+      JSON.stringify(input.bodyParams ?? []),
+      input.bodyPreview ?? "",
+      input.dailyLimit
+    );
+  return getCampaign(Number(result.lastInsertRowid));
+}
+
+export function getCampaign(id: number) {
+  const row = getDb().prepare("SELECT * FROM campaigns WHERE id = ?").get(id) as DbCampaign | undefined;
+  return row ? mapCampaign(row) : null;
+}
+
+export function listCampaigns(): Campaign[] {
+  const rows = getDb().prepare("SELECT * FROM campaigns ORDER BY id DESC").all() as DbCampaign[];
+  return rows.map(mapCampaign);
+}
+
+export function listRunnableCampaigns(minHoursSinceLastRun: number): Campaign[] {
+  const cutoff = new Date(Date.now() - minHoursSinceLastRun * 60 * 60 * 1000).toISOString();
+  const rows = getDb()
+    .prepare(
+      `SELECT * FROM campaigns
+       WHERE status = 'active'
+         AND (last_run_at IS NULL OR last_run_at <= ?)`
+    )
+    .all(cutoff) as DbCampaign[];
+  return rows.map(mapCampaign);
+}
+
+export function updateCampaignStatus(id: number, status: Campaign["status"]) {
+  getDb().prepare("UPDATE campaigns SET status = ? WHERE id = ?").run(status, id);
+  return getCampaign(id);
+}
+
+export function markCampaignRun(id: number) {
+  getDb().prepare("UPDATE campaigns SET last_run_at = ? WHERE id = ?").run(new Date().toISOString(), id);
+}
+
+export function recordCampaignRun(input: { campaignId: number; sent: number; failed: number; remaining: number }) {
+  getDb()
+    .prepare("INSERT INTO campaign_runs (campaign_id, sent, failed, remaining) VALUES (?, ?, ?, ?)")
+    .run(input.campaignId, input.sent, input.failed, input.remaining);
+}
+
+export function listCampaignRuns(campaignId: number): CampaignRun[] {
+  const rows = getDb()
+    .prepare("SELECT * FROM campaign_runs WHERE campaign_id = ? ORDER BY id DESC LIMIT 30")
+    .all(campaignId) as Array<{
+    id: number;
+    campaign_id: number;
+    sent: number;
+    failed: number;
+    remaining: number;
+    ran_at: string;
+  }>;
+  return rows.map((row) => ({
+    id: row.id,
+    campaignId: row.campaign_id,
+    sent: row.sent,
+    failed: row.failed,
+    remaining: row.remaining,
+    ranAt: row.ran_at
+  }));
+}
+
+export function campaignSentTotals(campaignId: number) {
+  const row = getDb()
+    .prepare("SELECT COALESCE(SUM(sent),0) AS sent, COALESCE(SUM(failed),0) AS failed FROM campaign_runs WHERE campaign_id = ?")
+    .get(campaignId) as { sent: number; failed: number };
+  return row;
 }
 
 export function listMemberIdsWithOutgoingBody(body: string) {

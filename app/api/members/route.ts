@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import "@/app/lib/scheduler";
 import { createMember, listMembers } from "@/app/lib/db";
 
 export const runtime = "nodejs";
