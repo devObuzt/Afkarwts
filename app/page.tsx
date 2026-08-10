@@ -1,6 +1,47 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { Mp3Encoder } from "@breezystack/lamejs";
+
+// WhatsApp rejects browser MediaRecorder containers (fragmented MP4/WebM),
+// so recordings are transcoded to plain MP3 before sending.
+async function transcodeToMp3(blob: Blob): Promise<File> {
+  const arrayBuffer = await blob.arrayBuffer();
+  const AudioContextCtor =
+    window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+  const audioContext = new AudioContextCtor();
+  const decoded = await audioContext.decodeAudioData(arrayBuffer);
+  void audioContext.close();
+
+  const first = decoded.getChannelData(0);
+  let mono = first;
+  if (decoded.numberOfChannels > 1) {
+    const second = decoded.getChannelData(1);
+    mono = new Float32Array(first.length);
+    for (let i = 0; i < first.length; i += 1) {
+      mono[i] = (first[i] + second[i]) / 2;
+    }
+  }
+
+  const samples = new Int16Array(mono.length);
+  for (let i = 0; i < mono.length; i += 1) {
+    const s = Math.max(-1, Math.min(1, mono[i]));
+    samples[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+  }
+
+  const encoder = new Mp3Encoder(1, decoded.sampleRate, 96);
+  const chunks: Uint8Array[] = [];
+  const blockSize = 1152;
+  for (let i = 0; i < samples.length; i += blockSize) {
+    const encoded = encoder.encodeBuffer(samples.subarray(i, i + blockSize));
+    if (encoded.length) chunks.push(new Uint8Array(encoded));
+  }
+  const tail = encoder.flush();
+  if (tail.length) chunks.push(new Uint8Array(tail));
+
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+  return new File(chunks as BlobPart[], `voice-${stamp}.mp3`, { type: "audio/mpeg" });
+}
 
 const maxMediaBytes = 64 * 1024 * 1024;
 const maxMediaLabel = "64 MB";
@@ -416,7 +457,20 @@ export default function Home() {
   useEffect(() => {
     void loadMembers();
     void loadGroups();
+    // Members refresh independently of the open chat so unread badges appear
+    // even when nothing is selected.
+    const interval = window.setInterval(() => void loadMembers(), 4000);
+    return () => window.clearInterval(interval);
   }, []);
+
+  const totalUnread = useMemo(
+    () => members.reduce((sum, member) => sum + member.unreadCount, 0),
+    [members]
+  );
+
+  useEffect(() => {
+    document.title = totalUnread > 0 ? `(${totalUnread}) Afkar WhatsApp` : "Afkar WhatsApp";
+  }, [totalUnread]);
 
   useEffect(() => {
     if (!selectedMemberId) {
@@ -426,7 +480,6 @@ export default function Home() {
     void loadMessages(selectedMemberId);
     const interval = window.setInterval(() => {
       void loadMessages(selectedMemberId);
-      void loadMembers();
     }, 3000);
     return () => window.clearInterval(interval);
   }, [selectedMemberId]);
@@ -530,13 +583,13 @@ export default function Home() {
 
   function recordingFormat() {
     if (typeof MediaRecorder === "undefined") return null;
-    if (MediaRecorder.isTypeSupported("audio/mp4")) {
-      return { recorderMime: "audio/mp4", fileMime: "audio/mp4", extension: "m4a" };
+    // Any container works — the recording is transcoded to MP3 before sending.
+    for (const mime of ["audio/webm;codecs=opus", "audio/mp4", "audio/ogg;codecs=opus"]) {
+      if (MediaRecorder.isTypeSupported(mime)) {
+        return { recorderMime: mime };
+      }
     }
-    if (MediaRecorder.isTypeSupported("audio/ogg;codecs=opus")) {
-      return { recorderMime: "audio/ogg;codecs=opus", fileMime: "audio/ogg", extension: "ogg" };
-    }
-    return null;
+    return { recorderMime: undefined };
   }
 
   async function startRecording() {
@@ -547,7 +600,10 @@ export default function Home() {
     }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream, { mimeType: format.recorderMime });
+      const recorder = new MediaRecorder(
+        stream,
+        format.recorderMime ? { mimeType: format.recorderMime } : undefined
+      );
       recordChunksRef.current = [];
       recordCancelledRef.current = false;
       recorder.ondataavailable = (event) => {
@@ -558,19 +614,23 @@ export default function Home() {
         setIsRecording(false);
         if (recordTimerRef.current) window.clearInterval(recordTimerRef.current);
         if (recordCancelledRef.current) return;
-        const blob = new Blob(recordChunksRef.current, { type: format.fileMime });
-        const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-        const file = new File([blob], `voice-${stamp}.${format.extension}`, { type: format.fileMime });
-        const validationError = validateSelectedFile(file);
-        if (validationError) {
-          flash(validationError);
-          return;
-        }
-        // Voice notes send immediately on ✓ — like WhatsApp.
+        const blob = new Blob(recordChunksRef.current, { type: recorder.mimeType || "audio/webm" });
         const memberId = recordMemberIdRef.current;
-        if (memberId) {
-          void sendMediaFile(file, memberId, "");
-        }
+        if (!memberId) return;
+        // Voice notes transcode to MP3 and send immediately on ✓ — like WhatsApp.
+        void (async () => {
+          try {
+            const file = await transcodeToMp3(blob);
+            const validationError = validateSelectedFile(file);
+            if (validationError) {
+              flash(validationError);
+              return;
+            }
+            await sendMediaFile(file, memberId, "");
+          } catch {
+            flash("Could not process the recording — try again.");
+          }
+        })();
       };
       recorderRef.current = recorder;
       recordMemberIdRef.current = selectedMemberId;

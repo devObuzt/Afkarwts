@@ -12,6 +12,7 @@
     "node": ">=23.0.0"
   },
   "dependencies": {
+    "@breezystack/lamejs": "^1.2.7",
     "next": "^15.3.4",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"

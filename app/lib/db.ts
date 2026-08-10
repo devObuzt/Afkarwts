@@ -444,7 +444,10 @@ export function listMembers() {
           SELECT MAX(id) FROM messages WHERE messages.member_id = members.id
         ) AS last_message_id
       FROM members
-      ORDER BY COALESCE(last_message_id, 0) DESC, members.created_at DESC`
+      ORDER BY
+        (unread_count > 0) DESC,
+        COALESCE(last_message_id, 0) DESC,
+        members.created_at DESC`
     )
     .all() as DbMember[];
   const groupMap = memberGroupIdMap();
