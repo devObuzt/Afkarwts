@@ -375,6 +375,7 @@ export function phoneForWhatsApp(phone: string) {
 
 // Accepts local formats commonly found in exports: "0526993229", "526993229",
 // "972526993229", "+972 52-699-3229" — all normalize to +972...
+// Local 056/059 prefixes belong to Palestinian carriers (Ooredoo/Jawwal) → +970.
 export function normalizeImportPhone(raw: string) {
   const digits = raw.replace(/[^\d]/g, "");
 
@@ -386,15 +387,45 @@ export function normalizeImportPhone(raw: string) {
     return `+${digits}`;
   }
 
-  if (digits.startsWith("0") && digits.length >= 9 && digits.length <= 10) {
-    return `+972${digits.slice(1)}`;
-  }
+  const local =
+    digits.startsWith("0") && digits.length >= 9 && digits.length <= 10
+      ? digits.slice(1)
+      : digits.startsWith("5") && digits.length === 9
+        ? digits
+        : null;
 
-  if (digits.startsWith("5") && digits.length === 9) {
-    return `+972${digits}`;
+  if (local) {
+    if ((local.startsWith("56") || local.startsWith("59")) && local.length === 9) {
+      return `+970${local}`;
+    }
+    return `+972${local}`;
   }
 
   return normalizePhone(raw);
+}
+
+export function fixPalestinianCountryCodes() {
+  const rows = getDb()
+    .prepare("SELECT id, phone FROM members WHERE phone LIKE '+97256%' OR phone LIKE '+97259%'")
+    .all() as Array<{ id: number; phone: string }>;
+
+  let fixed = 0;
+  let conflicts = 0;
+
+  for (const row of rows) {
+    const corrected = `+970${row.phone.slice(4)}`;
+    const existing = getDb().prepare("SELECT id FROM members WHERE phone = ?").get(corrected) as
+      | { id: number }
+      | undefined;
+    if (existing) {
+      conflicts += 1;
+      continue;
+    }
+    getDb().prepare("UPDATE members SET phone = ? WHERE id = ?").run(corrected, row.id);
+    fixed += 1;
+  }
+
+  return { found: rows.length, fixed, conflicts };
 }
 
 export function listMembers() {

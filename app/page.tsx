@@ -349,6 +349,7 @@ export default function Home() {
   const recordChunksRef = useRef<Blob[]>([]);
   const recordTimerRef = useRef<number | null>(null);
   const recordCancelledRef = useRef(false);
+  const recordMemberIdRef = useRef<number | null>(null);
 
   const mediaPreviewUrl = useMemo(
     () => (mediaFile && mediaFile.type.startsWith("audio/") ? URL.createObjectURL(mediaFile) : null),
@@ -488,30 +489,38 @@ export default function Home() {
     setIsSendingTemplate(false);
   }
 
-  async function sendMedia() {
-    if (!selectedMemberId || !mediaFile || mediaError) return;
+  async function sendMediaFile(file: File, memberId: number, caption: string) {
     setIsSending(true);
+    const mimeType = file.type.split(";")[0].trim() || "application/octet-stream";
     const params = new URLSearchParams({
-      memberId: String(selectedMemberId),
-      caption: messageText,
-      filename: mediaFile.name,
-      mimeType: mediaFile.type.split(";")[0].trim() || "application/octet-stream"
+      memberId: String(memberId),
+      caption,
+      filename: file.name,
+      mimeType
     });
     const response = await fetch(`/api/messages/send-media?${params.toString()}`, {
       method: "POST",
-      headers: { "Content-Type": mediaFile.type || "application/octet-stream" },
-      body: mediaFile
+      headers: { "Content-Type": mimeType },
+      body: file
     });
     const payload = await response.json();
-    if (!response.ok) {
+    const ok = response.ok;
+    if (!ok) {
       flash(payload.error ?? "Media send failed.");
-    } else {
+    }
+    await loadMessages(memberId);
+    setIsSending(false);
+    return ok;
+  }
+
+  async function sendMedia() {
+    if (!selectedMemberId || !mediaFile || mediaError) return;
+    const ok = await sendMediaFile(mediaFile, selectedMemberId, messageText);
+    if (ok) {
       setMessageText("");
       setMediaFile(null);
       setMediaError("");
     }
-    await loadMessages(selectedMemberId);
-    setIsSending(false);
   }
 
   function selectMediaFile(file: File | null) {
@@ -551,9 +560,20 @@ export default function Home() {
         if (recordCancelledRef.current) return;
         const blob = new Blob(recordChunksRef.current, { type: format.fileMime });
         const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-        selectMediaFile(new File([blob], `voice-${stamp}.${format.extension}`, { type: format.fileMime }));
+        const file = new File([blob], `voice-${stamp}.${format.extension}`, { type: format.fileMime });
+        const validationError = validateSelectedFile(file);
+        if (validationError) {
+          flash(validationError);
+          return;
+        }
+        // Voice notes send immediately on ✓ — like WhatsApp.
+        const memberId = recordMemberIdRef.current;
+        if (memberId) {
+          void sendMediaFile(file, memberId, "");
+        }
       };
       recorderRef.current = recorder;
+      recordMemberIdRef.current = selectedMemberId;
       recorder.start();
       setRecordSeconds(0);
       setIsRecording(true);
