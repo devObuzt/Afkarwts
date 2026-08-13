@@ -112,6 +112,7 @@ function getDb() {
     migrateMemberProfileColumns(db);
     migrateGroupTables(db);
     migrateCampaignTables(db);
+    migrateDeviceTables(db);
     migrateAudioMessageType(db);
     globalForDb.__afkarDb = db;
   }
@@ -265,6 +266,20 @@ function migrateAudioMessageType(db: DatabaseSync) {
 
     CREATE INDEX IF NOT EXISTS idx_messages_member_created
     ON messages(member_id, created_at);
+  `);
+}
+
+function migrateDeviceTables(db: DatabaseSync) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS devices (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      token TEXT NOT NULL UNIQUE,
+      platform TEXT NOT NULL DEFAULT 'unknown',
+      label TEXT NOT NULL DEFAULT '',
+      enabled INTEGER NOT NULL DEFAULT 1,
+      last_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
   `);
 }
 
@@ -639,6 +654,80 @@ export function campaignSentTotals(campaignId: number) {
     .prepare("SELECT COALESCE(SUM(sent),0) AS sent, COALESCE(SUM(failed),0) AS failed FROM campaign_runs WHERE campaign_id = ?")
     .get(campaignId) as { sent: number; failed: number };
   return row;
+}
+
+export type Device = {
+  id: number;
+  token: string;
+  platform: string;
+  label: string;
+  enabled: boolean;
+  lastSeenAt: string;
+  createdAt: string;
+};
+
+export function registerDevice(input: { token: string; platform?: string; label?: string }) {
+  const token = input.token.trim();
+  if (!token) {
+    throw new Error("A device token is required.");
+  }
+
+  getDb()
+    .prepare(
+      `INSERT INTO devices (token, platform, label, last_seen_at)
+       VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+       ON CONFLICT(token) DO UPDATE SET
+         platform = excluded.platform,
+         label = CASE WHEN excluded.label != '' THEN excluded.label ELSE devices.label END,
+         enabled = 1,
+         last_seen_at = CURRENT_TIMESTAMP`
+    )
+    .run(token, input.platform ?? "unknown", input.label ?? "");
+}
+
+export function removeDevice(token: string) {
+  getDb().prepare("DELETE FROM devices WHERE token = ?").run(token);
+}
+
+export function listActiveDeviceTokens() {
+  const rows = getDb()
+    .prepare("SELECT token FROM devices WHERE enabled = 1")
+    .all() as Array<{ token: string }>;
+  return rows.map((row) => row.token);
+}
+
+export function listDevices(): Device[] {
+  const rows = getDb().prepare("SELECT * FROM devices ORDER BY last_seen_at DESC").all() as Array<{
+    id: number;
+    token: string;
+    platform: string;
+    label: string;
+    enabled: number;
+    last_seen_at: string;
+    created_at: string;
+  }>;
+  return rows.map((row) => ({
+    id: row.id,
+    token: row.token,
+    platform: row.platform,
+    label: row.label,
+    enabled: Boolean(row.enabled),
+    lastSeenAt: row.last_seen_at,
+    createdAt: row.created_at
+  }));
+}
+
+export function totalUnreadCount() {
+  const row = getDb()
+    .prepare(
+      `SELECT COUNT(*) AS unread
+       FROM messages
+       INNER JOIN members ON members.id = messages.member_id
+       WHERE messages.direction = 'incoming'
+         AND messages.id > COALESCE(members.last_read_message_id, 0)`
+    )
+    .get() as { unread: number };
+  return row.unread;
 }
 
 export function listMemberIdsWithOutgoingBody(body: string) {

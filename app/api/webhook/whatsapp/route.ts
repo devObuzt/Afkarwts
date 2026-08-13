@@ -2,7 +2,16 @@ import { NextResponse } from "next/server";
 import { createMessage, findOrCreateMemberByPhone, updateMessageStatusByWhatsAppId, type Message } from "@/app/lib/db";
 import { createStoredMediaFilename, formatBytes, MAX_MEDIA_BYTES, MAX_MEDIA_LABEL, writeMediaFile } from "@/app/lib/media-store";
 import { downloadWhatsAppMedia, getWhatsAppMediaInfo } from "@/app/lib/whatsapp";
+import { messagePreview, sendPushToDevices } from "@/app/lib/push";
 import "@/app/lib/scheduler";
+
+function notifyDevices(memberName: string, type: string, body: string, memberId: number) {
+  void sendPushToDevices({
+    title: memberName,
+    body: messagePreview({ type, body }),
+    memberId
+  }).catch((error) => console.error("Push notification failed:", error));
+}
 
 export const runtime = "nodejs";
 
@@ -89,6 +98,7 @@ export async function POST(request: Request) {
             whatsappMessageId: incoming.id ?? null,
             status: "received"
           });
+          notifyDevices(member.name, "text", incoming.text.body, member.id);
           continue;
         }
 
@@ -139,6 +149,7 @@ export async function POST(request: Request) {
               mediaMimeType: media.mime_type || mediaInfo.mime_type,
               mediaFilename: filename
             });
+            notifyDevices(member.name, incoming.type, media.caption ?? "", member.id);
           } catch (error) {
             createMessage({
               memberId: member.id,
