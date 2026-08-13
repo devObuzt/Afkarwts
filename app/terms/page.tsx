@@ -13,7 +13,7 @@ export default function TermsPage() {
     <main className="legalShell">
       <article className="legalPanel">
         <header className="legalHeader">
-          <span className="brandMark">A</span>
+          <img alt="Afkar" className="brandMark" src="/afkar-logo.png" />
           <div>
             <h1>Terms of Service</h1>
             <p>Afkar — Eat. Love. Fit · Effective date: August 2, 2026</p>

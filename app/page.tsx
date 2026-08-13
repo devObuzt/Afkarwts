@@ -714,13 +714,7 @@ export default function Home() {
       <aside className="sidebar">
         <header className="sidebarTop">
           <div className="brand">
-            <span className="brandMark">
-              <svg aria-hidden fill="none" height="22" stroke="currentColor" strokeLinecap="round" strokeWidth="1.6" viewBox="0 0 32 32" width="22">
-                <circle cx="16" cy="16" r="13" />
-                <path d="M6 20c4-6 8-8 12-6s6 1 8-1" />
-                <circle cx="13" cy="13" r="2.6" />
-              </svg>
-            </span>
+            <img alt="Afkar" className="brandMark" src="/afkar-logo.png" />
             <div>
               <h1>Afkar</h1>
               <p>Eat · Love · Fit</p>

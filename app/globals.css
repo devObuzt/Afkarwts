@@ -129,12 +129,14 @@ label {
 
 .brandMark {
   align-items: center;
-  background: var(--green-900);
+  background: var(--panel);
+  border: 1px solid var(--line);
   border-radius: 12px;
-  color: #e9f3ec;
+  color: var(--green-900);
   display: inline-flex;
   height: 42px;
   justify-content: center;
+  object-fit: contain;
   width: 42px;
 }
 
