@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Mp3Encoder } from "@breezystack/lamejs";
+import { setupNativePush } from "./lib/native-push";
 
 // WhatsApp rejects browser MediaRecorder containers (fragmented MP4/WebM),
 // so recordings are transcoded to plain MP3 before sending.
@@ -471,6 +472,13 @@ export default function Home() {
   useEffect(() => {
     document.title = totalUnread > 0 ? `(${totalUnread}) Afkar WhatsApp` : "Afkar WhatsApp";
   }, [totalUnread]);
+
+  useEffect(() => {
+    void setupNativePush((memberId) => {
+      setSelectedMemberId(memberId);
+      setMobileChatOpen(true);
+    });
+  }, []);
 
   useEffect(() => {
     if (!selectedMemberId) {
