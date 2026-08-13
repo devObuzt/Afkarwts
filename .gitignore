@@ -13,3 +13,5 @@ android/local.properties
 android/.idea
 ios/App/build
 ios/DerivedData
+*.p8
+*firebase-adminsdk*.json

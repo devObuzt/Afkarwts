@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1091964449212",
+    "project_id": "afk-heartbeat",
+    "storage_bucket": "afk-heartbeat.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1091964449212:android:c5a57e907af32e9fc73bb9",
+        "android_client_info": {
+          "package_name": "com.afkar.heartbeat"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCN538jqY6Lri4YHDWley_kyaqIC3gOWhs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
