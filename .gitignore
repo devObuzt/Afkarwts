@@ -15,3 +15,5 @@ ios/App/build
 ios/DerivedData
 *.p8
 *firebase-adminsdk*.json
+android/keystore.properties
+*.keystore
