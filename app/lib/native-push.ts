@@ -33,35 +33,36 @@ export async function setupNativePush(openMember: (memberId: number) => void) {
   }
 
   try {
-    const { PushNotifications } = await import("@capacitor/push-notifications");
+    // FirebaseMessaging yields FCM tokens on both platforms, which is what the
+    // server sends through.
+    const { FirebaseMessaging } = await import("@capacitor-firebase/messaging");
 
-    let permission = await PushNotifications.checkPermissions();
+    let permission = await FirebaseMessaging.checkPermissions();
     if (permission.receive === "prompt" || permission.receive === "prompt-with-rationale") {
-      permission = await PushNotifications.requestPermissions();
+      permission = await FirebaseMessaging.requestPermissions();
     }
 
     if (permission.receive !== "granted") {
       return { supported: true, granted: false };
     }
 
-    await PushNotifications.removeAllListeners();
+    await FirebaseMessaging.removeAllListeners();
 
-    await PushNotifications.addListener("registration", (token) => {
-      void saveToken(token.value);
+    await FirebaseMessaging.addListener("tokenReceived", (event) => {
+      if (event.token) void saveToken(event.token);
     });
 
-    await PushNotifications.addListener("registrationError", (error) => {
-      console.error("Push registration failed:", error);
-    });
-
-    await PushNotifications.addListener("pushNotificationActionPerformed", (action) => {
-      const memberId = Number(action.notification.data?.memberId);
+    await FirebaseMessaging.addListener("notificationActionPerformed", (action) => {
+      const data = action.notification.data as { memberId?: string | number } | undefined;
+      const memberId = Number(data?.memberId);
       if (Number.isInteger(memberId) && memberId > 0) {
         openMember(memberId);
       }
     });
 
-    await PushNotifications.register();
+    const { token } = await FirebaseMessaging.getToken();
+    if (token) await saveToken(token);
+
     return { supported: true, granted: true };
   } catch (error) {
     console.error("Push setup failed:", error);
