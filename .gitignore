@@ -6,3 +6,10 @@ data
 .gstack
 .claude
 
+android/.gradle
+android/app/build
+android/build
+android/local.properties
+android/.idea
+ios/App/build
+ios/DerivedData
