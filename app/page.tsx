@@ -1782,8 +1782,17 @@ function BulkModal({ groups, onClose, onDone }: { groups: Group[]; onClose: () =
   const [maxRecipients, setMaxRecipients] = useState(250);
   const [metaLimit, setMetaLimit] = useState<{ dailyLimit: number; suggested: number; quality: string | null } | null>(null);
   const [autoCampaign, setAutoCampaign] = useState(false);
-  const [campaignStarted, setCampaignStarted] = useState<{ estimatedDays: number; total: number } | null>(null);
+  const [campaignStarted, setCampaignStarted] = useState<{
+    estimatedDays: number;
+    total: number;
+    scheduled?: boolean;
+    startsAt?: string;
+    repeatMode?: string;
+  } | null>(null);
   const [step, setStep] = useState(1);
+  const [scheduleDate, setScheduleDate] = useState("");
+  const [scheduleTime, setScheduleTime] = useState("09:00");
+  const [repeatMode, setRepeatMode] = useState<"once" | "daily" | "weekly">("once");
 
   const selectedGroup = groups.find((group) => group.id === groupId) ?? null;
 
@@ -1817,7 +1826,20 @@ function BulkModal({ groups, onClose, onDone }: { groups: Group[]; onClose: () =
 
   const capLimit = metaLimit?.dailyLimit ?? 1000;
 
-  async function startCampaign() {
+  // A schedule is only sent when the user picked a date on step 4.
+  const scheduledFor = scheduleDate ? new Date(`${scheduleDate}T${scheduleTime || "09:00"}`) : null;
+  const todayIso = new Date().toISOString().slice(0, 10);
+  // Recurrence only matters when the group cannot fit in a single allowed batch.
+  const needsRepeat = (selectedGroup?.memberCount ?? 0) > maxRecipients;
+
+  // A group that fits in one batch is always a one-off; a bigger one defaults to daily.
+  useEffect(() => {
+    if (step === 4) {
+      setRepeatMode(needsRepeat ? "daily" : "once");
+    }
+  }, [step, needsRepeat]);
+
+  async function startCampaign(schedule: boolean) {
     if (!groupId) return;
     setBusy(true);
     setError("");
@@ -1833,7 +1855,9 @@ function BulkModal({ groups, onClose, onDone }: { groups: Group[]; onClose: () =
           templateLanguage: templateSelection?.language,
           bodyParams: templateSelection?.bodyParams ?? [],
           bodyPreview: templateSelection?.preview,
-          dailyLimit: maxRecipients
+          dailyLimit: maxRecipients,
+          startsAt: schedule && scheduledFor ? scheduledFor.toISOString() : null,
+          repeatMode: schedule ? repeatMode : "daily"
         })
       });
       const payload = await response.json();
@@ -1842,7 +1866,10 @@ function BulkModal({ groups, onClose, onDone }: { groups: Group[]; onClose: () =
       }
       setCampaignStarted({
         estimatedDays: Math.max(1, (payload.estimatedDays ?? 0) + 1),
-        total: payload.campaign?.progress?.remaining ?? 0
+        total: payload.campaign?.progress?.remaining ?? 0,
+        scheduled: payload.scheduled,
+        startsAt: schedule && scheduledFor ? scheduledFor.toLocaleString() : undefined,
+        repeatMode: schedule ? repeatMode : undefined
       });
       await onDone();
     } catch (campaignError) {
@@ -1854,7 +1881,7 @@ function BulkModal({ groups, onClose, onDone }: { groups: Group[]; onClose: () =
   async function submit() {
     if (!groupId) return;
     if (autoCampaign) {
-      await startCampaign();
+      await startCampaign(false);
       return;
     }
     setBusy(true);
@@ -1891,12 +1918,26 @@ function BulkModal({ groups, onClose, onDone }: { groups: Group[]; onClose: () =
     return (
       <Modal onClose={onClose} title="Campaign started 🚀" wide>
         <div className="modalBody">
+          {campaignStarted.scheduled ? (
+            <p className="hint">
+              Nothing has been sent yet. The first batch of up to {maxRecipients} goes out on{" "}
+              <strong>{campaignStarted.startsAt}</strong>
+              {campaignStarted.repeatMode === "daily"
+                ? ", then every day at the same time until all "
+                : campaignStarted.repeatMode === "weekly"
+                  ? ", then every week on the same day and time until all "
+                  : " — a single batch, no repeat. "}
+              {campaignStarted.repeatMode === "once" ? "" : <><strong>{campaignStarted.total}</strong> members have it. </>}
+              Track or cancel it any time under <strong>Campaigns</strong>.
+            </p>
+          ) : (
           <p className="hint">
             The first batch is being sent right now. The remaining <strong>{campaignStarted.total}</strong> members
             will receive it automatically, one batch of {maxRecipients} per day — done in about{" "}
             <strong>{campaignStarted.estimatedDays} {campaignStarted.estimatedDays === 1 ? "day" : "days"}</strong>.
             Track it any time under <strong>Campaigns</strong>.
           </p>
+          )}
           <div className="modalActions">
             <button onClick={onClose} type="button">Done</button>
           </div>
@@ -1938,7 +1979,7 @@ function BulkModal({ groups, onClose, onDone }: { groups: Group[]; onClose: () =
         ) : (
           <>
             <ol className="wizardSteps">
-              {["Group", "Message", "Options"].map((label, index) => (
+              {(step === 4 ? ["Group", "Message", "Options", "Schedule"] : ["Group", "Message", "Options"]).map((label, index) => (
                 <li className={step === index + 1 ? "active" : step > index + 1 ? "done" : ""} key={label}>
                   <span>{index + 1}</span> {label}
                 </li>
@@ -2054,6 +2095,76 @@ function BulkModal({ groups, onClose, onDone }: { groups: Group[]; onClose: () =
             </div>
             ) : null}
 
+            {step === 4 ? (
+            <div className="bulkOptions">
+              <p className="hint">
+                Nothing is sent now. The first batch of up to <strong>{maxRecipients}</strong> goes out at the date
+                and time you pick below.
+              </p>
+              <div className="scheduleRow">
+                <label>
+                  Date
+                  <input
+                    min={todayIso}
+                    onChange={(event) => setScheduleDate(event.target.value)}
+                    type="date"
+                    value={scheduleDate}
+                  />
+                </label>
+                <label>
+                  Time
+                  <input
+                    onChange={(event) => setScheduleTime(event.target.value)}
+                    type="time"
+                    value={scheduleTime}
+                  />
+                </label>
+              </div>
+              {needsRepeat ? (
+                <>
+                  <p className="hint">
+                    This group has <strong>{selectedGroup?.memberCount}</strong> members — more than the{" "}
+                    {maxRecipients} allowed in one batch. Pick how the rest should follow.
+                  </p>
+                  <div className="repeatChoices">
+                    {([
+                      { value: "daily", label: "Every day", detail: "Same time each day until everyone got it" },
+                      { value: "weekly", label: "Every week", detail: "Same day and time each week" },
+                      { value: "once", label: "Just once", detail: `Only the first ${maxRecipients} — no repeat` }
+                    ] as const).map((choice) => (
+                      <label
+                        className={`repeatChoice${repeatMode === choice.value ? " active" : ""}`}
+                        key={choice.value}
+                      >
+                        <input
+                          checked={repeatMode === choice.value}
+                          name="repeatMode"
+                          onChange={() => setRepeatMode(choice.value)}
+                          type="radio"
+                        />
+                        <span>
+                          <strong>{choice.label}</strong>
+                          <em>{choice.detail}</em>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </>
+              ) : null}
+              {scheduledFor && selectedGroup ? (
+                <p className="hint">
+                  Starts <strong>{scheduledFor.toLocaleString()}</strong>
+                  {needsRepeat && repeatMode !== "once"
+                    ? ` — about ${Math.ceil(selectedGroup.memberCount / Math.max(1, maxRecipients))} ${
+                        repeatMode === "daily" ? "days" : "weeks"
+                      } to reach all ${selectedGroup.memberCount} members.`
+                    : "."}{" "}
+                  A Telegram report arrives after every batch.
+                </p>
+              ) : null}
+            </div>
+            ) : null}
+
             {error ? <div className="notice">{error}</div> : null}
 
             <div className="modalActions">
@@ -2066,19 +2177,37 @@ function BulkModal({ groups, onClose, onDone }: { groups: Group[]; onClose: () =
                 <button disabled={!canContinue} onClick={() => setStep(step + 1)} type="button">
                   Next
                 </button>
+              ) : step === 3 ? (
+                <>
+                  <button
+                    className="secondary"
+                    disabled={busy || !canContinue || (selectedGroup?.memberCount ?? 0) === 0}
+                    onClick={() => setStep(4)}
+                    type="button"
+                  >
+                    Schedule…
+                  </button>
+                  <button
+                    disabled={busy || !canContinue || (selectedGroup?.memberCount ?? 0) === 0}
+                    onClick={() => void submit()}
+                    type="button"
+                  >
+                    {busy
+                      ? autoCampaign ? "Starting campaign…" : "Sending…"
+                      : autoCampaign
+                        ? "Start auto-campaign"
+                        : selectedGroup
+                          ? `Send to up to ${Math.min(maxRecipients, selectedGroup.memberCount)} of ${selectedGroup.memberCount}`
+                          : "Send"}
+                  </button>
+                </>
               ) : (
                 <button
-                  disabled={busy || !canContinue || (selectedGroup?.memberCount ?? 0) === 0}
-                  onClick={() => void submit()}
+                  disabled={busy || !scheduledFor || scheduledFor.getTime() <= Date.now()}
+                  onClick={() => void startCampaign(true)}
                   type="button"
                 >
-                  {busy
-                    ? autoCampaign ? "Starting campaign…" : "Sending…"
-                    : autoCampaign
-                      ? "Start auto-campaign"
-                      : selectedGroup
-                        ? `Send to up to ${Math.min(maxRecipients, selectedGroup.memberCount)} of ${selectedGroup.memberCount}`
-                        : "Send"}
+                  {busy ? "Scheduling…" : scheduledFor ? "Schedule send" : "Pick a date"}
                 </button>
               )}
             </div>

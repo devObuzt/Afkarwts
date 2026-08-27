@@ -312,6 +312,14 @@ function migrateCampaignTables(db: DatabaseSync) {
       FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE CASCADE
     );
   `);
+
+  // Scheduling: hold the first batch until starts_at, then repeat on a cadence.
+  if (!hasColumn(db, "campaigns", "starts_at")) {
+    db.exec("ALTER TABLE campaigns ADD COLUMN starts_at TEXT");
+  }
+  if (!hasColumn(db, "campaigns", "repeat_mode")) {
+    db.exec("ALTER TABLE campaigns ADD COLUMN repeat_mode TEXT NOT NULL DEFAULT 'daily'");
+  }
 }
 
 function migrateGroupTables(db: DatabaseSync) {
@@ -509,6 +517,8 @@ export type Campaign = {
   dailyLimit: number;
   status: "active" | "paused" | "done";
   lastRunAt: string | null;
+  startsAt: string | null;
+  repeatMode: "once" | "daily" | "weekly";
   createdAt: string;
 };
 
@@ -534,6 +544,8 @@ type DbCampaign = {
   daily_limit: number;
   status: Campaign["status"];
   last_run_at: string | null;
+  starts_at: string | null;
+  repeat_mode: Campaign["repeatMode"] | null;
   created_at: string;
 };
 
@@ -557,6 +569,8 @@ function mapCampaign(row: DbCampaign): Campaign {
     dailyLimit: row.daily_limit,
     status: row.status,
     lastRunAt: row.last_run_at,
+    startsAt: row.starts_at,
+    repeatMode: row.repeat_mode ?? "daily",
     createdAt: row.created_at
   };
 }
@@ -571,11 +585,13 @@ export function createCampaign(input: {
   bodyParams?: string[];
   bodyPreview?: string;
   dailyLimit: number;
+  startsAt?: string | null;
+  repeatMode?: Campaign["repeatMode"];
 }) {
   const result = getDb()
     .prepare(
-      `INSERT INTO campaigns (group_id, label, mode, text, template_name, template_language, body_params, body_preview, daily_limit)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO campaigns (group_id, label, mode, text, template_name, template_language, body_params, body_preview, daily_limit, starts_at, repeat_mode)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       input.groupId,
@@ -586,7 +602,9 @@ export function createCampaign(input: {
       input.templateLanguage ?? null,
       JSON.stringify(input.bodyParams ?? []),
       input.bodyPreview ?? "",
-      input.dailyLimit
+      input.dailyLimit,
+      input.startsAt ?? null,
+      input.repeatMode ?? "daily"
     );
   return getCampaign(Number(result.lastInsertRowid));
 }
@@ -601,15 +619,25 @@ export function listCampaigns(): Campaign[] {
   return rows.map(mapCampaign);
 }
 
+// Due = active, past its start time, and either never run or past its cadence.
+// A 'once' campaign is due only until its single batch has run.
 export function listRunnableCampaigns(minHoursSinceLastRun: number): Campaign[] {
-  const cutoff = new Date(Date.now() - minHoursSinceLastRun * 60 * 60 * 1000).toISOString();
+  const now = new Date().toISOString();
+  const dailyCutoff = new Date(Date.now() - minHoursSinceLastRun * 60 * 60 * 1000).toISOString();
+  const weeklyCutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
   const rows = getDb()
     .prepare(
       `SELECT * FROM campaigns
        WHERE status = 'active'
-         AND (last_run_at IS NULL OR last_run_at <= ?)`
+         AND (starts_at IS NULL OR starts_at <= ?)
+         AND (
+           last_run_at IS NULL
+           OR (repeat_mode = 'daily' AND last_run_at <= ?)
+           OR (repeat_mode = 'weekly' AND last_run_at <= ?)
+         )`
     )
-    .all(cutoff) as DbCampaign[];
+    .all(now, dailyCutoff, weeklyCutoff) as DbCampaign[];
   return rows.map(mapCampaign);
 }
 
@@ -741,6 +769,54 @@ export type RecipientStatus = {
 
 // Per-member delivery state for one campaign body, so the UI can show exactly
 // who is still waiting and who failed.
+export type GroupSendSummary = {
+  body: string;
+  recipients: number;
+  sent: number;
+  failed: number;
+  firstAt: string;
+  lastAt: string;
+};
+
+/**
+ * Distinct outgoing bodies that went to several members of a group — used to
+ * rebuild campaign rows for manual sends made before they were logged.
+ */
+export function listGroupSendBodies(groupId: number, minRecipients = 5): GroupSendSummary[] {
+  const rows = getDb()
+    .prepare(
+      `SELECT
+         messages.body AS body,
+         COUNT(DISTINCT messages.member_id) AS recipients,
+         SUM(CASE WHEN messages.status = 'failed' THEN 0 ELSE 1 END) AS sent,
+         SUM(CASE WHEN messages.status = 'failed' THEN 1 ELSE 0 END) AS failed,
+         MIN(messages.created_at) AS first_at,
+         MAX(messages.created_at) AS last_at
+       FROM messages
+       INNER JOIN member_groups ON member_groups.member_id = messages.member_id
+       WHERE messages.direction = 'outgoing' AND member_groups.group_id = ? AND messages.body <> ''
+       GROUP BY messages.body
+       HAVING recipients >= ?
+       ORDER BY last_at DESC`
+    )
+    .all(groupId, minRecipients) as Array<{
+    body: string;
+    recipients: number;
+    sent: number;
+    failed: number;
+    first_at: string;
+    last_at: string;
+  }>;
+  return rows.map((row) => ({
+    body: row.body,
+    recipients: row.recipients,
+    sent: row.sent,
+    failed: row.failed,
+    firstAt: row.first_at,
+    lastAt: row.last_at
+  }));
+}
+
 export function listCampaignRecipients(groupId: number, body: string): RecipientStatus[] {
   const rows = getDb()
     .prepare(

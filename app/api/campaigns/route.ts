@@ -28,6 +28,8 @@ export async function POST(request: Request) {
       bodyParams?: string[];
       bodyPreview?: string;
       dailyLimit?: number;
+      startsAt?: string | null;
+      repeatMode?: "once" | "daily" | "weekly";
     };
 
     const groupId = Number(body.groupId);
@@ -49,6 +51,13 @@ export async function POST(request: Request) {
     const dailyLimit = Math.min(Math.max(1, Number(body.dailyLimit) || limit.suggested), limit.dailyLimit);
     const label = mode === "template" ? body.templateName || "template" : "free text";
 
+    const startsAt = body.startsAt ? new Date(body.startsAt) : null;
+    if (body.startsAt && Number.isNaN(startsAt?.getTime())) {
+      return NextResponse.json({ error: "Invalid schedule date." }, { status: 400 });
+    }
+    const repeatMode = body.repeatMode ?? "daily";
+    const scheduled = Boolean(startsAt && startsAt.getTime() > Date.now());
+
     const campaign = createCampaign({
       groupId,
       label: `${label} → ${group.name}`,
@@ -58,7 +67,9 @@ export async function POST(request: Request) {
       templateLanguage: body.templateLanguage ?? null,
       bodyParams: body.bodyParams ?? [],
       bodyPreview: body.bodyPreview ?? "",
-      dailyLimit
+      dailyLimit,
+      startsAt: startsAt ? startsAt.toISOString() : null,
+      repeatMode
     });
 
     if (!campaign) {
@@ -67,14 +78,18 @@ export async function POST(request: Request) {
 
     const progress = campaignProgress(campaign);
 
-    // First batch fires in the background so the request returns instantly.
-    void runCampaignBatch(campaign.id).catch((error) =>
-      console.error(`First run of campaign ${campaign.id} failed:`, error)
-    );
+    // A scheduled campaign waits for its start time; otherwise the first batch
+    // fires in the background so the request returns instantly.
+    if (!scheduled) {
+      void runCampaignBatch(campaign.id).catch((error) =>
+        console.error(`First run of campaign ${campaign.id} failed:`, error)
+      );
+    }
 
     return NextResponse.json(
       {
         campaign: { ...campaign, groupName: group.name, progress },
+        scheduled,
         estimatedDays: Math.ceil(progress.remaining / dailyLimit)
       },
       { status: 201 }

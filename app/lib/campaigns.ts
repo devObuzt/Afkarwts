@@ -91,7 +91,7 @@ export async function runCampaignBatch(campaignId: number) {
   const remaining = targets.length - batch.length;
   recordCampaignRun({ campaignId: campaign.id, sent, failed, remaining });
 
-  if (remaining === 0) {
+  if (remaining === 0 || campaign.repeatMode === "once") {
     updateCampaignStatus(campaign.id, "done");
   }
 
@@ -101,9 +101,11 @@ export async function runCampaignBatch(campaignId: number) {
     `📤 حملة «${campaign.label || groupName}»`,
     `المجموعة: ${groupName}`,
     `دفعة اليوم: ${sent} انبعتت ✅${failed ? ` · ${failed} فشلت ⚠️` : ""}`,
-    remaining > 0
+    remaining > 0 && campaign.repeatMode !== "once"
       ? `الباقي: ${remaining} (~${daysLeft} ${daysLeft === 1 ? "يوم" : "أيام"})`
-      : "🎉 الحملة اكتملت — الكل استلم الرسالة",
+      : remaining > 0
+        ? `الباقي: ${remaining} — الحملة كانت إرسال مجدول لمرة واحدة`
+        : "🎉 الحملة اكتملت — الكل استلم الرسالة",
     `الإجمالي حتى الآن: ${totals.sent} انبعتت${totals.failed ? ` · ${totals.failed} فشلت` : ""}`
   ];
   await sendTelegramMessage(lines.join("\n"));

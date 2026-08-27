@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
 import {
+  createCampaign,
   createMessage,
   getGroup,
   getMember,
   listGroupMembers,
   listMemberIdsWithOutgoingBody,
+  recordCampaignRun,
+  updateCampaignStatus,
   updateMessageStatus
 } from "@/app/lib/db";
 import { getMessagingLimit, sendWhatsAppTemplate, sendWhatsAppText } from "@/app/lib/whatsapp";
@@ -47,10 +50,12 @@ export async function POST(request: Request) {
     }
 
     let members = [] as ReturnType<typeof listGroupMembers>;
+    let group: ReturnType<typeof getGroup> = null;
 
     if (body.groupId) {
       const groupId = Number(body.groupId);
-      if (!getGroup(groupId)) {
+      group = getGroup(groupId);
+      if (!group) {
         return NextResponse.json({ error: "Group not found." }, { status: 404 });
       }
       members = listGroupMembers(groupId);
@@ -88,6 +93,27 @@ export async function POST(request: Request) {
       );
     }
 
+    // A manual send is logged as a one-off campaign so it shows up in Campaigns
+    // with its batch history and the members who did not get it.
+    const campaign = group
+      ? createCampaign({
+          groupId: group.id,
+          label: `${mode === "template" ? body.templateName || "template" : "free text"} → ${group.name}`,
+          mode,
+          text,
+          templateName: body.templateName ?? null,
+          templateLanguage: body.templateLanguage ?? null,
+          bodyParams,
+          bodyPreview: body.bodyPreview ?? "",
+          dailyLimit: maxRecipients,
+          repeatMode: "once"
+        })
+      : null;
+    // Closed straight away so the daily runner never picks up a manual send.
+    if (campaign) {
+      updateCampaignStatus(campaign.id, "done");
+    }
+
     const results: BulkResult[] = [];
 
     for (const member of members) {
@@ -119,6 +145,14 @@ export async function POST(request: Request) {
     }
 
     const sent = results.filter((result) => result.ok).length;
+    if (campaign) {
+      recordCampaignRun({
+        campaignId: campaign.id,
+        sent,
+        failed: results.length - sent,
+        remaining: remainingAfterBatch
+      });
+    }
     return NextResponse.json({
       sent,
       failed: results.length - sent,
