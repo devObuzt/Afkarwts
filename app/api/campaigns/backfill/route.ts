@@ -3,6 +3,7 @@ import {
   createCampaign,
   getGroup,
   listCampaigns,
+  listGroups,
   listGroupSendBodies,
   recordCampaignRun,
   updateCampaignStatus
@@ -24,18 +25,27 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => ({}))) as { groupId?: number; body?: string };
-  const groupId = Number(body.groupId);
-  const group = getGroup(groupId);
-  if (!group) {
+  // No groupId means "rebuild everything we can find" — used by the button in Campaigns.
+  const groups = body.groupId
+    ? [getGroup(Number(body.groupId))].filter((group): group is NonNullable<typeof group> => Boolean(group))
+    : listGroups();
+  if (!groups.length) {
     return NextResponse.json({ error: "Group not found." }, { status: 404 });
   }
 
+  const created = groups.flatMap((group) => backfillGroup(group, body.body));
+
+  return NextResponse.json({ created: created.filter(Boolean) });
+}
+
+function backfillGroup(group: { id: number; name: string }, onlyBody?: string) {
+  const groupId = group.id;
   const known = new Set(listCampaigns().filter((c) => c.groupId === groupId).map(campaignSendBody));
   const candidates = listGroupSendBodies(groupId).filter(
-    (send) => !known.has(send.body) && (!body.body || send.body === body.body)
+    (send) => !known.has(send.body) && (!onlyBody || send.body === onlyBody)
   );
 
-  const created = candidates.map((send) => {
+  return candidates.map((send) => {
     const campaign = createCampaign({
       groupId,
       label: `${send.body.slice(0, 40)}${send.body.length > 40 ? "…" : ""} → ${group.name}`,
@@ -47,8 +57,6 @@ export async function POST(request: Request) {
     if (!campaign) return null;
     updateCampaignStatus(campaign.id, "done");
     recordCampaignRun({ campaignId: campaign.id, sent: send.sent, failed: send.failed, remaining: 0 });
-    return { id: campaign.id, recipients: send.recipients, sent: send.sent, failed: send.failed };
+    return { id: campaign.id, group: group.name, recipients: send.recipients, sent: send.sent, failed: send.failed };
   });
-
-  return NextResponse.json({ created: created.filter(Boolean) });
 }

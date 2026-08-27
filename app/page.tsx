@@ -1466,6 +1466,8 @@ function CampaignsModal({ onClose }: { onClose: () => void }) {
   const [campaigns, setCampaigns] = useState<CampaignInfo[]>([]);
   const [openId, setOpenId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const [importing, setImporting] = useState(false);
+  const [importNote, setImportNote] = useState("");
 
   async function load() {
     const response = await fetch("/api/campaigns");
@@ -1491,6 +1493,22 @@ function CampaignsModal({ onClose }: { onClose: () => void }) {
     await load();
   }
 
+  // Sends made before manual bulk sends were logged can be rebuilt from the messages.
+  async function importPastSends() {
+    setImporting(true);
+    setImportNote("");
+    const response = await fetch("/api/campaigns/backfill", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({})
+    });
+    const payload = await response.json().catch(() => ({}));
+    const count = payload.created?.length ?? 0;
+    setImportNote(count ? `Added ${count} past send${count === 1 ? "" : "s"}.` : "Nothing new to import.");
+    setImporting(false);
+    await load();
+  }
+
   const statusLabel: Record<CampaignInfo["status"], string> = {
     active: "Active",
     paused: "Paused",
@@ -1500,6 +1518,12 @@ function CampaignsModal({ onClose }: { onClose: () => void }) {
   return (
     <Modal onClose={onClose} title="Campaigns" wide>
       <div className="modalBody">
+        <div className="campaignToolbar">
+          <button className="secondary" disabled={importing} onClick={() => void importPastSends()} type="button">
+            {importing ? "Importing…" : "Import past sends"}
+          </button>
+          {importNote ? <span className="hint">{importNote}</span> : null}
+        </div>
         {loading ? <p className="hint">Loading…</p> : null}
         {!loading && !campaigns.length ? (
           <p className="hint">

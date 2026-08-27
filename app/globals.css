@@ -1680,3 +1680,11 @@ label {
   font-size: 12px;
   color: var(--muted);
 }
+
+.campaignToolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
