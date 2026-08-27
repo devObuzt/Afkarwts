@@ -1381,8 +1381,90 @@ function GroupsModal({ groups, onChanged, onClose }: { groups: Group[]; onChange
 
 /* ---------- campaigns ---------- */
 
+type CampaignRun = { id: number; sent: number; failed: number; remaining: number; ranAt: string };
+type RecipientRow = { memberId: number; name: string; phone: string; error: string | null; sentAt: string | null };
+type CampaignDetail = {
+  runs: CampaignRun[];
+  delivered: RecipientRow[];
+  failed: RecipientRow[];
+  pending: RecipientRow[];
+};
+
+function CampaignDetailPanel({ campaignId }: { campaignId: number }) {
+  const [detail, setDetail] = useState<CampaignDetail | null>(null);
+  const [tab, setTab] = useState<"runs" | "failed" | "pending">("runs");
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const response = await fetch(`/api/campaigns/${campaignId}/detail`);
+      if (!response.ok || cancelled) return;
+      setDetail(await response.json());
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [campaignId]);
+
+  if (!detail) return <p className="hint">Loading batches…</p>;
+
+  const rows = tab === "failed" ? detail.failed : tab === "pending" ? detail.pending : [];
+
+  return (
+    <div className="campaignDetail">
+      <div className="detailTabs">
+        <button className={tab === "runs" ? "active" : ""} onClick={() => setTab("runs")} type="button">
+          Batches <em>{detail.runs.length}</em>
+        </button>
+        <button className={tab === "failed" ? "active" : ""} onClick={() => setTab("failed")} type="button">
+          Failed <em>{detail.failed.length}</em>
+        </button>
+        <button className={tab === "pending" ? "active" : ""} onClick={() => setTab("pending")} type="button">
+          Not sent yet <em>{detail.pending.length}</em>
+        </button>
+      </div>
+
+      {tab === "runs" ? (
+        detail.runs.length ? (
+          <table className="runTable">
+            <thead>
+              <tr><th>#</th><th>Date</th><th>Sent</th><th>Failed</th><th>Left after</th></tr>
+            </thead>
+            <tbody>
+              {detail.runs.map((run, index) => (
+                <tr key={run.id}>
+                  <td>{detail.runs.length - index}</td>
+                  <td>{new Date(run.ranAt).toLocaleString()}</td>
+                  <td><strong>{run.sent}</strong></td>
+                  <td className={run.failed ? "bad" : ""}>{run.failed}</td>
+                  <td>{run.remaining}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <p className="hint">No batch has run yet.</p>
+        )
+      ) : rows.length ? (
+        <div className="recipientList">
+          {rows.map((row) => (
+            <div className="recipientRow" key={row.memberId}>
+              <span dir="auto">{row.name}</span>
+              <span className="bulkPhone">{row.phone}</span>
+              {row.error ? <span className="recipientError">{row.error}</span> : null}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="hint">{tab === "failed" ? "No failures." : "Everyone has received it."}</p>
+      )}
+    </div>
+  );
+}
+
 function CampaignsModal({ onClose }: { onClose: () => void }) {
   const [campaigns, setCampaigns] = useState<CampaignInfo[]>([]);
+  const [openId, setOpenId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
   async function load() {
@@ -1450,6 +1532,18 @@ function CampaignsModal({ onClose }: { onClose: () => void }) {
                   {campaign.lastRunAt ? ` · last batch ${new Date(campaign.lastRunAt).toLocaleString()}` : ""}
                 </span>
               </div>
+              <div className="campaignActions">
+                <button
+                  className="secondary"
+                  onClick={() => setOpenId(openId === campaign.id ? null : campaign.id)}
+                  type="button"
+                >
+                  {openId === campaign.id ? "Hide batches" : "Batches & who is missing"}
+                </button>
+              </div>
+
+              {openId === campaign.id ? <CampaignDetailPanel campaignId={campaign.id} /> : null}
+
               {campaign.status !== "done" ? (
                 <div className="campaignActions">
                   {campaign.status === "active" ? (

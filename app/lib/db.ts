@@ -730,6 +730,61 @@ export function totalUnreadCount() {
   return row.unread;
 }
 
+export type RecipientStatus = {
+  memberId: number;
+  name: string;
+  phone: string;
+  status: Message["status"] | null;
+  error: string | null;
+  sentAt: string | null;
+};
+
+// Per-member delivery state for one campaign body, so the UI can show exactly
+// who is still waiting and who failed.
+export function listCampaignRecipients(groupId: number, body: string): RecipientStatus[] {
+  const rows = getDb()
+    .prepare(
+      `SELECT
+         members.id AS member_id,
+         members.name,
+         members.phone,
+         latest.status,
+         latest.error,
+         latest.created_at
+       FROM members
+       INNER JOIN member_groups ON member_groups.member_id = members.id
+       LEFT JOIN (
+         SELECT m.member_id, m.status, m.error, m.created_at
+         FROM messages m
+         INNER JOIN (
+           SELECT member_id, MAX(id) AS id
+           FROM messages
+           WHERE direction = 'outgoing' AND body = ?
+           GROUP BY member_id
+         ) newest ON newest.id = m.id
+       ) latest ON latest.member_id = members.id
+       WHERE member_groups.group_id = ?
+       ORDER BY members.name COLLATE NOCASE ASC`
+    )
+    .all(body, groupId) as Array<{
+    member_id: number;
+    name: string;
+    phone: string;
+    status: Message["status"] | null;
+    error: string | null;
+    created_at: string | null;
+  }>;
+
+  return rows.map((row) => ({
+    memberId: row.member_id,
+    name: row.name,
+    phone: row.phone,
+    status: row.status,
+    error: row.error,
+    sentAt: row.created_at
+  }));
+}
+
 export function listMemberIdsWithOutgoingBody(body: string) {
   const rows = getDb()
     .prepare("SELECT DISTINCT member_id FROM messages WHERE direction = 'outgoing' AND body = ?")
