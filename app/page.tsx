@@ -146,6 +146,21 @@ type CampaignInfo = {
 
 type ModalKind = "addMember" | "import" | "groups" | "bulk" | "template" | "campaigns" | null;
 
+/** Value the picker writes to mean "fill in this contact's first name at send time". */
+const NAME_TOKEN = "{{name}}";
+
+/** Contacts are stored full-name; greetings read better with the first name only. */
+function firstName(name: string) {
+  const trimmed = (name ?? "").trim();
+  return trimmed ? trimmed.split(/\s+/)[0] : "";
+}
+
+/** Resolves the name token for display — the message log should read as it was sent. */
+function withContactName(text: string, name: string) {
+  if (!text.includes(NAME_TOKEN)) return text;
+  return text.split(NAME_TOKEN).join(firstName(name) || "الاسم");
+}
+
 function renderTemplatePreview(template: Template, params: string[]) {
   let text = template.bodyText;
   for (let index = 1; index <= template.paramCount; index += 1) {
@@ -704,7 +719,7 @@ export default function Home() {
         </>
       );
     }
-    return <p dir="auto">{message.body}</p>;
+    return <p dir="auto">{withContactName(message.body, selectedMember?.name ?? "")}</p>;
   }
 
   let lastDate: Date | null = null;
@@ -1652,7 +1667,7 @@ function CampaignsModal({ onClose }: { onClose: () => void }) {
           return (
             <div className="campaignRow" key={campaign.id}>
               <div className="campaignHead">
-                <strong dir="auto">{campaign.label}</strong>
+                <strong dir="auto">{withContactName(campaign.label, "")}</strong>
                 <span className={`campaignStatus ${campaign.status}`}>{statusLabel[campaign.status]}</span>
               </div>
               <div className="progressTrack">
@@ -1835,7 +1850,20 @@ function TemplateSelector({
             <div className="templateParams">
               {Array.from({ length: template.paramCount }, (_, index) => (
                 <label key={index}>
-                  {"Value for {{"}{index + 1}{"}}"}
+                  <span className="paramLabel">
+                    {"Value for {{"}{index + 1}{"}}"}
+                    <button
+                      className="linkButton"
+                      onClick={() => {
+                        const next = [...params];
+                        next[index] = NAME_TOKEN;
+                        setParams(next);
+                      }}
+                      type="button"
+                    >
+                      use contact name
+                    </button>
+                  </span>
                   <input
                     dir="auto"
                     onChange={(event) => {
@@ -1845,6 +1873,11 @@ function TemplateSelector({
                     }}
                     value={params[index] ?? ""}
                   />
+                  {params[index] === NAME_TOKEN ? (
+                    <span className="paramHint">
+                      Each contact gets their own first name here — filled in automatically when it is sent.
+                    </span>
+                  ) : null}
                 </label>
               ))}
             </div>
@@ -1879,7 +1912,7 @@ function TemplatePickerModal({
         />
         {selection ? (
           <div className="templatePreview" dir="auto">
-            {selection.preview}
+            {withContactName(selection.preview, memberName)}
           </div>
         ) : null}
         <div className="modalActions">

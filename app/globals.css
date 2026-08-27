@@ -1766,3 +1766,16 @@ label {
   color: var(--muted);
   cursor: default;
 }
+
+.paramLabel {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.paramHint {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+}

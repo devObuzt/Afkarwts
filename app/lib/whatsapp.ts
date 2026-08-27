@@ -99,13 +99,40 @@ export type TemplateSendOptions = {
   bodyParams?: string[];
 };
 
+/** Placeholder the UI writes into a template value to mean "this contact's name". */
+export const NAME_TOKEN = "{{name}}";
+
+/** Used when a contact has no usable name, since WhatsApp rejects empty values. */
+export const NAME_FALLBACK = process.env.WHATSAPP_NAME_FALLBACK || "صديقنا";
+
+/**
+ * Contacts are stored with their full name; a greeting reads better with the
+ * first name alone, and numbers-as-names (from the webhook) are not names.
+ */
+export function contactFirstName(member: Pick<Member, "name" | "phone">) {
+  const name = (member.name ?? "").trim();
+  if (!name || name === member.phone || /^[+\d\s()-]+$/.test(name)) {
+    return NAME_FALLBACK;
+  }
+  return name.split(/\s+/)[0];
+}
+
+/** Swaps the name token for this contact's first name, leaving other values alone. */
+export function fillNameToken(bodyParams: string[], member: Pick<Member, "name" | "phone">) {
+  if (!bodyParams.some((param) => param.includes(NAME_TOKEN))) {
+    return bodyParams;
+  }
+  const first = contactFirstName(member);
+  return bodyParams.map((param) => param.split(NAME_TOKEN).join(first));
+}
+
 export async function sendWhatsAppTemplate(member: Member, options: TemplateSendOptions = {}) {
   const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
   const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
   const apiVersion = process.env.WHATSAPP_API_VERSION || "v23.0";
   const templateName = options.name || process.env.WHATSAPP_TEMPLATE_NAME;
   const templateLanguage = options.language || process.env.WHATSAPP_TEMPLATE_LANGUAGE || "en_US";
-  const bodyParams = options.bodyParams ?? [];
+  const bodyParams = fillNameToken(options.bodyParams ?? [], member);
 
   if (!accessToken || !phoneNumberId) {
     throw new Error("WhatsApp environment variables are missing.");
