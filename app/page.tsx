@@ -1479,17 +1479,28 @@ function CampaignsModal({ onClose }: { onClose: () => void }) {
 /* ---------- template selector ---------- */
 
 function TemplateSelector({
-  onChange
+  onChange,
+  searchable
 }: {
   onChange: (selection: TemplateSelection | null, state: { loading: boolean; error: string }) => void;
+  searchable?: boolean;
 }) {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [selectedName, setSelectedName] = useState("");
   const [params, setParams] = useState<string[]>([]);
+  const [query, setQuery] = useState("");
 
   const selected = templates.find((template) => template.name === selectedName) ?? null;
+
+  const visible = useMemo(() => {
+    const term = query.trim().toLowerCase();
+    if (!term) return templates;
+    return templates.filter((template) =>
+      `${template.name} ${template.bodyText} ${template.headerText ?? ""}`.toLowerCase().includes(term)
+    );
+  }, [templates, query]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1549,8 +1560,21 @@ function TemplateSelector({
   }
 
   return (
+    <>
+      {searchable ? (
+        <div className="searchBox templateSearch">
+          <Icon path={icons.search} size={16} />
+          <input
+            dir="auto"
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={`Search ${templates.length} templates…`}
+            value={query}
+          />
+        </div>
+      ) : null}
+      {!visible.length ? <p className="hint">No template matches “{query}”.</p> : null}
     <div className="templateList">
-      {templates.map((template) => (
+      {visible.map((template) => (
         <div key={`${template.name}-${template.language}`}>
           <button
             className={selectedName === template.name ? "templateOption active" : "templateOption"}
@@ -1591,6 +1615,7 @@ function TemplateSelector({
         </div>
       ))}
     </div>
+    </>
   );
 }
 
@@ -1659,8 +1684,17 @@ function BulkModal({ groups, onClose, onDone }: { groups: Group[]; onClose: () =
   const [metaLimit, setMetaLimit] = useState<{ dailyLimit: number; suggested: number; quality: string | null } | null>(null);
   const [autoCampaign, setAutoCampaign] = useState(false);
   const [campaignStarted, setCampaignStarted] = useState<{ estimatedDays: number; total: number } | null>(null);
+  const [step, setStep] = useState(1);
 
   const selectedGroup = groups.find((group) => group.id === groupId) ?? null;
+
+  // Each step gates the next: pick a group, compose a message, then confirm.
+  const canContinue =
+    step === 1
+      ? Boolean(groupId)
+      : mode === "text"
+        ? Boolean(text.trim())
+        : Boolean(templateSelection) || Boolean(templateState.error);
 
   useEffect(() => {
     let cancelled = false;
@@ -1804,49 +1838,74 @@ function BulkModal({ groups, onClose, onDone }: { groups: Group[]; onClose: () =
           </>
         ) : (
           <>
-            <label>
-              Group
-              <select onChange={(event) => setGroupId(event.target.value ? Number(event.target.value) : "")} value={groupId}>
-                <option value="">Choose a group…</option>
+            <ol className="wizardSteps">
+              {["Group", "Message", "Options"].map((label, index) => (
+                <li className={step === index + 1 ? "active" : step > index + 1 ? "done" : ""} key={label}>
+                  <span>{index + 1}</span> {label}
+                </li>
+              ))}
+            </ol>
+
+            {step > 1 && selectedGroup ? (
+              <div className="wizardContext">
+                <strong dir="auto">{selectedGroup.name}</strong>
+                <em>{selectedGroup.memberCount} contacts</em>
+              </div>
+            ) : null}
+
+            {step === 1 ? (
+              <div className="groupPicker">
                 {groups.map((group) => (
-                  <option key={group.id} value={group.id}>{group.name} ({group.memberCount})</option>
+                  <button
+                    className={groupId === group.id ? "groupPick active" : "groupPick"}
+                    key={group.id}
+                    onClick={() => setGroupId(group.id)}
+                    type="button"
+                  >
+                    <span dir="auto">{group.name}</span>
+                    <em>{group.memberCount}</em>
+                  </button>
                 ))}
-              </select>
-            </label>
-            <div className="modeSwitch">
-              <button className={mode === "template" ? "active" : ""} onClick={() => setMode("template")} type="button">
-                <Icon path={icons.zap} size={14} /> Opening template
-              </button>
-              <button className={mode === "text" ? "active" : ""} onClick={() => setMode("text")} type="button">
-                Free text
-              </button>
-            </div>
-            {mode === "text" ? (
+                {!groups.length ? <p className="hint">No groups yet — create one from Groups first.</p> : null}
+              </div>
+            ) : null}
+
+            {step === 2 ? (
               <>
-                <textarea
-                  dir="auto"
-                  onChange={(event) => setText(event.target.value)}
-                  placeholder="Write the message everyone in the group will receive…"
-                  rows={4}
-                  value={text}
-                />
-                <p className="hint warning">
-                  Free text only reaches members who wrote to you in the last 24 hours. For everyone else, use a template.
-                </p>
+                <div className="modeSwitch">
+                  <button className={mode === "template" ? "active" : ""} onClick={() => setMode("template")} type="button">
+                    <Icon path={icons.zap} size={14} /> Template
+                  </button>
+                  <button className={mode === "text" ? "active" : ""} onClick={() => setMode("text")} type="button">
+                    Free text
+                  </button>
+                </div>
+                {mode === "text" ? (
+                  <>
+                    <textarea
+                      dir="auto"
+                      onChange={(event) => setText(event.target.value)}
+                      placeholder="Write the message everyone in the group will receive…"
+                      rows={5}
+                      value={text}
+                    />
+                    <p className="hint warning">
+                      Free text only reaches members who wrote to you in the last 24 hours. For everyone else, use a template.
+                    </p>
+                  </>
+                ) : (
+                  <TemplateSelector
+                    searchable
+                    onChange={(nextSelection, nextState) => {
+                      setTemplateSelection(nextSelection);
+                      setTemplateState(nextState);
+                    }}
+                  />
+                )}
               </>
-            ) : (
-              <>
-                <p className="hint">
-                  Approved templates reach every member, any time. Pick one:
-                </p>
-                <TemplateSelector
-                  onChange={(nextSelection, nextState) => {
-                    setTemplateSelection(nextSelection);
-                    setTemplateState(nextState);
-                  }}
-                />
-              </>
-            )}
+            ) : null}
+
+            {step === 3 ? (
             <div className="bulkOptions">
               <label className="checkboxRow highlight">
                 <input
@@ -1894,28 +1953,35 @@ function BulkModal({ groups, onClose, onDone }: { groups: Group[]; onClose: () =
                 </p>
               ) : null}
             </div>
+            ) : null}
+
             {error ? <div className="notice">{error}</div> : null}
+
             <div className="modalActions">
-              <button className="secondary" onClick={onClose} type="button">Cancel</button>
-              <button
-                disabled={
-                  busy ||
-                  !groupId ||
-                  (mode === "text" && !text.trim()) ||
-                  (mode === "template" && !templateSelection && (templateState.loading || !templateState.error)) ||
-                  (selectedGroup?.memberCount ?? 0) === 0
-                }
-                onClick={() => void submit()}
-                type="button"
-              >
-                {busy
-                  ? autoCampaign ? "Starting campaign…" : "Sending…"
-                  : autoCampaign
-                    ? "Start auto-campaign"
-                    : selectedGroup
-                      ? `Send to up to ${Math.min(maxRecipients, selectedGroup.memberCount)} of ${selectedGroup.memberCount}`
-                      : "Send"}
-              </button>
+              {step === 1 ? (
+                <button className="secondary" onClick={onClose} type="button">Cancel</button>
+              ) : (
+                <button className="secondary" onClick={() => setStep(step - 1)} type="button">Back</button>
+              )}
+              {step < 3 ? (
+                <button disabled={!canContinue} onClick={() => setStep(step + 1)} type="button">
+                  Next
+                </button>
+              ) : (
+                <button
+                  disabled={busy || !canContinue || (selectedGroup?.memberCount ?? 0) === 0}
+                  onClick={() => void submit()}
+                  type="button"
+                >
+                  {busy
+                    ? autoCampaign ? "Starting campaign…" : "Sending…"
+                    : autoCampaign
+                      ? "Start auto-campaign"
+                      : selectedGroup
+                        ? `Send to up to ${Math.min(maxRecipients, selectedGroup.memberCount)} of ${selectedGroup.memberCount}`
+                        : "Send"}
+                </button>
+              )}
             </div>
           </>
         )}
