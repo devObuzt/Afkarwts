@@ -1532,7 +1532,12 @@ function TemplateSelector({
       onChange(null, { loading, error });
       return;
     }
-    const filled = selected.paramCount === 0 || params.slice(0, selected.paramCount).every((param) => param?.trim());
+    // Every placeholder must have a value — an empty array passes .every(),
+    // so the length has to be checked too.
+    const values = params.slice(0, selected.paramCount);
+    const filled =
+      selected.paramCount === 0 ||
+      (values.length === selected.paramCount && values.every((param) => Boolean(param?.trim())));
     onChange(
       filled
         ? {

@@ -115,6 +115,19 @@ export async function sendWhatsAppTemplate(member: Member, options: TemplateSend
     throw new Error("WHATSAPP_TEMPLATE_NAME is missing.");
   }
 
+  // Guard: WhatsApp rejects a template whose {{n}} placeholders are unfilled
+  // (error #132000). Fail here with a message the UI can actually show.
+  if (options.name) {
+    const known = await listWhatsAppTemplates().catch(() => [] as WhatsAppTemplate[]);
+    const match = known.find((item) => item.name === options.name);
+    if (match && match.paramCount !== bodyParams.length) {
+      throw new Error(
+        `This template needs ${match.paramCount} value${match.paramCount === 1 ? "" : "s"} ` +
+          `for its {{1}}…{{${match.paramCount}}} placeholders, but ${bodyParams.length} were provided.`
+      );
+    }
+  }
+
   const template: Record<string, unknown> = {
     name: templateName,
     language: {
