@@ -1062,6 +1062,19 @@ export function listGroupMembers(groupId: number): Member[] {
   return rows.map((row) => mapMember(row, groupMap.get(row.id) ?? []));
 }
 
+/** Moves a contact to a different number, refusing to collide with an existing one. */
+export function updateMemberPhone(memberId: number, phone: string) {
+  const normalized = normalizePhone(phone);
+  const existing = getDb().prepare("SELECT id FROM members WHERE phone = ? AND id <> ?").get(normalized, memberId) as
+    | { id: number }
+    | undefined;
+  if (existing) {
+    return { ok: false as const, reason: "taken" as const };
+  }
+  getDb().prepare("UPDATE members SET phone = ? WHERE id = ?").run(normalized, memberId);
+  return { ok: true as const, phone: normalized };
+}
+
 export function findMemberByPhone(phone: string) {
   const normalized = normalizePhone(phone);
   const row = getDb().prepare("SELECT * FROM members WHERE phone = ?").get(normalized) as

@@ -1383,16 +1383,32 @@ function GroupsModal({ groups, onChanged, onClose }: { groups: Group[]; onChange
 
 type CampaignRun = { id: number; sent: number; failed: number; remaining: number; ranAt: string };
 type RecipientRow = { memberId: number; name: string; phone: string; error: string | null; sentAt: string | null };
+type FailureReason = { kind: string; title: string; explanation: string; action: string | null };
+type FailedRow = RecipientRow & {
+  reason: FailureReason;
+  alternate: string | null;
+  alternateTaken: boolean;
+};
 type CampaignDetail = {
   runs: CampaignRun[];
   delivered: RecipientRow[];
-  failed: RecipientRow[];
+  failed: FailedRow[];
   pending: RecipientRow[];
 };
 
 function CampaignDetailPanel({ campaignId }: { campaignId: number }) {
   const [detail, setDetail] = useState<CampaignDetail | null>(null);
   const [tab, setTab] = useState<"runs" | "failed" | "pending">("runs");
+  const [openReason, setOpenReason] = useState<string | null>(null);
+  const [fixing, setFixing] = useState<number | null>(null);
+  const [fixNotes, setFixNotes] = useState<Record<number, string>>({});
+
+  async function load() {
+    const response = await fetch(`/api/campaigns/${campaignId}/detail`);
+    if (response.ok) {
+      setDetail(await response.json());
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -1406,9 +1422,40 @@ function CampaignDetailPanel({ campaignId }: { campaignId: number }) {
     };
   }, [campaignId]);
 
+  // Moves one contact to the other country code, then refreshes the list.
+  async function switchCountryCode(row: FailedRow) {
+    if (!row.alternate) return;
+    setFixing(row.memberId);
+    const response = await fetch("/api/members/phone", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ memberId: row.memberId, phone: row.alternate })
+    });
+    const payload = await response.json().catch(() => ({}));
+    setFixNotes((notes) => ({
+      ...notes,
+      [row.memberId]: response.ok ? `Now ${payload.phone}` : payload.error ?? "Could not change it."
+    }));
+    setFixing(null);
+    if (response.ok) {
+      await load();
+    }
+  }
+
   if (!detail) return <p className="hint">Loading batches…</p>;
 
-  const rows = tab === "failed" ? detail.failed : tab === "pending" ? detail.pending : [];
+  const rows = tab === "pending" ? detail.pending : [];
+
+  // Failures are grouped by reason so 27 identical-looking lines become a
+  // handful of problems, each with its own explanation.
+  const failureGroups = Object.values(
+    detail.failed.reduce<Record<string, { reason: FailureReason; rows: FailedRow[] }>>((groups, row) => {
+      const key = row.reason?.kind ?? "other";
+      groups[key] = groups[key] ?? { reason: row.reason, rows: [] };
+      groups[key].rows.push(row);
+      return groups;
+    }, {})
+  ).sort((a, b) => b.rows.length - a.rows.length);
 
   return (
     <div className="campaignDetail">
@@ -1445,18 +1492,72 @@ function CampaignDetailPanel({ campaignId }: { campaignId: number }) {
         ) : (
           <p className="hint">No batch has run yet.</p>
         )
+      ) : tab === "failed" ? (
+        failureGroups.length ? (
+          <div className="failureGroups">
+            {failureGroups.map(({ reason, rows: groupRows }) => (
+              <div className="failureGroup" key={reason.kind}>
+                <div className="failureHeading">
+                  <strong>{reason.title}</strong>
+                  <span className="failureCount">{groupRows.length}</span>
+                  <button
+                    aria-label={`What does "${reason.title}" mean?`}
+                    className="infoButton"
+                    onClick={() => setOpenReason(openReason === reason.kind ? null : reason.kind)}
+                    type="button"
+                  >
+                    i
+                  </button>
+                </div>
+                {openReason === reason.kind ? (
+                  <div className="failureExplain">
+                    <p>{reason.explanation}</p>
+                    {reason.action ? <p className="failureAction">{reason.action}</p> : null}
+                  </div>
+                ) : null}
+                <div className="recipientList">
+                  {groupRows.map((row) => (
+                    <div className="recipientRow" key={row.memberId}>
+                      <span dir="auto">{row.name}</span>
+                      <span className="bulkPhone">{row.phone}</span>
+                      {row.alternate ? (
+                        row.alternateTaken ? (
+                          <span className="recipientHint">
+                            {row.alternate} already belongs to another contact — likely a duplicate.
+                          </span>
+                        ) : fixNotes[row.memberId] ? (
+                          <span className="recipientHint">{fixNotes[row.memberId]}</span>
+                        ) : (
+                          <button
+                            className="linkButton"
+                            disabled={fixing === row.memberId}
+                            onClick={() => void switchCountryCode(row)}
+                            type="button"
+                          >
+                            {fixing === row.memberId ? "Changing…" : `Try ${row.alternate} instead`}
+                          </button>
+                        )
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="hint">No failures.</p>
+        )
       ) : rows.length ? (
         <div className="recipientList">
           {rows.map((row) => (
             <div className="recipientRow" key={row.memberId}>
               <span dir="auto">{row.name}</span>
               <span className="bulkPhone">{row.phone}</span>
-              {row.error ? <span className="recipientError">{row.error}</span> : null}
             </div>
           ))}
         </div>
       ) : (
-        <p className="hint">{tab === "failed" ? "No failures." : "Everyone has received it."}</p>
+        <p className="hint">Everyone has received it.</p>
       )}
     </div>
   );

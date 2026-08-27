@@ -1688,3 +1688,81 @@ label {
   flex-wrap: wrap;
   margin-bottom: 4px;
 }
+
+.failureGroups {
+  display: grid;
+  gap: 14px;
+}
+
+.failureHeading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.failureCount {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--danger);
+  background: var(--danger-soft);
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+
+.infoButton {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  font-style: italic;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.infoButton:hover {
+  border-color: var(--green-500);
+  color: var(--green-700);
+}
+
+.failureExplain {
+  background: var(--green-tint);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  font-size: 13px;
+  line-height: 1.55;
+  display: grid;
+  gap: 6px;
+}
+
+.failureAction {
+  color: var(--green-700);
+  font-weight: 600;
+}
+
+.recipientHint {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.linkButton {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--green-700);
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.linkButton:disabled {
+  color: var(--muted);
+  cursor: default;
+}
