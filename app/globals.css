@@ -1176,9 +1176,14 @@ label {
 .templateName {
   align-items: baseline;
   display: flex;
+  flex-wrap: wrap;
   font-weight: 700;
   gap: 8px;
-  justify-content: space-between;
+}
+
+/* The language sits at the far end, after the name and its category badge. */
+.templateName em {
+  margin-inline-start: auto;
 }
 
 .templateName em {
@@ -1778,4 +1783,30 @@ label {
   color: var(--muted);
   font-size: 12px;
   font-weight: 400;
+}
+
+/* Marketing templates count against the per-user daily cap; utility ones do
+   not — the difference decides whether a send lands, so it is worth a badge. */
+.categoryTag {
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  padding: 2px 8px;
+  text-transform: uppercase;
+}
+
+.categoryTag.utility {
+  background: var(--green-soft);
+  color: var(--green-700);
+}
+
+.categoryTag.marketing {
+  background: #f6efdf;
+  color: #8a6218;
+}
+
+.categoryTag.authentication {
+  background: #e7eef6;
+  color: #2e5a7c;
 }

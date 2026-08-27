@@ -1745,7 +1745,9 @@ function TemplateSelector({
     const term = query.trim().toLowerCase();
     if (!term) return templates;
     return templates.filter((template) =>
-      `${template.name} ${template.bodyText} ${template.headerText ?? ""}`.toLowerCase().includes(term)
+      `${template.name} ${template.category} ${template.bodyText} ${template.headerText ?? ""}`
+        .toLowerCase()
+        .includes(term)
     );
   }, [templates, query]);
 
@@ -1838,7 +1840,10 @@ function TemplateSelector({
           >
             <span className="templateName">
               {template.name}
-              <em>{template.language} · {template.category.toLowerCase()}</em>
+              <span className={`categoryTag ${template.category.toLowerCase()}`}>
+                {template.category === "UTILITY" ? "Utility" : template.category === "MARKETING" ? "Marketing" : template.category}
+              </span>
+              <em>{template.language}</em>
             </span>
             <span className="templateBody" dir="auto">
               {template.headerText ? <strong>{template.headerText}<br /></strong> : null}
