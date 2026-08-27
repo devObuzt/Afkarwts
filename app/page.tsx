@@ -1503,8 +1503,21 @@ function CampaignsModal({ onClose }: { onClose: () => void }) {
       body: JSON.stringify({})
     });
     const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      setImportNote(payload.error ?? `Import failed (${response.status}).`);
+      setImporting(false);
+      return;
+    }
     const count = payload.created?.length ?? 0;
-    setImportNote(count ? `Added ${count} past send${count === 1 ? "" : "s"}.` : "Nothing new to import.");
+    const scanned: Array<{ group: string; sends: number; alreadyLogged: number }> = payload.scanned ?? [];
+    const seen = scanned.reduce((total, entry) => total + entry.sends, 0);
+    setImportNote(
+      count
+        ? `Added ${count} past send${count === 1 ? "" : "s"}.`
+        : seen
+          ? `Found ${seen} past send${seen === 1 ? "" : "s"} — all already listed here.`
+          : "No past group sends found in the message history."
+    );
     setImporting(false);
     await load();
   }

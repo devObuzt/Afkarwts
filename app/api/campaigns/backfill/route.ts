@@ -33,19 +33,32 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Group not found." }, { status: 404 });
   }
 
-  const created = groups.flatMap((group) => backfillGroup(group, body.body));
+  const scanned = groups.map((group) => backfillGroup(group, body.body));
+  const created = scanned.flatMap((entry) => entry.created);
 
-  return NextResponse.json({ created: created.filter(Boolean) });
+  return NextResponse.json({
+    created,
+    // Per-group counts so the UI can explain an empty result.
+    scanned: scanned
+      .filter((entry) => entry.sends > 0)
+      .map(({ group, sends, alreadyLogged, created: rows }) => ({
+        group,
+        sends,
+        alreadyLogged,
+        created: rows.length
+      }))
+  });
 }
 
 function backfillGroup(group: { id: number; name: string }, onlyBody?: string) {
   const groupId = group.id;
   const known = new Set(listCampaigns().filter((c) => c.groupId === groupId).map(campaignSendBody));
-  const candidates = listGroupSendBodies(groupId).filter(
+  const sends = listGroupSendBodies(groupId);
+  const candidates = sends.filter(
     (send) => !known.has(send.body) && (!onlyBody || send.body === onlyBody)
   );
 
-  return candidates.map((send) => {
+  const created = candidates.map((send) => {
     const campaign = createCampaign({
       groupId,
       label: `${send.body.slice(0, 40)}${send.body.length > 40 ? "…" : ""} → ${group.name}`,
@@ -59,4 +72,11 @@ function backfillGroup(group: { id: number; name: string }, onlyBody?: string) {
     recordCampaignRun({ campaignId: campaign.id, sent: send.sent, failed: send.failed, remaining: 0 });
     return { id: campaign.id, group: group.name, recipients: send.recipients, sent: send.sent, failed: send.failed };
   });
+
+  return {
+    group: group.name,
+    sends: sends.length,
+    alreadyLogged: sends.filter((send) => known.has(send.body)).length,
+    created: created.filter((row): row is NonNullable<typeof row> => Boolean(row))
+  };
 }
