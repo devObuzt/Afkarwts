@@ -1083,6 +1083,21 @@ export function findMemberByPhone(phone: string) {
   return row ? mapMember(row) : null;
 }
 
+const STATUS_RANK: Record<Message["status"], number> = {
+  received: 0,
+  pending: 1,
+  accepted: 2,
+  sent: 3,
+  delivered: 4,
+  read: 5,
+  failed: 3
+};
+
+/** Meta delivers status updates out of order, so a status only ever moves forward. */
+export function statusRank(status: Message["status"]) {
+  return STATUS_RANK[status];
+}
+
 export function updateMessageStatusByWhatsAppId(
   whatsappMessageId: string,
   input: { status: Message["status"]; error?: string | null }
@@ -1095,9 +1110,16 @@ export function updateMessageStatusByWhatsAppId(
     return null;
   }
 
-  getDb()
-    .prepare("UPDATE messages SET status = ?, error = ? WHERE whatsapp_message_id = ?")
-    .run(input.status, input.error ?? null, whatsappMessageId);
+  const isFailure = input.status === "failed";
+  const alreadyDelivered = existing.status === "delivered" || existing.status === "read";
+  const movesForward = statusRank(input.status) > statusRank(existing.status);
+  const accepted = isFailure ? !alreadyDelivered : movesForward;
+
+  if (accepted) {
+    getDb()
+      .prepare("UPDATE messages SET status = ?, error = ? WHERE whatsapp_message_id = ?")
+      .run(input.status, input.error ?? null, whatsappMessageId);
+  }
 
   const row = getDb()
     .prepare("SELECT * FROM messages WHERE whatsapp_message_id = ?")
