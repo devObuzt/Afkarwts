@@ -8,6 +8,7 @@ const publicPrefixes = [
   "/api/auth/login",
   "/api/webhook/whatsapp",
   "/api/campaigns/tick",
+  "/api/dev/simulate",
   "/_next",
   "/favicon.ico"
 ];
