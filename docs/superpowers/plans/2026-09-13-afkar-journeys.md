@@ -538,20 +538,20 @@ import { useTempDataDir } from "./helpers/data-dir.ts";
 useTempDataDir();
 
 test("a simulated reply lands as an incoming message", async () => {
-  const { createMember, listMemberMessages } = await import("@/app/lib/db");
+  const { createMember, listMessages } = await import("@/app/lib/db");
   const { buildIncomingPayload, handleWebhookPayload } = await import("@/app/lib/whatsapp-webhook");
 
   const member = createMember({ name: "فحص", phone: "+972500000002", notes: "" });
   await handleWebhookPayload(buildIncomingPayload({ phone: member.phone, text: "أهلين" }));
 
-  const messages = listMemberMessages(member.id);
+  const messages = listMessages(member.id);
   assert.equal(messages.length, 1);
   assert.equal(messages[0].direction, "incoming");
   assert.equal(messages[0].body, "أهلين");
 });
 
 test("a simulated status updates the message", async () => {
-  const { createMember, createMessage, listMemberMessages } = await import("@/app/lib/db");
+  const { createMember, createMessage, listMessages } = await import("@/app/lib/db");
   const { buildStatusPayload, handleWebhookPayload } = await import("@/app/lib/whatsapp-webhook");
 
   const member = createMember({ name: "فحص", phone: "+972500000003", notes: "" });
@@ -564,11 +564,10 @@ test("a simulated status updates the message", async () => {
   });
 
   await handleWebhookPayload(buildStatusPayload({ whatsappMessageId: "dryrun.abc", status: "read" }));
-  assert.equal(listMemberMessages(member.id)[0].status, "read");
+  assert.equal(listMessages(member.id)[0].status, "read");
 });
 ```
 
-If `listMemberMessages` has a different name in `app/lib/db.ts`, use the real one.
 
 - [ ] **Step 4: Run it**
 
@@ -622,7 +621,6 @@ export async function POST(request: Request) {
 }
 ```
 
-Use the real accessor for a single member from `app/lib/db.ts` if it is not called `getMember`.
 
 - [ ] **Step 6: Verify the build**
 
@@ -674,7 +672,7 @@ Copy every variable from the production service **except** `FIREBASE_PROJECT_ID`
 
 Read the values through the Railway API into the staging service directly. Do not write them to a file.
 
-Before copying `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`, confirm whose chat the id is (§13.4). If it belongs to Afkar's staff, leave both unset for now and record that in `docs/staging.md`.
+`TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` are copied unchanged: the chat is ours, not Afkar's (settled 2026-09-13). Staging reports land in our own Telegram, marked as a simulation by the guard, and nobody at Afkar sees them.
 
 - [ ] **Step 4: Load the database**
 
@@ -899,7 +897,6 @@ test("a journey starts as a draft", async () => {
 });
 ```
 
-Use the real group-creation function from `app/lib/db.ts` if it is not `createGroup`.
 
 - [ ] **Step 4: Run it to verify it fails**
 
@@ -1506,12 +1503,12 @@ process.env.WHATSAPP_TEMPLATE_NAME = "clean_week";
 process.env.WHATSAPP_TEMPLATE_LANGUAGE = "ar";
 
 async function cohort() {
-  const { createMember, createGroup, addMemberToGroup } = await import("@/app/lib/db");
+  const { createMember, createGroup, addMembersToGroup } = await import("@/app/lib/db");
   const { createTemplate, createStep, createJourney, setJourneyStatus } = await import("@/app/lib/journeys/store");
 
   const group = createGroup(`كلين ${Date.now()}`);
   const member = createMember({ name: "سارة", phone: `+97250${String(Date.now()).slice(-7)}`, notes: "" });
-  addMemberToGroup(member.id, group.id);
+  addMembersToGroup(group.id, [member.id]);
 
   const template = createTemplate({ name: "كلين" });
   createStep({
@@ -1533,29 +1530,28 @@ async function cohort() {
 
 test("a due step is sent once, however many ticks run", async () => {
   const { runDueJourneys } = await import("@/app/lib/journeys/runner");
-  const { listMemberMessages } = await import("@/app/lib/db");
+  const { listMessages } = await import("@/app/lib/db");
   const { member } = await cohort();
 
   const now = new Date("2026-08-30T05:00:00.000Z"); // an hour after 07:00 Israel time
   await runDueJourneys(now);
   await runDueJourneys(now);
 
-  const messages = listMemberMessages(member.id).filter((message) => message.direction === "outgoing");
+  const messages = listMessages(member.id).filter((message) => message.direction === "outgoing");
   assert.equal(messages.length, 1);
   assert.match(messages[0].whatsappMessageId ?? "", /^dryrun\./);
 });
 
 test("a step whose window closed is recorded missed, not sent", async () => {
   const { runDueJourneys } = await import("@/app/lib/journeys/runner");
-  const { listMemberMessages } = await import("@/app/lib/db");
+  const { listMessages } = await import("@/app/lib/db");
   const { member } = await cohort();
 
   await runDueJourneys(new Date("2026-08-31T05:00:00.000Z")); // a full day late
-  assert.equal(listMemberMessages(member.id).length, 0);
+  assert.equal(listMessages(member.id).length, 0);
 });
 ```
 
-Use the real names from `app/lib/db.ts` for group creation and membership if they differ.
 
 - [ ] **Step 2: Run it to verify it fails**
 
@@ -1583,8 +1579,7 @@ export function claimSend(enrollmentId: number, stepId: number) {
 
 - [ ] **Step 4: Write the runner**
 
-`app/lib/journeys/runner.ts` — use the real single-member accessor from
-`app/lib/db.ts` if it is not called `getMember`:
+`app/lib/journeys/runner.ts`:
 
 ```ts
 import { createMessage, getMember, updateMessageStatus } from "../db";

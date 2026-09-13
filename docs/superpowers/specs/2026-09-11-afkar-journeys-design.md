@@ -70,7 +70,7 @@ service. They are never written to disk. Exceptions:
 | `DRY_RUN` | `1` (new) |
 | `WHATSAPP_VERIFY_TOKEN` | New random value, so a staging key cannot trigger production's tick and the reverse. |
 | `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY` | **Not copied.** The copied database holds 4 live device tokens belonging to Afkar staff. Without these variables `sendPushToDevices` already returns `skipped`. |
-| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | Copied only after confirming whose chat `TELEGRAM_CHAT_ID` is. If it is an Afkar staff chat, staging gets our own chat instead. |
+| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | Copied unchanged. The chat is ours, not Afkar's (settled 2026-09-13), so staging reports reach our own Telegram and nobody at Afkar sees them. |
 | `SMS_PROVIDER` | `none` (new) |
 
 ### 4.2 The outbound guard — the one part that must be right
@@ -456,5 +456,5 @@ the engine can move to HeartBeat's PostgreSQL later without rewriting its rules.
    into marketing. Step templates have to be service content — programme
    instructions and reminders. Offers belong in campaigns.
 3. **SMS to +970 numbers.** Not verified with Inforu. Manual only until tested.
-4. **Telegram chat.** Confirm whose chat `TELEGRAM_CHAT_ID` is before staging
-   reports go out (§4.1).
+4. ~~**Telegram chat.**~~ Settled 2026-09-13: the chat is ours, not Afkar's, so
+   staging copies both Telegram variables unchanged (§4.1).
