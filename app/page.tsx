@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Mp3Encoder } from "@breezystack/lamejs";
 import { setupNativePush } from "./lib/native-push";
+import JourneysModal from "@/app/journeys/JourneysModal";
 
 // WhatsApp rejects browser MediaRecorder containers (fragmented MP4/WebM),
 // so recordings are transcoded to plain MP3 before sending.
@@ -144,7 +145,7 @@ type CampaignInfo = {
   progress: { total: number; delivered: number; remaining: number; daysLeft: number };
 };
 
-type ModalKind = "addMember" | "import" | "groups" | "bulk" | "template" | "campaigns" | null;
+type ModalKind = "addMember" | "import" | "groups" | "bulk" | "template" | "campaigns" | "journeys" | null;
 
 /** Value the picker writes to mean "fill in this contact's first name at send time". */
 const NAME_TOKEN = "{{name}}";
@@ -785,6 +786,9 @@ export default function Home() {
           <button onClick={() => setModal("campaigns")} type="button">
             <Icon path={icons.calendar} size={15} /> Campaigns
           </button>
+          <button onClick={() => setModal("journeys")} type="button">
+            <Icon path={icons.calendar} size={15} /> Journeys
+          </button>
         </div>
 
         <section className="memberList" aria-label="Members">
@@ -1029,6 +1033,7 @@ export default function Home() {
         />
       ) : null}
       {modal === "campaigns" ? <CampaignsModal onClose={() => setModal(null)} /> : null}
+      {modal === "journeys" ? <JourneysModal onClose={() => setModal(null)} /> : null}
       {modal === "template" && selectedMember ? (
         <TemplatePickerModal
           memberName={selectedMember.name}
