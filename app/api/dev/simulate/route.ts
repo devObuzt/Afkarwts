@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
-import { getMember } from "@/app/lib/db";
+import { getDb, getMember } from "@/app/lib/db";
 import { isLive } from "@/app/lib/outbound-guard";
 import { buildIncomingPayload, buildStatusPayload, handleWebhookPayload } from "@/app/lib/whatsapp-webhook";
 
 export const runtime = "nodejs";
 
 type Body =
-  | { type: "incoming"; memberId: number; text: string }
+  | { type: "incoming"; memberId: number; text: string; at?: string }
   | { type: "status"; whatsappMessageId: string; status: "sent" | "delivered" | "read" | "failed"; error?: string };
 
 export async function POST(request: Request) {
@@ -28,7 +28,21 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Member not found." }, { status: 404 });
     }
 
-    await handleWebhookPayload(buildIncomingPayload({ phone: member.phone, text: body.text }));
+    const messageId = `sim.${Date.now()}.${Math.random().toString(36).slice(2, 8)}`;
+    await handleWebhookPayload(buildIncomingPayload({ phone: member.phone, text: body.text, messageId }));
+
+    // A simulated run drives its own clock, so the reply can be placed in time
+    // rather than stamped with the real one.
+    if (body.at) {
+      const at = new Date(body.at);
+      if (Number.isNaN(at.getTime())) {
+        return NextResponse.json({ error: "Invalid at." }, { status: 400 });
+      }
+      getDb()
+        .prepare("UPDATE messages SET created_at = ? WHERE whatsapp_message_id = ?")
+        .run(at.toISOString().slice(0, 19).replace("T", " "), messageId);
+    }
+
     return NextResponse.json({ ok: true });
   }
 

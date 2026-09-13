@@ -333,10 +333,9 @@ export function syncEnrollments(journeyId: number, now: Date) {
     // Steps whose window shut before this member joined were never theirs.
     for (const step of steps) {
       if (now.getTime() >= stepDueAt(journey.anchorDate, step).getTime() + SEND_WINDOW_MS) {
-        db.prepare("INSERT INTO journey_sends (enrollment_id, step_id, state) VALUES (?, ?, 'skipped')").run(
-          enrollmentId,
-          step.id
-        );
+        db.prepare(
+          "INSERT INTO journey_sends (enrollment_id, step_id, state, attempted_at) VALUES (?, ?, 'skipped', ?)"
+        ).run(enrollmentId, step.id, sqliteStamp(now));
       }
     }
   }
@@ -443,15 +442,18 @@ export function loadTickState(journeyId: number, now: Date): EnrollmentState[] {
  * take the same step, so a process that dies mid-send leaves a pending row
  * rather than a gap that would be sent twice.
  */
-export function claimSend(enrollmentId: number, stepId: number) {
+export function claimSend(enrollmentId: number, stepId: number, now: Date) {
+  // The tick's own clock is written, not the database's: the silence rule
+  // measures from this timestamp, and a simulated run must be able to move it.
+  const stamp = sqliteStamp(now);
   const row = getDb()
     .prepare(
-      `INSERT INTO journey_sends (enrollment_id, step_id, state) VALUES (?, ?, 'pending')
-       ON CONFLICT (enrollment_id, step_id) DO UPDATE SET state = 'pending', attempted_at = CURRENT_TIMESTAMP
+      `INSERT INTO journey_sends (enrollment_id, step_id, state, attempted_at) VALUES (?, ?, 'pending', ?)
+       ON CONFLICT (enrollment_id, step_id) DO UPDATE SET state = 'pending', attempted_at = excluded.attempted_at
          WHERE journey_sends.state = 'deferred'
        RETURNING id`
     )
-    .get(enrollmentId, stepId) as { id: number } | undefined;
+    .get(enrollmentId, stepId, stamp) as { id: number } | undefined;
 
   return row ? row.id : null;
 }
@@ -465,14 +467,19 @@ export function recordSend(
     .run(input.channel, input.messageId, input.state, input.error ?? null, sendId);
 }
 
-export function recordSendState(enrollmentId: number, stepId: number, state: "deferred" | "missed" | "skipped") {
+export function recordSendState(
+  enrollmentId: number,
+  stepId: number,
+  state: "deferred" | "missed" | "skipped",
+  now: Date
+) {
   getDb()
     .prepare(
-      `INSERT INTO journey_sends (enrollment_id, step_id, state) VALUES (?, ?, ?)
-       ON CONFLICT (enrollment_id, step_id) DO UPDATE SET state = excluded.state
+      `INSERT INTO journey_sends (enrollment_id, step_id, state, attempted_at) VALUES (?, ?, ?, ?)
+       ON CONFLICT (enrollment_id, step_id) DO UPDATE SET state = excluded.state, attempted_at = excluded.attempted_at
          WHERE journey_sends.state = 'deferred'`
     )
-    .run(enrollmentId, stepId, state);
+    .run(enrollmentId, stepId, state, sqliteStamp(now));
 }
 
 export function stopEnrollment(enrollmentId: number, reason: string, now: Date) {

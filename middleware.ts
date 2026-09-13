@@ -10,6 +10,7 @@ const publicPrefixes = [
   "/api/campaigns/tick",
   "/api/dev/simulate",
   "/api/journeys/tick",
+  "/api/journeys/digest",
   "/_next",
   "/favicon.ico"
 ];
