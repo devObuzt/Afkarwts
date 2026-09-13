@@ -1,4 +1,5 @@
 import { runDueCampaigns } from "./campaigns";
+import { runDueJourneys } from "./journeys/runner";
 import { isLive } from "./outbound-guard";
 
 const globalForScheduler = globalThis as typeof globalThis & {
@@ -16,6 +17,15 @@ if (!globalForScheduler.__afkarSchedulerStarted) {
 
   setTimeout(tick, 60 * 1000);
   setInterval(tick, 30 * 60 * 1000);
+
+  // Journeys tick far more often than campaigns: a step is due at a given hour,
+  // and a missed window is reported rather than sent late.
+  const journeyTick = () => {
+    runDueJourneys().catch((error) => console.error("Journey scheduler tick failed:", error));
+  };
+
+  setTimeout(journeyTick, 30 * 1000);
+  setInterval(journeyTick, 5 * 60 * 1000);
   console.log("Afkar campaign scheduler started.");
 
   if (!isLive()) {

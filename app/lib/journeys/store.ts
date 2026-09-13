@@ -1,4 +1,7 @@
 import { getDb } from "../db";
+import { getMessagingLimit } from "../whatsapp";
+import { SEND_WINDOW_MS, type EnrollmentState, type LastSend, type PendingStep } from "./engine";
+import { stepDueAt } from "./schedule";
 
 export type JourneyTemplate = {
   id: number;
@@ -226,6 +229,9 @@ export function updateStep(
       next.templatePreview,
       id
     );
+
+  // An edit that moves a step into the past must not fire it on the spot.
+  markEditedStepSkipped(id, new Date());
   return getStep(id)!;
 }
 
@@ -269,4 +275,274 @@ export function setJourneyStatus(id: number, status: Journey["status"]) {
        WHERE id = ?`
     )
     .run(status, activating ? 1 : 0, id);
+}
+
+/* Enrollments, sends and the tick state */
+
+/**
+ * SQLite writes CURRENT_TIMESTAMP as "YYYY-MM-DD HH:MM:SS" in UTC with no zone
+ * marker, which JavaScript would otherwise read as local time.
+ */
+function toIso(value: string) {
+  return value.includes("T") ? value : `${value.replace(" ", "T")}Z`;
+}
+
+function sqliteStamp(date: Date) {
+  return date.toISOString().slice(0, 19).replace("T", " ");
+}
+
+/** A deferred row is a note that a step waited, not a claim on it. */
+const SETTLED_STATES = "('pending', 'sent', 'failed', 'missed', 'skipped')";
+
+export function syncEnrollments(journeyId: number, now: Date) {
+  const db = getDb();
+  const journey = getJourney(journeyId);
+  if (!journey) {
+    return { added: 0, removed: 0 };
+  }
+
+  const steps = listSteps(journey.templateId);
+  const memberIds = (
+    db.prepare("SELECT member_id FROM member_groups WHERE group_id = ?").all(journey.groupId) as Array<{
+      member_id: number;
+    }>
+  ).map((row) => row.member_id);
+
+  const enrolled = new Map(
+    (
+      db.prepare("SELECT id, member_id, state FROM journey_enrollments WHERE journey_id = ?").all(journeyId) as Array<{
+        id: number;
+        member_id: number;
+        state: string;
+      }>
+    ).map((row) => [row.member_id, row])
+  );
+
+  let added = 0;
+  for (const memberId of memberIds) {
+    if (enrolled.has(memberId)) {
+      continue;
+    }
+
+    const result = db
+      .prepare("INSERT INTO journey_enrollments (journey_id, member_id) VALUES (?, ?)")
+      .run(journeyId, memberId);
+    const enrollmentId = Number(result.lastInsertRowid);
+    added += 1;
+
+    // Steps whose window shut before this member joined were never theirs.
+    for (const step of steps) {
+      if (now.getTime() >= stepDueAt(journey.anchorDate, step).getTime() + SEND_WINDOW_MS) {
+        db.prepare("INSERT INTO journey_sends (enrollment_id, step_id, state) VALUES (?, ?, 'skipped')").run(
+          enrollmentId,
+          step.id
+        );
+      }
+    }
+  }
+
+  const inGroup = new Set(memberIds);
+  let removed = 0;
+  for (const [memberId, row] of enrolled) {
+    if (!inGroup.has(memberId) && row.state === "active") {
+      db.prepare("UPDATE journey_enrollments SET state = 'removed' WHERE id = ?").run(row.id);
+      removed += 1;
+    }
+  }
+
+  return { added, removed };
+}
+
+export function loadTickState(journeyId: number, now: Date): EnrollmentState[] {
+  const db = getDb();
+  const journey = getJourney(journeyId);
+  if (!journey) {
+    return [];
+  }
+
+  const steps = listSteps(journey.templateId);
+  const enrollments = db
+    .prepare("SELECT id, member_id FROM journey_enrollments WHERE journey_id = ? AND state = 'active'")
+    .all(journeyId) as Array<{ id: number; member_id: number }>;
+
+  return enrollments.map((enrollment) => {
+    const incoming = db
+      .prepare("SELECT MAX(created_at) AS at FROM messages WHERE member_id = ? AND direction = 'incoming'")
+      .get(enrollment.member_id) as { at: string | null };
+
+    const lastSendRow = db
+      .prepare(
+        `SELECT s.step_id, s.attempted_at, s.state, m.status AS message_status, COALESCE(s.error, m.error) AS error
+         FROM journey_sends s
+         LEFT JOIN messages m ON m.id = s.message_id
+         WHERE s.enrollment_id = ? AND s.state IN ('sent', 'failed')
+         ORDER BY s.attempted_at DESC, s.id DESC
+         LIMIT 1`
+      )
+      .get(enrollment.id) as
+      | { step_id: number; attempted_at: string; state: "sent" | "failed"; message_status: string | null; error: string | null }
+      | undefined;
+
+    const settled = new Set(
+      (
+        db
+          .prepare(`SELECT step_id FROM journey_sends WHERE enrollment_id = ? AND state IN ${SETTLED_STATES}`)
+          .all(enrollment.id) as Array<{ step_id: number }>
+      ).map((row) => row.step_id)
+    );
+
+    const dueSteps: PendingStep[] = [];
+    const expiredSteps: PendingStep[] = [];
+    let hasUnsentStepsAhead = false;
+
+    for (const step of steps) {
+      if (settled.has(step.id)) {
+        continue;
+      }
+
+      const dueAt = stepDueAt(journey.anchorDate, step);
+      const pending: PendingStep = {
+        stepId: step.id,
+        dueAt: dueAt.toISOString(),
+        hasFreeText: step.freeText.trim().length > 0
+      };
+
+      if (now.getTime() < dueAt.getTime()) {
+        hasUnsentStepsAhead = true;
+      } else if (now.getTime() < dueAt.getTime() + SEND_WINDOW_MS) {
+        dueSteps.push(pending);
+      } else {
+        expiredSteps.push(pending);
+      }
+    }
+
+    const lastSend: LastSend | null = lastSendRow
+      ? {
+          stepId: lastSendRow.step_id,
+          attemptedAt: toIso(lastSendRow.attempted_at),
+          state: lastSendRow.state,
+          messageStatus: (lastSendRow.message_status as LastSend["messageStatus"]) ?? null,
+          error: lastSendRow.error
+        }
+      : null;
+
+    return {
+      enrollmentId: enrollment.id,
+      memberId: enrollment.member_id,
+      lastIncomingAt: incoming.at ? toIso(incoming.at) : null,
+      lastSend,
+      dueSteps,
+      expiredSteps,
+      hasUnsentStepsAhead
+    };
+  });
+}
+
+/**
+ * Claims a step before it is sent. The unique key means a second tick cannot
+ * take the same step, so a process that dies mid-send leaves a pending row
+ * rather than a gap that would be sent twice.
+ */
+export function claimSend(enrollmentId: number, stepId: number) {
+  const row = getDb()
+    .prepare(
+      `INSERT INTO journey_sends (enrollment_id, step_id, state) VALUES (?, ?, 'pending')
+       ON CONFLICT (enrollment_id, step_id) DO UPDATE SET state = 'pending', attempted_at = CURRENT_TIMESTAMP
+         WHERE journey_sends.state = 'deferred'
+       RETURNING id`
+    )
+    .get(enrollmentId, stepId) as { id: number } | undefined;
+
+  return row ? row.id : null;
+}
+
+export function recordSend(
+  sendId: number,
+  input: { channel: "text" | "template"; messageId: number | null; state: "sent" | "failed"; error?: string | null }
+) {
+  getDb()
+    .prepare("UPDATE journey_sends SET channel = ?, message_id = ?, state = ?, error = ? WHERE id = ?")
+    .run(input.channel, input.messageId, input.state, input.error ?? null, sendId);
+}
+
+export function recordSendState(enrollmentId: number, stepId: number, state: "deferred" | "missed" | "skipped") {
+  getDb()
+    .prepare(
+      `INSERT INTO journey_sends (enrollment_id, step_id, state) VALUES (?, ?, ?)
+       ON CONFLICT (enrollment_id, step_id) DO UPDATE SET state = excluded.state
+         WHERE journey_sends.state = 'deferred'`
+    )
+    .run(enrollmentId, stepId, state);
+}
+
+export function stopEnrollment(enrollmentId: number, reason: string, now: Date) {
+  getDb()
+    .prepare("UPDATE journey_enrollments SET state = 'stopped', stop_reason = ?, stopped_at = ? WHERE id = ?")
+    .run(reason, sqliteStamp(now), enrollmentId);
+}
+
+export function completeEnrollment(enrollmentId: number) {
+  getDb().prepare("UPDATE journey_enrollments SET state = 'completed' WHERE id = ?").run(enrollmentId);
+}
+
+export function resumeEnrollment(enrollmentId: number) {
+  getDb()
+    .prepare("UPDATE journey_enrollments SET state = 'active', stop_reason = NULL, stopped_at = NULL WHERE id = ?")
+    .run(enrollmentId);
+}
+
+export function enrollmentMemberId(enrollmentId: number) {
+  const row = getDb().prepare("SELECT member_id FROM journey_enrollments WHERE id = ?").get(enrollmentId) as
+    | { member_id: number }
+    | undefined;
+  return row?.member_id ?? null;
+}
+
+/**
+ * Meta counts business-initiated conversations per rolling 24h. Counting every
+ * member we wrote to is deliberately conservative: it also counts replies sent
+ * inside an open window, which do not consume the allowance.
+ */
+export async function remainingAllowance(now: Date) {
+  const limit = await getMessagingLimit();
+  const since = sqliteStamp(new Date(now.getTime() - 24 * 60 * 60 * 1000));
+  const row = getDb()
+    .prepare("SELECT COUNT(DISTINCT member_id) AS n FROM messages WHERE direction = 'outgoing' AND created_at >= ?")
+    .get(since) as { n: number };
+
+  return Math.max(0, limit.dailyLimit - row.n);
+}
+
+/**
+ * After a step's time is edited, any active enrollment whose new time is
+ * already past records a skipped row, so the edit never fires the step on the
+ * spot and never looks like an outage.
+ */
+export function markEditedStepSkipped(stepId: number, now: Date) {
+  const step = getStep(stepId);
+  if (!step) {
+    return;
+  }
+
+  const db = getDb();
+  const journeys = db
+    .prepare("SELECT id, anchor_date FROM journeys WHERE template_id = ? AND status IN ('active', 'paused')")
+    .all(step.templateId) as Array<{ id: number; anchor_date: string }>;
+
+  for (const journey of journeys) {
+    if (now.getTime() < stepDueAt(journey.anchor_date, step).getTime() + SEND_WINDOW_MS) {
+      continue;
+    }
+
+    const enrollments = db
+      .prepare("SELECT id FROM journey_enrollments WHERE journey_id = ? AND state = 'active'")
+      .all(journey.id) as Array<{ id: number }>;
+
+    for (const enrollment of enrollments) {
+      db.prepare(
+        `INSERT INTO journey_sends (enrollment_id, step_id, state) VALUES (?, ?, 'skipped')
+         ON CONFLICT (enrollment_id, step_id) DO NOTHING`
+      ).run(enrollment.id, stepId);
+    }
+  }
 }
