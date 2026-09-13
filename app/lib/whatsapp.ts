@@ -1,4 +1,5 @@
 import { formatBytes, MAX_MEDIA_BYTES, MAX_MEDIA_LABEL } from "./media-store";
+import { dryRunId, isLive } from "./outbound-guard";
 import { phoneForWhatsApp, type Member } from "./db";
 
 type WhatsAppSendResponse = {
@@ -59,6 +60,10 @@ export async function sendWhatsAppText(member: Member, body: string) {
 
   if (!accessToken || !phoneNumberId) {
     throw new Error("WhatsApp environment variables are missing.");
+  }
+
+  if (!isLive()) {
+    return dryRunId();
   }
 
   const response = await fetch(`https://graph.facebook.com/${apiVersion}/${phoneNumberId}/messages`, {
@@ -169,6 +174,10 @@ export async function sendWhatsAppTemplate(member: Member, options: TemplateSend
         parameters: bodyParams.map((text) => ({ type: "text", text }))
       }
     ];
+  }
+
+  if (!isLive()) {
+    return { messageId: dryRunId(), templateName, templateLanguage };
   }
 
   const response = await fetch(`https://graph.facebook.com/${apiVersion}/${phoneNumberId}/messages`, {
@@ -438,6 +447,10 @@ export async function uploadWhatsAppMedia(input: { bytes: Uint8Array; mimeType: 
   ) as ArrayBuffer;
   formData.set("file", new File([mediaBuffer], input.filename, { type: input.mimeType }));
 
+  if (!isLive()) {
+    return dryRunId();
+  }
+
   const response = await fetch(`https://graph.facebook.com/${apiVersion}/${phoneNumberId}/media`, {
     method: "POST",
     headers: {
@@ -480,6 +493,10 @@ export async function sendWhatsAppMedia(input: {
     if (input.caption) {
       mediaPayload.caption = input.caption;
     }
+  }
+
+  if (!isLive()) {
+    return dryRunId();
   }
 
   const response = await fetch(`https://graph.facebook.com/${apiVersion}/${phoneNumberId}/messages`, {

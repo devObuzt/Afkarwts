@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { isLive } from "./outbound-guard";
 import { listActiveDeviceTokens, removeDevice, totalUnreadCount } from "./db";
 
 type ServiceAccountToken = { value: string; expiresAt: number };
@@ -67,6 +68,10 @@ export async function sendPushToDevices(input: {
   body: string;
   memberId?: number;
 }) {
+  if (!isLive()) {
+    return { sent: 0, skipped: true };
+  }
+
   const projectId = process.env.FIREBASE_PROJECT_ID;
   const accessToken = await getAccessToken();
 

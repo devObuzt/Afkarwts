@@ -1,4 +1,5 @@
 import { runDueCampaigns } from "./campaigns";
+import { isLive } from "./outbound-guard";
 
 const globalForScheduler = globalThis as typeof globalThis & {
   __afkarSchedulerStarted?: boolean;
@@ -16,6 +17,10 @@ if (!globalForScheduler.__afkarSchedulerStarted) {
   setTimeout(tick, 60 * 1000);
   setInterval(tick, 30 * 60 * 1000);
   console.log("Afkar campaign scheduler started.");
+
+  if (!isLive()) {
+    console.log("Outbound disabled - no WhatsApp, SMS or push will leave this process.");
+  }
 }
 
 export {};

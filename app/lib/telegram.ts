@@ -1,3 +1,5 @@
+import { isLive } from "./outbound-guard";
+
 export async function sendTelegramMessage(text: string) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.TELEGRAM_CHAT_ID;
@@ -7,10 +9,12 @@ export async function sendTelegramMessage(text: string) {
     return false;
   }
 
+  const body = isLive() ? text : `🧪 ستيجينج · محاكاة\n${text}`;
+
   try {
     const payload: Record<string, unknown> = {
       chat_id: chatId,
-      text,
+      text: body,
       disable_web_page_preview: true
     };
     if (threadId) {
