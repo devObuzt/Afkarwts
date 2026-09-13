@@ -2023,6 +2023,14 @@ git commit -m "feat: report each journey's funnel, steps and daily digest"
 
 ### Task 12: The screens
 
+> **Built differently, on purpose.** The app has no tab bar: it is one `Home`
+> component with modals opened from a toolbar (`GroupsModal`, `CampaignsModal`).
+> Journeys became a modal beside Campaigns instead of a tab. And the app's own
+> copy is English, not Arabic — only the Telegram reports are Arabic — so the
+> screens follow the app. The Arabic follow-up reasons from spec §9 are kept as
+> written, which does leave Arabic reason text inside an English screen.
+
+
 **Files:**
 - Create: `app/api/journeys/templates/route.ts`, `app/api/journeys/templates/[id]/steps/route.ts`, `app/api/journeys/route.ts`, `app/api/journeys/[id]/route.ts`, `app/api/journeys/[id]/report/route.ts`, `app/api/journeys/followups/route.ts`, `app/api/journeys/followups/[id]/route.ts`
 - Create: `app/journeys/JourneysTab.tsx`, `app/journeys/TemplateEditor.tsx`, `app/journeys/JourneyView.tsx`, `app/journeys/FollowupList.tsx`
