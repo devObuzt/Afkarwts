@@ -1,6 +1,7 @@
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { getDataDir } from "./media-store";
+import { migrateJourneyTables } from "./journeys/schema";
 
 export type Member = {
   id: number;
@@ -70,7 +71,7 @@ const globalForDb = globalThis as typeof globalThis & {
   __afkarDb?: DatabaseSync;
 };
 
-function getDb() {
+export function getDb() {
   if (!globalForDb.__afkarDb) {
     const dataDir = getDataDir();
     const db = new DatabaseSync(path.join(dataDir, "app.sqlite"));
@@ -114,6 +115,7 @@ function getDb() {
     migrateCampaignTables(db);
     migrateDeviceTables(db);
     migrateAudioMessageType(db);
+    migrateJourneyTables(db);
     globalForDb.__afkarDb = db;
   }
 
