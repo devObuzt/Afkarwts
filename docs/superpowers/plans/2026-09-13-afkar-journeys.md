@@ -911,10 +911,6 @@ Expected: FAIL — `Cannot find module '@/app/lib/journeys/store'`.
 - `listSteps` filters `archived_at IS NULL` and orders by `week, weekday, send_time`.
 - `archiveStep` and `archiveTemplate` set `archived_at`; neither deletes.
 - Map snake_case columns to camelCase fields, the same way `app/lib/db.ts` does.
-- `updateStep` recomputes the step's due time for every active journey using that
-  template. When the new time is already past, it records a `skipped`
-  `journey_sends` row for each enrollment that has no row for that step yet (spec
-  §5), so an edit never fires a step on the spot and never looks like an outage.
 
 - [ ] **Step 6: Run the tests**
 
@@ -1481,6 +1477,7 @@ The I/O half: read the state, call `planTick`, carry out the actions, and expose
   - `claimSend(enrollmentId: number, stepId: number): number | null` — inserts a `pending` row and returns its id, or `null` when one already exists.
   - `recordSend(sendId: number, input: { channel: "text" | "template"; messageId: number | null; state: "sent" | "failed"; error?: string | null }): void`
   - `recordSendState(enrollmentId: number, stepId: number, state: "deferred" | "missed" | "skipped"): void`
+  - `markEditedStepSkipped(stepId: number, now: Date): void` — called by `updateStep`. When an edit moves a step's due time into the past, it records a `skipped` row for every active enrollment with no row for that step (spec §5), so an edit never fires a step on the spot and never looks like an outage. It lives here rather than in Task 6 because it needs both enrollments and `stepDueAt`.
   - `stopEnrollment(enrollmentId: number, reason: string, now: Date): void`
   - `completeEnrollment(enrollmentId: number): void`
   - `remainingAllowance(now: Date): Promise<number>` — `getMessagingLimit().dailyLimit` minus the distinct members who received an outgoing message in the last 24 hours.
