@@ -1,10 +1,12 @@
 import { createMessage, getMember, updateMessageStatus } from "../db";
 import { sendWhatsAppTemplate, sendWhatsAppText } from "../whatsapp";
 import { planTick } from "./engine";
+import { drainSmsQueue, openFollowupsForStop } from "./followups";
 import {
   claimSend,
   completeEnrollment,
   getStep,
+  getTemplate,
   listActiveJourneys,
   loadTickState,
   recordSend,
@@ -16,10 +18,28 @@ import {
 
 const globalForRunner = globalThis as typeof globalThis & { __afkarJourneyRunning?: boolean };
 
-export type TickTotals = { sent: number; failed: number; stopped: number; deferred: number; missed: number };
+export type TickTotals = {
+  sent: number;
+  failed: number;
+  stopped: number;
+  deferred: number;
+  missed: number;
+  smsSent: number;
+  smsFailed: number;
+  smsHeld: number;
+};
 
 export async function runDueJourneys(now = new Date()) {
-  const totals: TickTotals = { sent: 0, failed: 0, stopped: 0, deferred: 0, missed: 0 };
+  const totals: TickTotals = {
+    sent: 0,
+    failed: 0,
+    stopped: 0,
+    deferred: 0,
+    missed: 0,
+    smsSent: 0,
+    smsFailed: 0,
+    smsHeld: 0
+  };
 
   if (globalForRunner.__afkarJourneyRunning) {
     return totals;
@@ -32,6 +52,7 @@ export async function runDueJourneys(now = new Date()) {
     for (const journey of listActiveJourneys()) {
       syncEnrollments(journey.id, now);
 
+      const smsText = getTemplate(journey.templateId)?.smsText ?? "";
       const enrollments = loadTickState(journey.id, now);
       const memberIdByEnrollment = new Map(enrollments.map((item) => [item.enrollmentId, item.memberId]));
       const actions = planTick({ now, allowance, enrollments });
@@ -39,6 +60,12 @@ export async function runDueJourneys(now = new Date()) {
       for (const action of actions) {
         if (action.kind === "stop") {
           stopEnrollment(action.enrollmentId, action.reason, now);
+          openFollowupsForStop({
+            enrollmentId: action.enrollmentId,
+            memberId: memberIdByEnrollment.get(action.enrollmentId) ?? 0,
+            reason: action.reason,
+            smsText
+          });
           totals.stopped += 1;
           continue;
         }
@@ -101,6 +128,11 @@ export async function runDueJourneys(now = new Date()) {
         }
       }
     }
+
+    const sms = await drainSmsQueue(now);
+    totals.smsSent = sms.sent;
+    totals.smsFailed = sms.failed;
+    totals.smsHeld = sms.held;
 
     return totals;
   } finally {
