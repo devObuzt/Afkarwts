@@ -23,6 +23,7 @@ three were deliberately left out.
 | `DRY_RUN` | `1` | Belt to the braces of the project-name check in `outbound-guard.ts`. |
 | `WHATSAPP_VERIFY_TOKEN` | fresh random value | A staging key cannot trigger production's tick, or the reverse. |
 | `SMS_PROVIDER` | `none` | Nothing is sent even once Afkar's Inforu credentials arrive. |
+| `Admin_User`, `Admin_Pass` | staging's own | Changed 2026-09-14. Staging no longer shares production's admin password: a copy of it on a second host is a risk with no upside, and it let the screens be checked in a browser without anyone typing production's password into a form. |
 | `APP_DATA_DIR` | `/app/data` | The mounted volume. |
 | `FIREBASE_PROJECT_ID` | **not set** | The copied database holds four live device tokens belonging to Afkar staff. Without these, `sendPushToDevices` returns `skipped` before it can reach Google. |
 | `FIREBASE_CLIENT_EMAIL` | **not set** | as above |
