@@ -553,3 +553,17 @@ export function markEditedStepSkipped(stepId: number, now: Date) {
     }
   }
 }
+
+/** Journeys still running on a path, which is what makes it unsafe to remove. */
+export function liveJourneysUsingTemplate(templateId: number) {
+  const rows = getDb()
+    .prepare(
+      `SELECT j.id, g.name AS group_name, j.status
+       FROM journeys j
+       JOIN groups g ON g.id = j.group_id
+       WHERE j.template_id = ? AND j.status IN ('draft', 'active', 'paused')`
+    )
+    .all(templateId) as Array<{ id: number; group_name: string; status: string }>;
+
+  return rows.map((row) => ({ id: row.id, groupName: row.group_name, status: row.status }));
+}

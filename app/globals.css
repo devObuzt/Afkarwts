@@ -2312,3 +2312,9 @@ label {
 .backLink.spaced {
   margin-inline-start: 14px;
 }
+
+button.danger {
+  background: #b3261e;
+  color: #fff;
+  border-color: #b3261e;
+}

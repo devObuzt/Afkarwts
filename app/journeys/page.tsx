@@ -169,6 +169,7 @@ function PathsView({ onError }: { onError: (message: string) => void }) {
   const [waTemplates, setWaTemplates] = useState<WaTemplate[]>([]);
   const [name, setName] = useState("");
   const [openId, setOpenId] = useState<number | null>(null);
+  const [confirmId, setConfirmId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -197,6 +198,18 @@ function PathsView({ onError }: { onError: (message: string) => void }) {
     }
   }
 
+  async function remove(id: number) {
+    try {
+      onError("");
+      await api(`/api/journeys/templates/${id}`, { method: "DELETE" });
+      setConfirmId(null);
+      await load();
+    } catch (caught) {
+      setConfirmId(null);
+      onError(caught instanceof Error ? caught.message : "Could not delete the path.");
+    }
+  }
+
   if (loading) {
     return <p className="hint">Loading…</p>;
   }
@@ -222,7 +235,28 @@ function PathsView({ onError }: { onError: (message: string) => void }) {
             <button className="secondary" onClick={() => setOpenId(openId === template.id ? null : template.id)} type="button">
               {openId === template.id ? "Close" : "Open"}
             </button>
+            {confirmId === template.id ? (
+              <>
+                <button className="danger" onClick={() => void remove(template.id)} type="button">
+                  Delete for good
+                </button>
+                <button className="secondary" onClick={() => setConfirmId(null)} type="button">
+                  Keep
+                </button>
+              </>
+            ) : (
+              <button className="secondary" onClick={() => setConfirmId(template.id)} type="button">
+                Delete
+              </button>
+            )}
           </header>
+          {confirmId === template.id ? (
+            <p className="hint">
+              Deleting removes &ldquo;{template.name}&rdquo; and its {template.steps.length} step
+              {template.steps.length === 1 ? "" : "s"} from this list. Journeys that already ran on it keep their
+              history.
+            </p>
+          ) : null}
 
           {openId === template.id ? (
             <PathEditor onChanged={load} onError={onError} template={template} waTemplates={waTemplates} />
