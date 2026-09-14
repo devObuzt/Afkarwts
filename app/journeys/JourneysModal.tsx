@@ -64,9 +64,20 @@ type Followup = {
   body: string;
   note: string;
   error: string | null;
+  providerRef: string | null;
   memberName: string;
   memberPhone: string;
 };
+
+/**
+ * A simulated send is marked as one. Without this an item reads "sent" while
+ * the panel above it says no credentials are in place, which is the kind of
+ * number nobody should have to second-guess.
+ */
+function smsState(item: Followup) {
+  const simulated = (item.providerRef ?? "").startsWith("sms.");
+  return item.state === "sent" && simulated ? "simulated" : item.state;
+}
 
 type WaTemplate = { name: string; language: string; category: string; bodyText: string; paramCount: number };
 
@@ -591,7 +602,7 @@ function FollowupsView({ onError }: { onError: (message: string) => void }) {
             <strong>
               {item.memberName} · {item.memberPhone}
             </strong>
-            <span className="campaignStatus">{item.state}</span>
+            <span className="campaignStatus">{smsState(item)}</span>
           </div>
           <div className="campaignMeta">
             {item.reason}
