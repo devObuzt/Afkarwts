@@ -88,6 +88,14 @@ export function migrateJourneyTables(db: DatabaseSync) {
       FOREIGN KEY (enrollment_id) REFERENCES journey_enrollments(id) ON DELETE SET NULL
     );
 
+    -- A nickname we keep for a Meta template, so a list of near-identical
+    -- names is readable. It is ours alone and never sent to Meta.
+    CREATE TABLE IF NOT EXISTS template_aliases (
+      template_name TEXT PRIMARY KEY,
+      alias TEXT NOT NULL DEFAULT '',
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
     CREATE INDEX IF NOT EXISTS idx_journey_sends_enrollment ON journey_sends(enrollment_id);
     CREATE INDEX IF NOT EXISTS idx_enrollments_journey_state ON journey_enrollments(journey_id, state);
     CREATE INDEX IF NOT EXISTS idx_followups_state ON followups(kind, state);

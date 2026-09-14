@@ -2124,3 +2124,191 @@ label {
   font-weight: 600;
   opacity: 0.65;
 }
+
+/* ---------- template picker ---------- */
+
+.fieldLabel {
+  display: block;
+  font-size: 12.5px;
+  opacity: 0.7;
+  margin-bottom: 5px;
+}
+
+.picker {
+  position: relative;
+}
+
+.pickerButton {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  text-align: start;
+  background: #fff;
+  border: 1px solid var(--line, #d8d8d8);
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+
+.pickerChosen {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pickerPlaceholder {
+  opacity: 0.55;
+}
+
+.pickerPanel {
+  position: absolute;
+  z-index: 40;
+  inset-inline-start: 0;
+  top: calc(100% + 6px);
+  width: min(720px, 92vw);
+  display: grid;
+  grid-template-columns: minmax(230px, 1fr) minmax(240px, 1.1fr);
+  background: #fff;
+  border: 1px solid var(--line, #d8d8d8);
+  border-radius: 10px;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.14);
+  overflow: hidden;
+}
+
+.pickerList {
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+  max-height: 340px;
+  overflow-y: auto;
+  border-inline-end: 1px solid var(--line, #eee);
+}
+
+.pickerList button {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  padding: 7px 9px;
+  text-align: start;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.pickerList button:hover,
+.pickerList button:focus-visible {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.pickerList button.current {
+  background: rgba(11, 61, 46, 0.09);
+  font-weight: 600;
+}
+
+.pickerList code,
+.templateNames code {
+  font-size: 11.5px;
+  opacity: 0.6;
+}
+
+.pickerName {
+  line-height: 1.3;
+}
+
+.pickerPreview {
+  padding: 12px 14px;
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+.previewBody {
+  margin: 8px 0 0;
+  font-size: 13px;
+  white-space: pre-wrap;
+  line-height: 1.55;
+}
+
+/* ---------- templates page ---------- */
+
+.templateRow {
+  border: 1px solid var(--line, #e6e6e6);
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 10px;
+}
+
+.templateRow > header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.templateToggle {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: none;
+  border: none;
+  padding: 4px 0;
+  text-align: start;
+  cursor: pointer;
+}
+
+.chevron {
+  opacity: 0.5;
+  font-size: 12px;
+}
+
+.templateNames {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.templateNames .alias {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.templateNames .alias.none {
+  font-weight: 400;
+  opacity: 0.45;
+  font-style: italic;
+}
+
+.renameRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 10px 0 4px;
+}
+
+.renameRow input {
+  flex: 1 1 260px;
+}
+
+.templateBody {
+  padding: 10px 0 4px;
+  border-top: 1px solid var(--line, #f0f0f0);
+  margin-top: 8px;
+}
+
+.templateHeaderText {
+  font-weight: 600;
+  font-size: 13px;
+  margin: 6px 0 0;
+}
+
+.backLink.spaced {
+  margin-inline-start: 14px;
+}

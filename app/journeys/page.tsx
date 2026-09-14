@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { smsSegments } from "@/app/lib/sms-format";
+import { TemplatePicker } from "./TemplatePicker";
 
 type Step = {
   id: number;
@@ -70,7 +71,14 @@ type Followup = {
   memberPhone: string;
 };
 
-type WaTemplate = { name: string; language: string; category: string; bodyText: string; paramCount: number };
+type WaTemplate = {
+  name: string;
+  language: string;
+  category: string;
+  bodyText: string;
+  paramCount: number;
+  alias?: string;
+};
 
 type Group = { id: number; name: string; memberCount: number };
 
@@ -121,6 +129,9 @@ export default function JourneysPage() {
         <div>
           <Link className="backLink" href="/">
             &larr; Inbox
+          </Link>
+          <Link className="backLink spaced" href="/templates">
+            Templates &rarr;
           </Link>
           <h1>Journeys</h1>
           <p className="hint">
@@ -299,7 +310,13 @@ function PathEditor({
               <div className="stepWhat">
                 <strong>{item.label || "Untitled step"}</strong>
                 <p className="stepTemplate">
-                  Template <code>{item.templateName}</code>
+                  Template{" "}
+                  {waTemplates.find((wa) => wa.name === item.templateName)?.alias ? (
+                    <>
+                      <strong>{waTemplates.find((wa) => wa.name === item.templateName)?.alias}</strong>{" "}
+                    </>
+                  ) : null}
+                  <code>{item.templateName}</code>
                 </p>
                 {item.templatePreview ? <p className="stepPreview">{item.templatePreview}</p> : null}
                 {item.freeText ? (
@@ -356,17 +373,14 @@ function PathEditor({
           />
         </label>
 
-        <label className="full">
-          <span>Approved template — sent when the 24-hour window is shut</span>
-          <select onChange={(event) => setStep({ ...step, templateName: event.target.value })} value={step.templateName}>
-            <option value="">Choose a template…</option>
-            {waTemplates.map((item) => (
-              <option key={`${item.name}:${item.language}`} value={item.name}>
-                {item.name} — {item.category}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="full">
+          <span className="fieldLabel">Approved template — sent when the 24-hour window is shut</span>
+          <TemplatePicker
+            onChange={(name) => setStep({ ...step, templateName: name })}
+            templates={waTemplates}
+            value={step.templateName}
+          />
+        </div>
 
         {picked ? (
           <div className="full">
