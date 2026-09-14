@@ -1,6 +1,6 @@
 import { createMessage, getMember, updateMessageStatus } from "../db";
 import { sendTelegramMessage } from "../telegram";
-import { sendWhatsAppTemplate, sendWhatsAppText } from "../whatsapp";
+import { fillNameToken, renderTemplateBody, sendWhatsAppTemplate, sendWhatsAppText } from "../whatsapp";
 import { planTick } from "./engine";
 import { drainSmsQueue, openFollowupsForStop } from "./followups";
 import { formatTickReport, journeyLabel } from "./report";
@@ -110,7 +110,9 @@ export async function runDueJourneys(now = new Date()) {
           continue;
         }
 
-        const body = action.channel === "text" ? step.freeText : step.templatePreview;
+        const params = fillNameToken(step.bodyParams, member);
+        const body =
+          action.channel === "text" ? step.freeText : renderTemplateBody(step.templatePreview, params);
         const message = createMessage({ memberId: member.id, direction: "outgoing", body, status: "pending" });
 
         try {

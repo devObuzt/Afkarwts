@@ -123,3 +123,37 @@ test("a member who never wrote gets the template, not free text", async () => {
   assert.equal(messages.length, 1);
   assert.equal(messages[0].body, "مراحب"); // the template preview
 });
+
+test("the thread shows what the member actually received, not the raw template", async () => {
+  const { runDueJourneys } = await import("@/app/lib/journeys/runner");
+  const { createMember, createGroup, addMembersToGroup } = await import("@/app/lib/db");
+  const { createTemplate, createStep, createJourney, setJourneyStatus } = await import("@/app/lib/journeys/store");
+
+  seq += 1;
+  const group = createGroup(`قالب بمتغيرات ${seq}`);
+  const member = createMember({ name: "سارة حاج", phone: `+9725009${String(seq).padStart(6, "0")}`, notes: "" })!;
+  addMembersToGroup(group.id, [member.id]);
+
+  const template = createTemplate({ name: "متغيرات" });
+  createStep({
+    templateId: template.id,
+    week: 1,
+    weekday: 0,
+    sendTime: "07:00",
+    label: "ترحيب",
+    freeText: "",
+    templateName: "clean_week",
+    templateLanguage: "ar",
+    bodyParams: ["{{name}}"],
+    templatePreview: "سلام {{1}}، تذكير بتعليمات اليوم 1."
+  });
+
+  const journey = createJourney({ templateId: template.id, groupId: group.id, anchorDate: "2026-08-30" });
+  setJourneyStatus(journey.id, "active");
+
+  await runDueJourneys(new Date("2026-08-30T05:00:00.000Z"));
+
+  const [sent] = await outgoing(member.id);
+  // Meta fills {{1}} on its way out, so our own copy should read the same.
+  assert.equal(sent.body, "سلام سارة، تذكير بتعليمات اليوم 1.");
+});

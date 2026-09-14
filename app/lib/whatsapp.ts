@@ -131,6 +131,15 @@ export function fillNameToken(bodyParams: string[], member: Pick<Member, "name" 
   return bodyParams.map((param) => param.split(NAME_TOKEN).join(first));
 }
 
+/**
+ * Meta fills {{1}}, {{2}}… from the values we send, so the copy we keep for
+ * ourselves is filled the same way. Otherwise the thread and the reports show
+ * a raw template while the member received their own name.
+ */
+export function renderTemplateBody(body: string, params: string[]) {
+  return params.reduce((text, value, index) => text.split(`{{${index + 1}}}`).join(value), body);
+}
+
 export async function sendWhatsAppTemplate(member: Member, options: TemplateSendOptions = {}) {
   const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
   const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
