@@ -116,10 +116,24 @@ export function getDb() {
     migrateDeviceTables(db);
     migrateAudioMessageType(db);
     migrateJourneyTables(db);
+    migrateSendKeyColumn(db);
     globalForDb.__afkarDb = db;
   }
 
   return globalForDb.__afkarDb;
+}
+
+/**
+ * What a send was, as opposed to what one person saw. The body carries each
+ * member's own name; this carries the text the send was made from, so the
+ * checks that decide who has already been written to keep working. Rows
+ * written before this column existed fall back to their body.
+ */
+function migrateSendKeyColumn(db: DatabaseSync) {
+  if (!hasColumn(db, "messages", "send_key")) {
+    db.exec("ALTER TABLE messages ADD COLUMN send_key TEXT");
+  }
+  db.exec("CREATE INDEX IF NOT EXISTS idx_messages_send_key ON messages(send_key)");
 }
 
 function migrateMessageStatuses(db: DatabaseSync) {
@@ -788,7 +802,7 @@ export function listGroupSendBodies(groupId: number, minRecipients = 5): GroupSe
   const rows = getDb()
     .prepare(
       `SELECT
-         messages.body AS body,
+         COALESCE(messages.send_key, messages.body) AS body,
          COUNT(DISTINCT messages.member_id) AS recipients,
          SUM(CASE WHEN messages.status = 'failed' THEN 0 ELSE 1 END) AS sent,
          SUM(CASE WHEN messages.status = 'failed' THEN 1 ELSE 0 END) AS failed,
@@ -797,7 +811,7 @@ export function listGroupSendBodies(groupId: number, minRecipients = 5): GroupSe
        FROM messages
        INNER JOIN member_groups ON member_groups.member_id = messages.member_id
        WHERE messages.direction = 'outgoing' AND member_groups.group_id = ? AND messages.body <> ''
-       GROUP BY messages.body
+       GROUP BY COALESCE(messages.send_key, messages.body)
        HAVING recipients >= ?
        ORDER BY last_at DESC`
     )
@@ -837,7 +851,7 @@ export function listCampaignRecipients(groupId: number, body: string): Recipient
          INNER JOIN (
            SELECT member_id, MAX(id) AS id
            FROM messages
-           WHERE direction = 'outgoing' AND body = ?
+           WHERE direction = 'outgoing' AND COALESCE(send_key, body) = ?
            GROUP BY member_id
          ) newest ON newest.id = m.id
        ) latest ON latest.member_id = members.id
@@ -865,7 +879,9 @@ export function listCampaignRecipients(groupId: number, body: string): Recipient
 
 export function listMemberIdsWithOutgoingBody(body: string) {
   const rows = getDb()
-    .prepare("SELECT DISTINCT member_id FROM messages WHERE direction = 'outgoing' AND body = ?")
+    .prepare(
+      "SELECT DISTINCT member_id FROM messages WHERE direction = 'outgoing' AND COALESCE(send_key, body) = ?"
+    )
     .all(body) as Array<{ member_id: number }>;
   return new Set(rows.map((row) => row.member_id));
 }
@@ -942,10 +958,12 @@ export function createMessage(input: {
   mediaUrl?: string | null;
   mediaMimeType?: string | null;
   mediaFilename?: string | null;
+  /** The text this send was made from, when the body is personalised. */
+  sendKey?: string | null;
 }) {
   const result = getDb()
     .prepare(
-      "INSERT INTO messages (member_id, direction, message_type, body, whatsapp_message_id, status, error, media_url, media_mime_type, media_filename) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+      "INSERT INTO messages (member_id, direction, message_type, body, whatsapp_message_id, status, error, media_url, media_mime_type, media_filename, send_key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     )
     .run(
       input.memberId,
@@ -957,7 +975,8 @@ export function createMessage(input: {
       input.error ?? null,
       input.mediaUrl ?? null,
       input.mediaMimeType ?? null,
-      input.mediaFilename ?? null
+      input.mediaFilename ?? null,
+      input.sendKey ?? null
     );
 
   const row = getDb().prepare("SELECT * FROM messages WHERE id = ?").get(Number(result.lastInsertRowid)) as DbMessage;

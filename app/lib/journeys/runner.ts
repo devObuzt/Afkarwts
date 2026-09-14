@@ -113,7 +113,13 @@ export async function runDueJourneys(now = new Date()) {
         const params = fillNameToken(step.bodyParams, member);
         const body =
           action.channel === "text" ? step.freeText : renderTemplateBody(step.templatePreview, params);
-        const message = createMessage({ memberId: member.id, direction: "outgoing", body, status: "pending" });
+        const message = createMessage({
+          memberId: member.id,
+          direction: "outgoing",
+          body,
+          status: "pending",
+          sendKey: action.channel === "text" ? step.freeText : step.templatePreview
+        });
 
         try {
           const whatsappMessageId =

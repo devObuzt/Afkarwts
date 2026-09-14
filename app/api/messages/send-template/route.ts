@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createMessage, getMember, updateMessageStatus } from "@/app/lib/db";
-import { sendWhatsAppTemplate } from "@/app/lib/whatsapp";
+import { fillNameToken, renderTemplateBody, sendWhatsAppTemplate } from "@/app/lib/whatsapp";
 
 export const runtime = "nodejs";
 
@@ -32,8 +32,9 @@ export async function POST(request: Request) {
     const pending = createMessage({
       memberId,
       direction: "outgoing",
-      body: storedBody,
-      status: "pending"
+      body: renderTemplateBody(storedBody, fillNameToken(bodyParams, member)),
+      status: "pending",
+      sendKey: storedBody
     });
 
     try {

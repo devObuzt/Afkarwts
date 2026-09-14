@@ -10,7 +10,13 @@ import {
   updateCampaignStatus,
   updateMessageStatus
 } from "@/app/lib/db";
-import { getMessagingLimit, sendWhatsAppTemplate, sendWhatsAppText } from "@/app/lib/whatsapp";
+import {
+  fillNameToken,
+  getMessagingLimit,
+  renderTemplateBody,
+  sendWhatsAppTemplate,
+  sendWhatsAppText
+} from "@/app/lib/whatsapp";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -117,11 +123,14 @@ export async function POST(request: Request) {
     const results: BulkResult[] = [];
 
     for (const member of members) {
+      // Stored as this member saw it, keyed by what the send was made from.
+      const params = fillNameToken(bodyParams, member);
       const pending = createMessage({
         memberId: member.id,
         direction: "outgoing",
-        body: mode === "template" ? templateStoredBody : text,
-        status: "pending"
+        body: mode === "template" ? renderTemplateBody(templateStoredBody, params) : text,
+        status: "pending",
+        sendKey: sendBody
       });
 
       try {

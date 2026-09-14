@@ -12,7 +12,13 @@ import {
   updateCampaignStatus,
   type Campaign
 } from "./db";
-import { getMessagingLimit, sendWhatsAppTemplate, sendWhatsAppText } from "./whatsapp";
+import {
+  fillNameToken,
+  getMessagingLimit,
+  renderTemplateBody,
+  sendWhatsAppTemplate,
+  sendWhatsAppText
+} from "./whatsapp";
 import { sendTelegramMessage } from "./telegram";
 
 const globalForRunner = globalThis as typeof globalThis & {
@@ -59,11 +65,16 @@ export async function runCampaignBatch(campaignId: number) {
   let failed = 0;
 
   for (const member of batch) {
+    // The body is this member's own copy; the send key is what the campaign
+    // was sent from, and is what every "already written to" check compares.
+    const params = fillNameToken(campaign.bodyParams, member);
+    const body = campaign.mode === "template" ? renderTemplateBody(storedBody, params) : storedBody;
     const pending = createMessage({
       memberId: member.id,
       direction: "outgoing",
-      body: storedBody,
-      status: "pending"
+      body,
+      status: "pending",
+      sendKey: storedBody
     });
 
     try {
