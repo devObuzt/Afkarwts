@@ -1813,13 +1813,297 @@ label {
 
 /* ---------- journeys ---------- */
 
-.funnel {
-  list-style: none;
-  margin: 0 0 14px;
-  padding: 0;
-  display: grid;
-  gap: 4px;
+.toolbarLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  text-decoration: none;
+}
+
+.journeyPage {
+  max-width: 940px;
+  margin: 0 auto;
+  padding: 28px 20px 80px;
+}
+
+.journeyHeader h1 {
+  margin: 8px 0 6px;
+  font-size: 24px;
+}
+
+.backLink {
   font-size: 13px;
+  text-decoration: none;
+  opacity: 0.75;
+}
+
+.journeyTabs {
+  display: flex;
+  gap: 8px;
+  margin: 20px 0 18px;
+  border-bottom: 1px solid var(--line, #e6e6e6);
+}
+
+.journeyTabs button {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  padding: 9px 12px;
+  font-size: 14px;
+  cursor: pointer;
+  opacity: 0.65;
+}
+
+.journeyTabs button.active {
+  border-bottom-color: currentColor;
+  opacity: 1;
+  font-weight: 600;
+}
+
+.journeyError {
+  background: #fdecec;
+  border: 1px solid #f3bcbc;
+  color: #8c2020;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  margin: 0 0 16px;
+}
+
+.journeySection > h2 {
+  font-size: 16px;
+  margin: 26px 0 10px;
+}
+
+.newPath,
+.startJourney {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-end;
+  padding: 16px;
+  border: 1px solid var(--line, #e6e6e6);
+  border-radius: 10px;
+  margin-bottom: 20px;
+}
+
+.newPath input {
+  flex: 1 1 260px;
+}
+
+.startJourney label,
+.stepForm label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12.5px;
+  flex: 1 1 150px;
+}
+
+.startJourney label span,
+.stepForm label span {
+  opacity: 0.7;
+}
+
+.pathCard,
+.journeyCard,
+.followupCard {
+  border: 1px solid var(--line, #e6e6e6);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 14px;
+}
+
+.pathCard > header,
+.journeyCard > header,
+.followupCard > header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.pathCard h2,
+.journeyCard h2 {
+  font-size: 15.5px;
+  margin: 0;
+  flex: 1 1 auto;
+}
+
+.journeyCard .on {
+  font-weight: 400;
+  opacity: 0.55;
+}
+
+.badge {
+  font-size: 11.5px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.06);
+  white-space: nowrap;
+}
+
+.badge.warn {
+  background: #fbe6c8;
+  color: #7a4a06;
+}
+
+.journeyMeta {
+  font-size: 12.5px;
+  opacity: 0.75;
+  margin: 8px 0 12px;
+}
+
+.journeyActions,
+.followupActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.followupActions input {
+  flex: 1 1 200px;
+}
+
+.pathBody {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line, #e6e6e6);
+}
+
+.pathBody h3 {
+  font-size: 13.5px;
+  margin: 18px 0 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.6;
+}
+
+.stepList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.stepList li {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line, #f0f0f0);
+}
+
+.stepWhen {
+  flex: 0 0 120px;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.stepWhat {
+  flex: 1 1 auto;
+  font-size: 13px;
+}
+
+.stepTemplate,
+.stepPreview,
+.stepFree {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+}
+
+.stepPreview {
+  opacity: 0.7;
+  border-inline-start: 2px solid var(--line, #e0e0e0);
+  padding-inline-start: 8px;
+}
+
+.stepFree span {
+  opacity: 0.6;
+}
+
+.stepForm {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line, #e6e6e6);
+  border-radius: 10px;
+}
+
+.stepForm .wide {
+  flex: 2 1 240px;
+}
+
+.stepForm .full {
+  flex: 1 1 100%;
+}
+
+.templatePreview {
+  border: 1px solid #cfe0d4;
+  background: #f4f9f5;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
+}
+
+.templatePreview.marketing {
+  border-color: #f0d6ab;
+  background: #fdf6e9;
+}
+
+.templatePreview p {
+  margin: 6px 0 0;
+  white-space: pre-wrap;
+}
+
+.previewMeta {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 11.5px;
+  opacity: 0.75;
+}
+
+.previewWarn {
+  font-size: 12px;
+  color: #7a4a06;
+}
+
+.report {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line, #e6e6e6);
+}
+
+.funnelGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.funnelGrid div {
+  border: 1px solid var(--line, #eee);
+  border-radius: 8px;
+  padding: 10px;
+  text-align: center;
+}
+
+.funnelGrid strong {
+  display: block;
+  font-size: 19px;
+}
+
+.funnelGrid span {
+  font-size: 11.5px;
+  opacity: 0.65;
+}
+
+.tableScroll {
+  overflow-x: auto;
 }
 
 .stepTable {
@@ -1830,13 +2114,13 @@ label {
 
 .stepTable th,
 .stepTable td {
-  padding: 6px 8px;
+  padding: 7px 10px;
   text-align: left;
-  border-bottom: 1px solid var(--line, #e6e6e6);
+  border-bottom: 1px solid var(--line, #eee);
   white-space: nowrap;
 }
 
 .stepTable th {
   font-weight: 600;
-  opacity: 0.7;
+  opacity: 0.65;
 }
