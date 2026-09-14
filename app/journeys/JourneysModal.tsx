@@ -190,8 +190,13 @@ function JourneysView({ onError }: { onError: (message: string) => void }) {
   }
 
   async function setStatus(id: number, status: string) {
-    await api(`/api/journeys/${id}`, { method: "PATCH", body: JSON.stringify({ status }) });
-    await load();
+    try {
+      onError("");
+      await api(`/api/journeys/${id}`, { method: "PATCH", body: JSON.stringify({ status }) });
+      await load();
+    } catch (caught) {
+      onError(caught instanceof Error ? caught.message : "Could not change the journey.");
+    }
   }
 
   if (loading) {
@@ -249,7 +254,8 @@ function JourneysView({ onError }: { onError: (message: string) => void }) {
             <span className="campaignStatus">{journey.status}</span>
           </div>
           <div className="campaignMeta">
-            starts {journey.anchorDate} · {journey.funnel.enrolled} enrolled · {journey.funnel.reached} reached ·{" "}
+            starts {journey.anchorDate} · {templates.find((item) => item.id === journey.templateId)?.steps.length ?? 0}{" "}
+            steps · {journey.funnel.enrolled} enrolled · {journey.funnel.reached} reached ·{" "}
             {journey.funnel.read} read · {journey.funnel.replied} replied ·{" "}
             {Object.values(journey.funnel.stopped).reduce((sum, n) => sum + n, 0)} stopped
           </div>
