@@ -23,6 +23,8 @@ export type JourneyStep = {
   templateLanguage: string;
   bodyParams: string[];
   templatePreview: string;
+  /** Sent instead of this step when WhatsApp cannot deliver it. */
+  smsText: string;
   createdAt: string;
   archivedAt: string | null;
 };
@@ -57,6 +59,7 @@ type DbStep = {
   template_language: string;
   body_params: string;
   template_preview: string;
+  sms_text: string | null;
   created_at: string;
   archived_at: string | null;
 };
@@ -94,6 +97,7 @@ function mapStep(row: DbStep): JourneyStep {
     templateLanguage: row.template_language,
     bodyParams: JSON.parse(row.body_params || "[]") as string[],
     templatePreview: row.template_preview,
+    smsText: row.sms_text ?? "",
     createdAt: row.created_at,
     archivedAt: row.archived_at
   };
@@ -161,12 +165,13 @@ export function createStep(input: {
   templateLanguage: string;
   bodyParams: string[];
   templatePreview: string;
+  smsText?: string;
 }) {
   const result = getDb()
     .prepare(
       `INSERT INTO journey_steps
-         (template_id, week, weekday, send_time, label, free_text, template_name, template_language, body_params, template_preview)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         (template_id, week, weekday, send_time, label, free_text, template_name, template_language, body_params, template_preview, sms_text)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       input.templateId,
@@ -178,7 +183,8 @@ export function createStep(input: {
       input.templateName,
       input.templateLanguage,
       JSON.stringify(input.bodyParams),
-      input.templatePreview
+      input.templatePreview,
+      input.smsText ?? ""
     );
   return getStep(Number(result.lastInsertRowid))!;
 }
@@ -214,7 +220,7 @@ export function updateStep(
     .prepare(
       `UPDATE journey_steps
        SET week = ?, weekday = ?, send_time = ?, label = ?, free_text = ?,
-           template_name = ?, template_language = ?, body_params = ?, template_preview = ?
+           template_name = ?, template_language = ?, body_params = ?, template_preview = ?, sms_text = ?
        WHERE id = ?`
     )
     .run(
@@ -227,6 +233,7 @@ export function updateStep(
       next.templateLanguage,
       JSON.stringify(next.bodyParams),
       next.templatePreview,
+      next.smsText,
       id
     );
 

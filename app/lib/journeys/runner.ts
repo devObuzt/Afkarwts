@@ -2,7 +2,7 @@ import { createMessage, getMember, updateMessageStatus } from "../db";
 import { sendTelegramMessage } from "../telegram";
 import { fillNameToken, renderTemplateBody, sendWhatsAppTemplate, sendWhatsAppText } from "../whatsapp";
 import { planTick } from "./engine";
-import { drainSmsQueue, openFollowupsForStop } from "./followups";
+import { drainSmsQueue, openFollowupsForStop, queueStepSms } from "./followups";
 import { formatTickReport, journeyLabel } from "./report";
 import {
   claimSend,
@@ -55,7 +55,7 @@ export async function runDueJourneys(now = new Date()) {
       syncEnrollments(journey.id, now);
 
       const smsText = getTemplate(journey.templateId)?.smsText ?? "";
-      const round = { sent: 0, sentText: 0, sentTemplate: 0, failed: 0, deferred: 0, stopped: 0 };
+      const round = { sent: 0, sentText: 0, sentTemplate: 0, failed: 0, deferred: 0, stopped: 0, smsFallback: 0 };
       const enrollments = loadTickState(journey.id, now);
       const memberIdByEnrollment = new Map(enrollments.map((item) => [item.enrollmentId, item.memberId]));
       const actions = planTick({ now, allowance, enrollments });
@@ -144,6 +144,32 @@ export async function runDueJourneys(now = new Date()) {
           recordSend(sendId, { channel: action.channel, messageId: message.id, state: "failed", error: text });
           totals.failed += 1;
           round.failed += 1;
+
+          // WhatsApp could not deliver this step, so it goes out as the step's
+          // own SMS and the member stays on the path - a number that fails this
+          // week may work the next. When SMS cannot reach them either, the path
+          // ends here and a person picks it up.
+          const failedFor = memberIdByEnrollment.get(action.enrollmentId) ?? 0;
+          const viaSms = queueStepSms({
+            enrollmentId: action.enrollmentId,
+            memberId: failedFor,
+            stepId: action.stepId,
+            text: step.smsText
+          });
+
+          if (viaSms) {
+            round.smsFallback += 1;
+          } else {
+            stopEnrollment(action.enrollmentId, "send_failed", now);
+            openFollowupsForStop({
+              enrollmentId: action.enrollmentId,
+              memberId: failedFor,
+              reason: "send_failed",
+              smsText
+            });
+            totals.stopped += 1;
+            round.stopped += 1;
+          }
         }
       }
 

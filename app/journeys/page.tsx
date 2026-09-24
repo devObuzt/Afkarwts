@@ -15,6 +15,7 @@ type Step = {
   templateName: string;
   templateLanguage: string;
   templatePreview: string;
+  smsText: string;
 };
 
 type Template = { id: number; name: string; smsText: string; steps: Step[] };
@@ -285,11 +286,13 @@ function PathEditor({
     sendTime: "07:00",
     label: "",
     freeText: "",
-    templateName: ""
+    templateName: "",
+    smsText: ""
   });
 
   const picked = waTemplates.find((item) => item.name === step.templateName);
   const counted = smsSegments(smsText);
+  const stepSms = smsSegments(step.smsText);
 
   async function addStep() {
     if (!picked) {
@@ -307,7 +310,7 @@ function PathEditor({
           bodyParams: Array.from({ length: picked.paramCount }, (_, index) => (index === 0 ? "{{name}}" : ""))
         })
       });
-      setStep({ ...step, label: "", freeText: "", templateName: "" });
+      setStep({ ...step, label: "", freeText: "", templateName: "", smsText: "" });
       onError("");
       await onChanged();
     } catch (caught) {
@@ -359,6 +362,15 @@ function PathEditor({
                   </p>
                 ) : (
                   <p className="hint">Template only — no free-text version.</p>
+                )}
+                {item.smsText ? (
+                  <p className="stepFree">
+                    <span>SMS, when WhatsApp cannot deliver it:</span> {item.smsText}
+                  </p>
+                ) : (
+                  <p className="previewWarn">
+                    No SMS for this step — a member WhatsApp cannot reach leaves the path here.
+                  </p>
                 )}
               </div>
               <button className="secondary" onClick={() => void removeStep(item.id)} type="button">
@@ -448,6 +460,20 @@ function PathEditor({
           />
         </label>
 
+        <label className="full">
+          <span>
+            SMS for this step — sent when WhatsApp cannot deliver it, so the member stays on the path. Use{" "}
+            <code>{"{{name}}"}</code> for their first name.
+          </span>
+          <textarea
+            onChange={(event) => setStep({ ...step, smsText: event.target.value })}
+            placeholder="أهلا {{name}}، بلشنا أسبوع كلين. للتفاصيل ردّي علينا"
+            rows={2}
+            value={step.smsText}
+          />
+          <span className="hint">{stepSms.characters} characters · {stepSms.segments} SMS {stepSms.segments === 1 ? "message" : "messages"} each time it is used</span>
+        </label>
+
         <div className="full">
           <button disabled={!step.templateName} onClick={() => void addStep()} type="button">
             Add step
@@ -455,9 +481,10 @@ function PathEditor({
         </div>
       </div>
 
-      <h3>SMS fallback</h3>
+      <h3>End-of-path SMS</h3>
       <p className="hint">
-        Sent once, to anyone who stops being reachable on WhatsApp. Skipped for numbers an Israeli SMS cannot reach.
+        Sent once, only when the path ends for someone nothing could reach — not for a single failed step. A failed
+        step uses that step&apos;s own SMS above and the member carries on.
       </p>
       <textarea onChange={(event) => setSmsText(event.target.value)} rows={2} value={smsText} />
       <p className="hint">

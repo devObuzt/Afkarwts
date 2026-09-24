@@ -1,5 +1,3 @@
-import { classifyFailure } from "../whatsapp-errors";
-
 /** Free text only reaches someone who wrote in the last 24h; 10 minutes of margin. */
 export const FREE_TEXT_WINDOW_MS = (23 * 60 + 50) * 60 * 1000;
 /** Silence this long after our last message ends the path for that member. */
@@ -46,12 +44,11 @@ function stopFor(enrollment: EnrollmentState, now: Date): Action | null {
     return null;
   }
 
+  // A failed send is not silence: the runner already answered it, by sending
+  // the step as SMS or by ending the path when nothing could reach them. Either
+  // way this rule has nothing to add.
   if (hasFailed(last)) {
-    // A number with no WhatsApp account will not start working in two days.
-    // Every other failure is ours to fix, so the member stays in the path.
-    return classifyFailure(last.error).kind === "undeliverable"
-      ? { kind: "stop", enrollmentId: enrollment.enrollmentId, reason: "send_failed" }
-      : null;
+    return null;
   }
 
   const silentFor = now.getTime() - new Date(last.attemptedAt).getTime();

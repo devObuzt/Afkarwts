@@ -19,6 +19,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     templateLanguage?: string;
     bodyParams?: string[];
     templatePreview?: string;
+    smsText?: string;
   };
 
   // A step without a template has no way through once the window closes.
@@ -36,7 +37,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     templateName: body.templateName,
     templateLanguage: body.templateLanguage || "ar",
     bodyParams: body.bodyParams ?? [],
-    templatePreview: body.templatePreview ?? ""
+    templatePreview: body.templatePreview ?? "",
+    smsText: body.smsText
   });
 
   return NextResponse.json({ step });

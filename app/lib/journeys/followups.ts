@@ -1,6 +1,7 @@
 import { getDb, getMember } from "../db";
 import { sendSms } from "../sms";
 import { isIsraeliMobile } from "../sms-format";
+import { contactFirstName, NAME_TOKEN } from "../whatsapp";
 import { alternateCountryCode } from "../whatsapp-errors";
 import { jerusalemHour } from "./schedule";
 import { resumeEnrollment } from "./store";
@@ -9,6 +10,7 @@ export type Followup = {
   id: number;
   memberId: number;
   enrollmentId: number | null;
+  stepId: number | null;
   kind: "sms" | "manual";
   reason: string;
   state: "queued" | "sent" | "failed" | "open" | "done";
@@ -25,6 +27,7 @@ type DbFollowup = {
   id: number;
   member_id: number;
   enrollment_id: number | null;
+  step_id: number | null;
   kind: Followup["kind"];
   reason: string;
   state: Followup["state"];
@@ -52,6 +55,7 @@ function mapFollowup(row: DbFollowup): Followup {
     id: row.id,
     memberId: row.member_id,
     enrollmentId: row.enrollment_id,
+    stepId: row.step_id ?? null,
     kind: row.kind,
     reason: row.reason,
     state: row.state,
@@ -187,4 +191,25 @@ export function resumeFromFollowup(id: number) {
     resumeEnrollment(row.enrollment_id);
   }
   resolveManual(id, "رجع للمسار");
+}
+
+/**
+ * A step WhatsApp could not deliver goes out as that step's own SMS, and the
+ * member stays on the path: the next step tries WhatsApp again, because a
+ * number that fails today may work next week.
+ */
+export function queueStepSms(input: { enrollmentId: number; memberId: number; stepId: number; text: string }) {
+  const member = getMember(input.memberId);
+  if (!member || !isIsraeliMobile(member.phone) || !input.text.trim()) {
+    return false;
+  }
+
+  const body = input.text.split(NAME_TOKEN).join(contactFirstName(member));
+  getDb()
+    .prepare(
+      `INSERT INTO followups (member_id, enrollment_id, step_id, kind, reason, state, body)
+       VALUES (?, ?, ?, 'sms', ?, 'queued', ?)`
+    )
+    .run(input.memberId, input.enrollmentId, input.stepId, "الواتساب ما وصل — الخطوة انبعتت SMS", body);
+  return true;
 }

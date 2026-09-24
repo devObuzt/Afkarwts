@@ -138,7 +138,7 @@ test("a reply after our message clears the silence", () => {
   assert.deepEqual(actions, []);
 });
 
-test("an undeliverable number stops at once, without waiting 48 hours", () => {
+test("a failed send is left to the runner, which answers it with SMS", () => {
   const actions = planTick({
     now: NOW,
     allowance: 100,
@@ -154,7 +154,9 @@ test("an undeliverable number stops at once, without waiting 48 hours", () => {
     ]
   });
 
-  assert.deepEqual(actions, [{ kind: "stop", enrollmentId: 1, reason: "send_failed" }]);
+  // The runner sends that step as SMS and keeps the member on the path, so
+  // planTick must not end it behind the runner's back.
+  assert.deepEqual(actions, []);
 });
 
 test("a template parameter failure does not stop the member", () => {

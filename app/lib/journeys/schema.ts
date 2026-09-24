@@ -4,6 +4,15 @@ import type { DatabaseSync } from "node:sqlite";
  * Journeys live in their own tables beside campaigns. Nothing here alters an
  * existing table, so the migration is safe to run against a production copy.
  */
+function addColumnIfMissing(db: DatabaseSync, table: string, column: string, definition: string) {
+  const has = (db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>).some(
+    (row) => row.name === column
+  );
+  if (!has) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  }
+}
+
 export function migrateJourneyTables(db: DatabaseSync) {
   db.exec(`
     CREATE TABLE IF NOT EXISTS journey_templates (
@@ -26,6 +35,7 @@ export function migrateJourneyTables(db: DatabaseSync) {
       template_language TEXT NOT NULL DEFAULT 'ar',
       body_params TEXT NOT NULL DEFAULT '[]',
       template_preview TEXT NOT NULL DEFAULT '',
+      sms_text TEXT NOT NULL DEFAULT '',
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       archived_at TEXT,
       FOREIGN KEY (template_id) REFERENCES journey_templates(id) ON DELETE CASCADE
@@ -100,4 +110,9 @@ export function migrateJourneyTables(db: DatabaseSync) {
     CREATE INDEX IF NOT EXISTS idx_enrollments_journey_state ON journey_enrollments(journey_id, state);
     CREATE INDEX IF NOT EXISTS idx_followups_state ON followups(kind, state);
   `);
+
+  // Added after the first release: the SMS a step falls back to, and which step
+  // a follow-up belongs to.
+  addColumnIfMissing(db, "journey_steps", "sms_text", "TEXT NOT NULL DEFAULT ''");
+  addColumnIfMissing(db, "followups", "step_id", "INTEGER");
 }

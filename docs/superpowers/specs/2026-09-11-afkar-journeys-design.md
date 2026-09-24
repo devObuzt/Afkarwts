@@ -308,6 +308,22 @@ why it lives on this branch with the rest.
 
 ## 8. SMS
 
+> **Changed 2026-09-24, on Wisam's decision.** SMS was a single end-of-path
+> message: one text per path, sent once when a member stopped. It is now a
+> **per-step delivery channel**. When WhatsApp cannot deliver a step, that
+> step's own SMS goes out immediately and **the member stays on the path** —
+> the next step tries WhatsApp again, because a number that fails this week may
+> work the next. The path-level text remains, but only for the case where
+> nothing can reach the member at all and the path ends.
+>
+> What this costs, measured on Afkar's real sends: their messages average
+> **6 SMS segments** each (Arabic fits 70 characters per segment), against 1
+> for the old end-of-path text. Step SMS text is therefore written separately
+> and short, not copied from the WhatsApp version.
+>
+> A number SMS cannot reach either — anything that is not an Israeli mobile —
+> still ends the path and opens a manual task, as before.
+
 `app/lib/sms.ts` exposes `sendSms(phone, body)`. The provider comes from
 `SMS_PROVIDER`:
 
