@@ -280,6 +280,7 @@ function PathEditor({
   onError: (message: string) => void;
 }) {
   const [smsText, setSmsText] = useState(template.smsText);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [step, setStep] = useState({
     week: 1,
     weekday: 0,
@@ -294,27 +295,49 @@ function PathEditor({
   const counted = smsSegments(smsText);
   const stepSms = smsSegments(step.smsText);
 
-  async function addStep() {
+  function startEdit(item: Step) {
+    setEditingId(item.id);
+    setStep({
+      week: item.week,
+      weekday: item.weekday,
+      sendTime: item.sendTime,
+      label: item.label,
+      freeText: item.freeText,
+      templateName: item.templateName,
+      smsText: item.smsText
+    });
+    onError("");
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setStep({ week: 1, weekday: 0, sendTime: "07:00", label: "", freeText: "", templateName: "", smsText: "" });
+  }
+
+  async function saveStep() {
     if (!picked) {
       onError("Pick an approved template for this step.");
       return;
     }
 
+    const payload = {
+      ...step,
+      templateLanguage: picked.language,
+      templatePreview: picked.bodyText,
+      bodyParams: Array.from({ length: picked.paramCount }, (_, index) => (index === 0 ? "{{name}}" : ""))
+    };
+
     try {
-      await api(`/api/journeys/templates/${template.id}/steps`, {
-        method: "POST",
-        body: JSON.stringify({
-          ...step,
-          templateLanguage: picked.language,
-          templatePreview: picked.bodyText,
-          bodyParams: Array.from({ length: picked.paramCount }, (_, index) => (index === 0 ? "{{name}}" : ""))
-        })
-      });
-      setStep({ ...step, label: "", freeText: "", templateName: "", smsText: "" });
+      if (editingId) {
+        await api(`/api/journeys/steps/${editingId}`, { method: "PATCH", body: JSON.stringify(payload) });
+      } else {
+        await api(`/api/journeys/templates/${template.id}/steps`, { method: "POST", body: JSON.stringify(payload) });
+      }
+      cancelEdit();
       onError("");
       await onChanged();
     } catch (caught) {
-      onError(caught instanceof Error ? caught.message : "Could not add the step.");
+      onError(caught instanceof Error ? caught.message : "Could not save the step.");
     }
   }
 
@@ -373,15 +396,24 @@ function PathEditor({
                   </p>
                 )}
               </div>
-              <button className="secondary" onClick={() => void removeStep(item.id)} type="button">
-                Remove
-              </button>
+              <div className="stepRowActions">
+                <button
+                  className={editingId === item.id ? "" : "secondary"}
+                  onClick={() => (editingId === item.id ? cancelEdit() : startEdit(item))}
+                  type="button"
+                >
+                  {editingId === item.id ? "Editing" : "Edit"}
+                </button>
+                <button className="secondary" onClick={() => void removeStep(item.id)} type="button">
+                  Remove
+                </button>
+              </div>
             </li>
           ))}
         </ol>
       )}
 
-      <h3>Add a step</h3>
+      <h3>{editingId ? "Edit this step" : "Add a step"}</h3>
       <div className="stepForm">
         <label>
           <span>Week</span>
@@ -474,10 +506,21 @@ function PathEditor({
           <span className="hint">{stepSms.characters} characters · {stepSms.segments} SMS {stepSms.segments === 1 ? "message" : "messages"} each time it is used</span>
         </label>
 
-        <div className="full">
-          <button disabled={!step.templateName} onClick={() => void addStep()} type="button">
-            Add step
+        <div className="full stepFormActions">
+          <button disabled={!step.templateName} onClick={() => void saveStep()} type="button">
+            {editingId ? "Save changes" : "Add step"}
           </button>
+          {editingId ? (
+            <button className="secondary" onClick={cancelEdit} type="button">
+              Cancel
+            </button>
+          ) : null}
+          {editingId ? (
+            <span className="hint">
+              Changing the time moves this step for every journey still running on this path. A new time that has
+              already passed is skipped rather than sent late.
+            </span>
+          ) : null}
         </div>
       </div>
 

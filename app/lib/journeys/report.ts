@@ -128,72 +128,76 @@ export function stepBreakdown(journeyId: number): StepRow[] {
   }
 
   const db = getDb();
-  return listSteps(journey.templateId).map((step) => {
-    const counts = countBy(
-      `SELECT s.state AS key, COUNT(*) AS n FROM journey_sends s
-       JOIN journey_enrollments e ON e.id = s.enrollment_id
-       WHERE e.journey_id = ? AND s.step_id = ? GROUP BY s.state`,
-      [journeyId, step.id]
-    );
+  // Ordered by when each step actually fires, not by its weekday number: a
+  // cohort that starts on a Tuesday reaches Thursday before it reaches Sunday.
+  return listSteps(journey.templateId)
+    .map((step) => {
+      const counts = countBy(
+        `SELECT s.state AS key, COUNT(*) AS n FROM journey_sends s
+         JOIN journey_enrollments e ON e.id = s.enrollment_id
+         WHERE e.journey_id = ? AND s.step_id = ? GROUP BY s.state`,
+        [journeyId, step.id]
+      );
 
-    const channels = countBy(
-      `SELECT s.channel AS key, COUNT(*) AS n FROM journey_sends s
-       JOIN journey_enrollments e ON e.id = s.enrollment_id
-       WHERE e.journey_id = ? AND s.step_id = ? AND s.state = 'sent' GROUP BY s.channel`,
-      [journeyId, step.id]
-    );
+      const channels = countBy(
+        `SELECT s.channel AS key, COUNT(*) AS n FROM journey_sends s
+         JOIN journey_enrollments e ON e.id = s.enrollment_id
+         WHERE e.journey_id = ? AND s.step_id = ? AND s.state = 'sent' GROUP BY s.channel`,
+        [journeyId, step.id]
+      );
 
-    const statuses = countBy(
-      `SELECT m.status AS key, COUNT(*) AS n FROM journey_sends s
-       JOIN journey_enrollments e ON e.id = s.enrollment_id
-       JOIN messages m ON m.id = s.message_id
-       WHERE e.journey_id = ? AND s.step_id = ? GROUP BY m.status`,
-      [journeyId, step.id]
-    );
+      const statuses = countBy(
+        `SELECT m.status AS key, COUNT(*) AS n FROM journey_sends s
+         JOIN journey_enrollments e ON e.id = s.enrollment_id
+         JOIN messages m ON m.id = s.message_id
+         WHERE e.journey_id = ? AND s.step_id = ? GROUP BY m.status`,
+        [journeyId, step.id]
+      );
 
-    // A reply within 48 hours of this step's own send.
-    const replied = (
-      db
-        .prepare(
-          `SELECT COUNT(DISTINCT e.id) AS n FROM journey_sends s
-           JOIN journey_enrollments e ON e.id = s.enrollment_id
-           JOIN messages i ON i.member_id = e.member_id AND i.direction = 'incoming'
-             AND i.created_at >= s.attempted_at
-             AND julianday(i.created_at) - julianday(s.attempted_at) <= 2
-           WHERE e.journey_id = ? AND s.step_id = ? AND s.state = 'sent'`
-        )
-        .get(journeyId, step.id) as { n: number }
-    ).n;
+      // A reply within 48 hours of this step's own send.
+      const replied = (
+        db
+          .prepare(
+            `SELECT COUNT(DISTINCT e.id) AS n FROM journey_sends s
+             JOIN journey_enrollments e ON e.id = s.enrollment_id
+             JOIN messages i ON i.member_id = e.member_id AND i.direction = 'incoming'
+               AND i.created_at >= s.attempted_at
+               AND julianday(i.created_at) - julianday(s.attempted_at) <= 2
+             WHERE e.journey_id = ? AND s.step_id = ? AND s.state = 'sent'`
+          )
+          .get(journeyId, step.id) as { n: number }
+      ).n;
 
-    // A row still pending long after it was claimed means a process died
-    // between claiming a step and recording it. It is never resent.
-    const stuck = (
-      db
-        .prepare(
-          `SELECT COUNT(*) AS n FROM journey_sends s
-           JOIN journey_enrollments e ON e.id = s.enrollment_id
-           WHERE e.journey_id = ? AND s.step_id = ? AND s.state = 'pending'
-             AND julianday('now') - julianday(s.attempted_at) > 10.0 / (24 * 60)`
-        )
-        .get(journeyId, step.id) as { n: number }
-    ).n;
+      // A row still pending long after it was claimed means a process died
+      // between claiming a step and recording it. It is never resent.
+      const stuck = (
+        db
+          .prepare(
+            `SELECT COUNT(*) AS n FROM journey_sends s
+             JOIN journey_enrollments e ON e.id = s.enrollment_id
+             WHERE e.journey_id = ? AND s.step_id = ? AND s.state = 'pending'
+               AND julianday('now') - julianday(s.attempted_at) > 10.0 / (24 * 60)`
+          )
+          .get(journeyId, step.id) as { n: number }
+      ).n;
 
-    return {
-      stepId: step.id,
-      label: step.label || `أسبوع ${step.week}`,
-      dueAt: stepDueAt(journey.anchorDate, step).toISOString(),
-      sentText: channels.text ?? 0,
-      sentTemplate: channels.template ?? 0,
-      failed: counts.failed ?? 0,
-      deferred: counts.deferred ?? 0,
-      missed: counts.missed ?? 0,
-      skipped: counts.skipped ?? 0,
-      stuck,
-      delivered: (statuses.delivered ?? 0) + (statuses.read ?? 0),
-      read: statuses.read ?? 0,
-      replied
-    };
-  });
+      return {
+        stepId: step.id,
+        label: step.label || `أسبوع ${step.week}`,
+        dueAt: stepDueAt(journey.anchorDate, step).toISOString(),
+        sentText: channels.text ?? 0,
+        sentTemplate: channels.template ?? 0,
+        failed: counts.failed ?? 0,
+        deferred: counts.deferred ?? 0,
+        missed: counts.missed ?? 0,
+        skipped: counts.skipped ?? 0,
+        stuck,
+        delivered: (statuses.delivered ?? 0) + (statuses.read ?? 0),
+        read: statuses.read ?? 0,
+        replied
+      };
+    })
+    .sort((a, b) => a.dueAt.localeCompare(b.dueAt));
 }
 
 export function journeyLabel(journeyId: number) {

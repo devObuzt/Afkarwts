@@ -2318,3 +2318,20 @@ button.danger {
   color: #fff;
   border-color: #b3261e;
 }
+
+.stepRowActions,
+.stepFormActions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.stepRowActions {
+  flex-direction: column;
+}
+
+.stepList li.editing {
+  background: rgba(11, 61, 46, 0.05);
+  border-radius: 8px;
+}
