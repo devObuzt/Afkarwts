@@ -489,10 +489,19 @@ export function recordSendState(
     .run(enrollmentId, stepId, state, sqliteStamp(now));
 }
 
+/**
+ * Stopping is a one-time event: the first reason is the one that stopped the
+ * member, and a second call says nothing new. Returns whether this call is the
+ * one that stopped them, so the caller opens a single manual task rather than
+ * one per failed step.
+ */
 export function stopEnrollment(enrollmentId: number, reason: string, now: Date) {
-  getDb()
-    .prepare("UPDATE journey_enrollments SET state = 'stopped', stop_reason = ?, stopped_at = ? WHERE id = ?")
+  const result = getDb()
+    .prepare(
+      "UPDATE journey_enrollments SET state = 'stopped', stop_reason = ?, stopped_at = ? WHERE id = ? AND state = 'active'"
+    )
     .run(reason, sqliteStamp(now), enrollmentId);
+  return Number(result.changes) > 0;
 }
 
 export function completeEnrollment(enrollmentId: number) {

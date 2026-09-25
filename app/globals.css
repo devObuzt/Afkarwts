@@ -2335,3 +2335,19 @@ button.danger {
   background: rgba(11, 61, 46, 0.05);
   border-radius: 8px;
 }
+
+.freeTextTools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.freeTextTools .hint {
+  flex-basis: 100%;
+}
+
+.freeTextCopyPicker {
+  margin-bottom: 8px;
+}

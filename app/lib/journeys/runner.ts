@@ -1,6 +1,6 @@
 import { createMessage, getMember, updateMessageStatus } from "../db";
 import { sendTelegramMessage } from "../telegram";
-import { fillNameToken, renderTemplateBody, sendWhatsAppTemplate, sendWhatsAppText } from "../whatsapp";
+import { fillNameInText, fillNameToken, renderTemplateBody, sendWhatsAppTemplate, sendWhatsAppText } from "../whatsapp";
 import { planTick } from "./engine";
 import { drainSmsQueue, openFollowupsForStop, queueStepSms } from "./followups";
 import { formatTickReport, journeyLabel } from "./report";
@@ -48,7 +48,11 @@ function answerFailedSend(input: {
     return "sms" as const;
   }
 
-  stopEnrollment(input.enrollmentId, "send_failed", input.now);
+  if (!stopEnrollment(input.enrollmentId, "send_failed", input.now)) {
+    // Already stopped by an earlier failed step: one manual task is enough,
+    // and counting this as a second stop would overstate the round.
+    return "already-stopped" as const;
+  }
   openFollowupsForStop({
     enrollmentId: input.enrollmentId,
     memberId: input.memberId,
@@ -110,7 +114,7 @@ export async function runDueJourneys(now = new Date()) {
         round.failed += 1;
         if (answer === "sms") {
           round.smsFallback += 1;
-        } else {
+        } else if (answer === "stopped") {
           totals.stopped += 1;
           round.stopped += 1;
         }
@@ -170,8 +174,8 @@ export async function runDueJourneys(now = new Date()) {
         }
 
         const params = fillNameToken(step.bodyParams, member);
-        const body =
-          action.channel === "text" ? step.freeText : renderTemplateBody(step.templatePreview, params);
+        const freeText = fillNameInText(step.freeText, member);
+        const body = action.channel === "text" ? freeText : renderTemplateBody(step.templatePreview, params);
         const message = createMessage({
           memberId: member.id,
           direction: "outgoing",
@@ -183,7 +187,7 @@ export async function runDueJourneys(now = new Date()) {
         try {
           const whatsappMessageId =
             action.channel === "text"
-              ? await sendWhatsAppText(member, step.freeText)
+              ? await sendWhatsAppText(member, freeText)
               : (
                   await sendWhatsAppTemplate(member, {
                     name: step.templateName,

@@ -72,6 +72,15 @@ type Followup = {
   memberPhone: string;
 };
 
+/**
+ * Afkar's words already live in the approved templates, so the free-text box
+ * starts from one rather than from nothing. Meta numbers its placeholders;
+ * the box speaks in {{name}}, which is what the sender fills in.
+ */
+function templateBodyToFreeText(body: string) {
+  return body.split("{{1}}").join("{{name}}").trim();
+}
+
 type WaTemplate = {
   name: string;
   language: string;
@@ -281,6 +290,8 @@ function PathEditor({
 }) {
   const [smsText, setSmsText] = useState(template.smsText);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [copyOpen, setCopyOpen] = useState(false);
+  const [copiedFrom, setCopiedFrom] = useState("");
   const [step, setStep] = useState({
     week: 1,
     weekday: 0,
@@ -295,8 +306,24 @@ function PathEditor({
   const counted = smsSegments(smsText);
   const stepSms = smsSegments(step.smsText);
 
+  function copyIntoFreeText(source: WaTemplate) {
+    const words = templateBodyToFreeText(source.bodyText);
+    if (!words) {
+      onError("That template has no body text to copy.");
+      return;
+    }
+    if (step.freeText.trim() && !window.confirm("This replaces the free text you have written. Continue?")) {
+      return;
+    }
+    setStep({ ...step, freeText: words });
+    setCopiedFrom(source.name);
+    setCopyOpen(false);
+  }
+
   function startEdit(item: Step) {
     setEditingId(item.id);
+    setCopiedFrom("");
+    setCopyOpen(false);
     setStep({
       week: item.week,
       weekday: item.weekday,
@@ -311,6 +338,8 @@ function PathEditor({
 
   function cancelEdit() {
     setEditingId(null);
+    setCopiedFrom("");
+    setCopyOpen(false);
     setStep({ week: 1, weekday: 0, sendTime: "07:00", label: "", freeText: "", templateName: "", smsText: "" });
   }
 
@@ -482,15 +511,56 @@ function PathEditor({
           <p className="hint full">Pick a template to see what it actually says.</p>
         )}
 
-        <label className="full">
-          <span>Free text — used instead, when the member wrote to us in the last 24 hours (optional)</span>
+        <div className="full">
+          <span className="fieldLabel">
+            Free text — used instead, when the member wrote to us in the last 24 hours (optional)
+          </span>
+
+          <div className="freeTextTools">
+            <button
+              className="secondary"
+              disabled={!picked}
+              onClick={() => picked && copyIntoFreeText(picked)}
+              type="button"
+            >
+              Start from the chosen template
+            </button>
+            <button className="secondary" onClick={() => setCopyOpen(!copyOpen)} type="button">
+              {copyOpen ? "Close" : "…or from another one"}
+            </button>
+            {copiedFrom ? (
+              <span className="hint">
+                Copied from <code>{copiedFrom}</code> — edit it freely. The template itself is untouched, and this
+                text goes out only inside the 24-hour window, where WhatsApp allows anything.
+              </span>
+            ) : null}
+          </div>
+
+          {copyOpen ? (
+            <div className="freeTextCopyPicker">
+              <TemplatePicker
+                onChange={(name) => {
+                  const source = waTemplates.find((item) => item.name === name);
+                  if (source) {
+                    copyIntoFreeText(source);
+                  }
+                }}
+                templates={waTemplates}
+                value=""
+              />
+            </div>
+          ) : null}
+
           <textarea
             onChange={(event) => setStep({ ...step, freeText: event.target.value })}
             placeholder="مراحب يا رفاق 👋 كيف ماشي معكم؟"
             rows={3}
             value={step.freeText}
           />
-        </label>
+          <span className="hint">
+            Write <code>{"{{name}}"}</code> anywhere and each member reads their own first name.
+          </span>
+        </div>
 
         <label className="full">
           <span>

@@ -12,7 +12,7 @@ delete process.env.WHATSAPP_WABA_ID;
 
 let seq = 0;
 
-async function cohort(phone: string) {
+async function cohort(phone: string, extraTimes: string[] = []) {
   const { createMember, createGroup, addMembersToGroup } = await import("@/app/lib/db");
   const { createTemplate, createStep, createJourney, setJourneyStatus } = await import("@/app/lib/journeys/store");
 
@@ -34,6 +34,21 @@ async function cohort(phone: string) {
     templatePreview: "مراحب",
     smsText: "أهلا {{name}}، بلشنا أسبوع كلين"
   });
+
+  for (const sendTime of extraTimes) {
+    createStep({
+      templateId: template.id,
+      week: 1,
+      weekday: 0,
+      sendTime,
+      label: `خطوة ${sendTime}`,
+      templateName: "clean_week",
+      templateLanguage: "ar",
+      bodyParams: [],
+      templatePreview: "مراحب",
+      smsText: "أهلا {{name}}، تذكير"
+    });
+  }
 
   const journey = createJourney({ templateId: template.id, groupId: group.id, anchorDate: "2026-08-30" });
   setJourneyStatus(journey.id, "active");
@@ -100,4 +115,24 @@ test("the report counts a late failure as a problem, before any tick reconciles 
 
   // No second tick: the report must not wait for one to tell the truth.
   assert.equal(stepBreakdown(journey.id)[0].failed, 1);
+});
+
+test("a member whose steps all fail is flagged once, not once per step", async () => {
+  const { runDueJourneys } = await import("@/app/lib/journeys/runner");
+  const { getDb } = await import("@/app/lib/db");
+  const { listFollowups } = await import("@/app/lib/journeys/followups");
+
+  // Two steps on the same day, both accepted by Meta and both rejected after —
+  // the shape production showed: one member, three identical manual tasks.
+  const { journey, member } = await cohort("+970597000001", ["12:00"]);
+
+  await runDueJourneys(new Date("2026-08-30T14:00:00.000Z"));
+  getDb()
+    .prepare("UPDATE messages SET status = 'failed', error = 'Message undeliverable' WHERE member_id = ?")
+    .run(member.id);
+  await runDueJourneys(new Date("2026-08-30T14:05:00.000Z"));
+
+  const manual = listFollowups({ kind: "manual" }).filter((item) => item.memberId === member.id);
+  assert.equal(manual.length, 1);
+  assert.equal((await enrollment(journey.id)).stop_reason, "send_failed");
 });

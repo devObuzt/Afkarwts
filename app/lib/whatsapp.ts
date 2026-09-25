@@ -132,6 +132,17 @@ export function fillNameToken(bodyParams: string[], member: Pick<Member, "name" 
 }
 
 /**
+ * Free text carries the same name token as a template value does, so the box
+ * the UI writes and the template it was copied from read alike.
+ */
+export function fillNameInText(text: string, member: Pick<Member, "name" | "phone">) {
+  if (!text.includes(NAME_TOKEN)) {
+    return text;
+  }
+  return text.split(NAME_TOKEN).join(contactFirstName(member));
+}
+
+/**
  * Meta fills {{1}}, {{2}}… from the values we send, so the copy we keep for
  * ourselves is filled the same way. Otherwise the thread and the reports show
  * a raw template while the member received their own name.

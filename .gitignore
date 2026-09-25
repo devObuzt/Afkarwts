@@ -17,3 +17,4 @@ ios/DerivedData
 *firebase-adminsdk*.json
 android/keystore.properties
 *.keystore
+tsconfig.tsbuildinfo

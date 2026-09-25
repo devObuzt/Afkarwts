@@ -157,3 +157,45 @@ test("the thread shows what the member actually received, not the raw template",
   // Meta fills {{1}} on its way out, so our own copy should read the same.
   assert.equal(sent.body, "سلام سارة، تذكير بتعليمات اليوم 1.");
 });
+
+test("free text greets the member by name, like the template does", async () => {
+  const { runDueJourneys } = await import("@/app/lib/journeys/runner");
+  const { buildIncomingPayload, handleWebhookPayload } = await import("@/app/lib/whatsapp-webhook");
+  const { getDb } = await import("@/app/lib/db");
+  const { createMember, createGroup, addMembersToGroup } = await import("@/app/lib/db");
+  const { createTemplate, createStep, createJourney, setJourneyStatus } = await import("@/app/lib/journeys/store");
+
+  seq += 1;
+  const group = createGroup(`كلين نداء ${seq}`);
+  const member = createMember({ name: "سارة عوض", phone: `+9725100${String(seq).padStart(5, "0")}`, notes: "" })!;
+  addMembersToGroup(group.id, [member.id]);
+
+  const template = createTemplate({ name: "كلين نداء" });
+  createStep({
+    templateId: template.id,
+    week: 1,
+    weekday: 0,
+    sendTime: "07:00",
+    // What "copy from the template" writes into the box: the template's own
+    // body, with its {{1}} turned into the name token the UI uses everywhere.
+    freeText: "سلام {{name}} 👋 كيف ماشي معك الأسبوع؟",
+    templateName: "clean_week",
+    templateLanguage: "ar",
+    bodyParams: ["{{name}}"],
+    templatePreview: "سلام {{1}}"
+  });
+
+  const journey = createJourney({ templateId: template.id, groupId: group.id, anchorDate: "2026-08-30" });
+  setJourneyStatus(journey.id, "active");
+
+  await handleWebhookPayload(buildIncomingPayload({ phone: member.phone, text: "جاهزة" }));
+  getDb()
+    .prepare("UPDATE messages SET created_at = ? WHERE member_id = ? AND direction = 'incoming'")
+    .run("2026-08-30 04:30:00", member.id);
+
+  await runDueJourneys(new Date("2026-08-30T05:00:00.000Z"));
+
+  const messages = await outgoing(member.id);
+  assert.equal(messages.length, 1);
+  assert.equal(messages[0].body, "سلام سارة 👋 كيف ماشي معك الأسبوع؟");
+});
