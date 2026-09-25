@@ -25,7 +25,13 @@ export function setAlias(templateName: string, alias: string) {
   const trimmed = alias.trim();
 
   if (!trimmed) {
-    getDb().prepare("DELETE FROM template_aliases WHERE template_name = ?").run(templateName);
+    // The row also carries whether the template is frozen, so clearing the
+    // nickname empties that one field rather than dropping the row — deleting
+    // it would quietly bring a frozen template back into every picker.
+    getDb().prepare("UPDATE template_aliases SET alias = '' WHERE template_name = ?").run(templateName);
+    getDb().prepare("DELETE FROM template_aliases WHERE template_name = ? AND alias = '' AND frozen_at IS NULL").run(
+      templateName
+    );
     return;
   }
 

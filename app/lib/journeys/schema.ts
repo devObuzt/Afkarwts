@@ -106,6 +106,19 @@ export function migrateJourneyTables(db: DatabaseSync) {
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
 
+    CREATE TABLE IF NOT EXISTS template_groups (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL UNIQUE,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS template_group_items (
+      group_id INTEGER NOT NULL,
+      template_name TEXT NOT NULL,
+      PRIMARY KEY (group_id, template_name),
+      FOREIGN KEY (group_id) REFERENCES template_groups(id) ON DELETE CASCADE
+    );
+
     CREATE INDEX IF NOT EXISTS idx_journey_sends_enrollment ON journey_sends(enrollment_id);
     CREATE INDEX IF NOT EXISTS idx_enrollments_journey_state ON journey_enrollments(journey_id, state);
     CREATE INDEX IF NOT EXISTS idx_followups_state ON followups(kind, state);
@@ -115,5 +128,6 @@ export function migrateJourneyTables(db: DatabaseSync) {
   // a follow-up belongs to.
   addColumnIfMissing(db, "journey_steps", "sms_text", "TEXT NOT NULL DEFAULT ''");
   addColumnIfMissing(db, "journey_steps", "sms_uses_free_text", "INTEGER NOT NULL DEFAULT 0");
+  addColumnIfMissing(db, "template_aliases", "frozen_at", "TEXT");
   addColumnIfMissing(db, "followups", "step_id", "INTEGER");
 }

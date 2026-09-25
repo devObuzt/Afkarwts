@@ -9,6 +9,7 @@ export type PickerTemplate = {
   bodyText: string;
   paramCount: number;
   alias?: string;
+  groups?: string[];
 };
 
 /**
@@ -29,6 +30,8 @@ export function TemplatePicker({
   const [finePointer, setFinePointer] = useState(false);
   const [open, setOpen] = useState(false);
   const [hovered, setHovered] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [group, setGroup] = useState("");
   const boxRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -59,6 +62,20 @@ export function TemplatePicker({
       document.removeEventListener("keydown", onKey);
     };
   }, [open]);
+
+  // Fifty-eight near-identical names are unreadable as a list, so the list
+  // narrows two ways: by the words in the message, and by the shelf it sits on.
+  const groupNames = Array.from(new Set(templates.flatMap((item) => item.groups ?? []))).sort();
+  const needle = query.trim().toLowerCase();
+  const shown = templates
+    .filter((item) => (group ? (item.groups ?? []).includes(group) : true))
+    .filter(
+      (item) =>
+        !needle ||
+        item.name.toLowerCase().includes(needle) ||
+        (item.alias ?? "").toLowerCase().includes(needle) ||
+        item.bodyText.toLowerCase().includes(needle)
+    );
 
   const selected = templates.find((item) => item.name === value);
   const previewed = templates.find((item) => item.name === (hovered ?? value)) ?? null;
@@ -99,8 +116,37 @@ export function TemplatePicker({
 
       {open ? (
         <div className="pickerPanel">
+          <div className="pickerSearch">
+            <input
+              autoFocus
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search the name, the internal name, or the words inside"
+              value={query}
+            />
+            {groupNames.length ? (
+              <div className="pickerGroups">
+                <button className={group ? "chip" : "chip on"} onClick={() => setGroup("")} type="button">
+                  All
+                </button>
+                {groupNames.map((name) => (
+                  <button
+                    className={group === name ? "chip on" : "chip"}
+                    key={name}
+                    onClick={() => setGroup(group === name ? "" : name)}
+                    type="button"
+                  >
+                    {name}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+            <span className="hint">
+              {shown.length} of {templates.length}
+            </span>
+          </div>
+
           <ul className="pickerList" role="listbox">
-            {templates.map((item) => (
+            {shown.map((item) => (
               <li key={`${item.name}:${item.language}`}>
                 <button
                   className={item.name === value ? "current" : ""}
@@ -119,6 +165,11 @@ export function TemplatePicker({
                 </button>
               </li>
             ))}
+            {!shown.length ? (
+              <li>
+                <p className="hint">Nothing matches. Clear the search, or pick another group.</p>
+              </li>
+            ) : null}
           </ul>
 
           <div className="pickerPreview">

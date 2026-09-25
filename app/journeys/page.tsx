@@ -89,6 +89,8 @@ type WaTemplate = {
   bodyText: string;
   paramCount: number;
   alias?: string;
+  frozen?: boolean;
+  groups?: string[];
 };
 
 type Group = { id: number; name: string; memberCount: number };
@@ -187,7 +189,9 @@ function PathsView({ onError }: { onError: (message: string) => void }) {
     try {
       const [paths, wa] = await Promise.all([api("/api/journeys/templates"), api("/api/templates")]);
       setTemplates(paths.templates);
-      setWaTemplates(wa.templates ?? []);
+      // A frozen template keeps working wherever it is already used; it simply
+      // stops being offered for anything new, which is what freezing is for.
+      setWaTemplates((wa.templates ?? []).filter((item: WaTemplate) => !item.frozen));
     } catch (caught) {
       onError(caught instanceof Error ? caught.message : "Could not load paths.");
     }

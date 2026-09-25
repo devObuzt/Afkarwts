@@ -305,6 +305,7 @@ export type WhatsAppTemplate = {
   name: string;
   language: string;
   category: string;
+  status: string;
   bodyText: string;
   headerText: string | null;
   paramCount: number;
@@ -337,7 +338,9 @@ function countBodyParams(text: string) {
   return max;
 }
 
-export async function listWhatsAppTemplates(): Promise<WhatsAppTemplate[]> {
+export async function listWhatsAppTemplates(
+  options: { includeUnapproved?: boolean } = {}
+): Promise<WhatsAppTemplate[]> {
   const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
   const apiVersion = process.env.WHATSAPP_API_VERSION || "v23.0";
   const wabaId = process.env.WHATSAPP_WABA_ID;
@@ -368,7 +371,13 @@ export async function listWhatsAppTemplates(): Promise<WhatsAppTemplate[]> {
   const templates: WhatsAppTemplate[] = [];
 
   for (const item of payload.data ?? []) {
-    if (item.status !== "APPROVED" || !item.name || !item.language) {
+    if (!item.name || !item.language) {
+      continue;
+    }
+
+    // Sending needs an approved template; the management screen needs to see
+    // the ones still waiting or rejected, which is the whole point of it.
+    if (!options.includeUnapproved && item.status !== "APPROVED") {
       continue;
     }
 
@@ -380,6 +389,7 @@ export async function listWhatsAppTemplates(): Promise<WhatsAppTemplate[]> {
       name: item.name,
       language: item.language,
       category: item.category ?? "",
+      status: item.status ?? "",
       bodyText,
       headerText: header?.format === "TEXT" ? header.text ?? null : null,
       paramCount: countBodyParams(bodyText),
@@ -388,6 +398,109 @@ export async function listWhatsAppTemplates(): Promise<WhatsAppTemplate[]> {
   }
 
   return templates;
+}
+
+export type NewTemplateButton =
+  | { type: "QUICK_REPLY"; text: string }
+  | { type: "URL"; text: string; url: string }
+  | { type: "PHONE_NUMBER"; text: string; phoneNumber: string };
+
+export type NewTemplate = {
+  name: string;
+  language: string;
+  category: "UTILITY" | "MARKETING";
+  bodyText: string;
+  headerText?: string;
+  footerText?: string;
+  buttons?: NewTemplateButton[];
+  allowCategoryChange?: boolean;
+  /** One example value per {{n}} in the body — Meta rejects a template without them. */
+  bodyExamples?: string[];
+};
+
+type TemplateCreateResponse = {
+  id?: string;
+  status?: string;
+  category?: string;
+  error?: { message?: string; error_user_msg?: string; error_subcode?: number };
+};
+
+/**
+ * Submits a template for review. Meta screens the text on the spot: a body
+ * that reads as an access code comes back REJECTED in this same call however
+ * it is categorised, because AUTHENTICATION templates take no free text. A
+ * healthy submission answers PENDING.
+ *
+ * The name is burned by that rejection — a category cannot be changed later,
+ * approved or not — so a second attempt needs a new name.
+ */
+export async function createWhatsAppTemplate(input: NewTemplate) {
+  const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
+  const apiVersion = process.env.WHATSAPP_API_VERSION || "v23.0";
+  const wabaId = process.env.WHATSAPP_WABA_ID;
+
+  if (!accessToken) {
+    throw new Error("WHATSAPP_ACCESS_TOKEN is missing.");
+  }
+  if (!wabaId) {
+    throw new Error("WHATSAPP_WABA_ID is missing.");
+  }
+
+  const components: Array<Record<string, unknown>> = [];
+
+  if (input.headerText?.trim()) {
+    components.push({ type: "HEADER", format: "TEXT", text: input.headerText.trim() });
+  }
+
+  const body: Record<string, unknown> = { type: "BODY", text: input.bodyText };
+  if (input.bodyExamples?.length) {
+    body.example = { body_text: [input.bodyExamples] };
+  }
+  components.push(body);
+
+  if (input.footerText?.trim()) {
+    components.push({ type: "FOOTER", text: input.footerText.trim() });
+  }
+
+  if (input.buttons?.length) {
+    components.push({
+      type: "BUTTONS",
+      buttons: input.buttons.map((button) =>
+        button.type === "URL"
+          ? { type: "URL", text: button.text, url: button.url }
+          : button.type === "PHONE_NUMBER"
+            ? { type: "PHONE_NUMBER", text: button.text, phone_number: button.phoneNumber }
+            : { type: "QUICK_REPLY", text: button.text }
+      )
+    });
+  }
+
+  const payload = {
+    name: input.name,
+    language: input.language,
+    category: input.category,
+    allow_category_change: input.allowCategoryChange ?? true,
+    components
+  };
+
+  if (!isLive()) {
+    return { id: dryRunId("template"), status: "PENDING", category: input.category, dryRun: true };
+  }
+
+  const response = await fetch(`https://graph.facebook.com/${apiVersion}/${wabaId}/message_templates`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+
+  const result = (await response.json()) as TemplateCreateResponse;
+
+  if (!response.ok) {
+    const meta = result.error?.error_user_msg || result.error?.message || `Meta refused it (${response.status}).`;
+    throw new Error(meta);
+  }
+
+  return { id: result.id ?? "", status: result.status ?? "PENDING", category: result.category ?? input.category, dryRun: false };
 }
 
 export function mediaKindFromMime(mimeType: string, byteLength = 0): OutboundMediaKind {
