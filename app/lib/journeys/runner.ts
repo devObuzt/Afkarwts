@@ -16,6 +16,7 @@ import {
   markSendFailed,
   recordSendState,
   remainingAllowance,
+  stepSmsBody,
   stopEnrollment,
   syncEnrollments
 } from "./store";
@@ -40,7 +41,7 @@ function answerFailedSend(input: {
         enrollmentId: input.enrollmentId,
         memberId: input.memberId,
         stepId: input.stepId,
-        text: step.smsText
+        text: stepSmsBody(step)
       })
     : false;
 

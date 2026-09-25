@@ -25,6 +25,8 @@ export type JourneyStep = {
   templatePreview: string;
   /** Sent instead of this step when WhatsApp cannot deliver it. */
   smsText: string;
+  /** When set, the SMS is the step's own free text rather than a separate one. */
+  smsUsesFreeText: boolean;
   createdAt: string;
   archivedAt: string | null;
 };
@@ -60,6 +62,7 @@ type DbStep = {
   body_params: string;
   template_preview: string;
   sms_text: string | null;
+  sms_uses_free_text: number | null;
   created_at: string;
   archived_at: string | null;
 };
@@ -98,6 +101,7 @@ function mapStep(row: DbStep): JourneyStep {
     bodyParams: JSON.parse(row.body_params || "[]") as string[],
     templatePreview: row.template_preview,
     smsText: row.sms_text ?? "",
+    smsUsesFreeText: Boolean(row.sms_uses_free_text),
     createdAt: row.created_at,
     archivedAt: row.archived_at
   };
@@ -166,12 +170,13 @@ export function createStep(input: {
   bodyParams: string[];
   templatePreview: string;
   smsText?: string;
+  smsUsesFreeText?: boolean;
 }) {
   const result = getDb()
     .prepare(
       `INSERT INTO journey_steps
-         (template_id, week, weekday, send_time, label, free_text, template_name, template_language, body_params, template_preview, sms_text)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         (template_id, week, weekday, send_time, label, free_text, template_name, template_language, body_params, template_preview, sms_text, sms_uses_free_text)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       input.templateId,
@@ -184,9 +189,19 @@ export function createStep(input: {
       input.templateLanguage,
       JSON.stringify(input.bodyParams),
       input.templatePreview,
-      input.smsText ?? ""
+      input.smsText ?? "",
+      input.smsUsesFreeText ? 1 : 0
     );
   return getStep(Number(result.lastInsertRowid))!;
+}
+
+/**
+ * What this step says over SMS. A step can carry its own short line, or reuse
+ * the free text it already has — resolved here rather than copied at save
+ * time, so editing the words never leaves a stale SMS behind.
+ */
+export function stepSmsBody(step: JourneyStep) {
+  return step.smsUsesFreeText ? step.freeText : step.smsText;
 }
 
 export function getStep(id: number) {
@@ -220,7 +235,8 @@ export function updateStep(
     .prepare(
       `UPDATE journey_steps
        SET week = ?, weekday = ?, send_time = ?, label = ?, free_text = ?,
-           template_name = ?, template_language = ?, body_params = ?, template_preview = ?, sms_text = ?
+           template_name = ?, template_language = ?, body_params = ?, template_preview = ?, sms_text = ?,
+           sms_uses_free_text = ?
        WHERE id = ?`
     )
     .run(
@@ -234,6 +250,7 @@ export function updateStep(
       JSON.stringify(next.bodyParams),
       next.templatePreview,
       next.smsText,
+      next.smsUsesFreeText ? 1 : 0,
       id
     );
 

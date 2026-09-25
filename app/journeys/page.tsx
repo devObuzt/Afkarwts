@@ -16,6 +16,7 @@ type Step = {
   templateLanguage: string;
   templatePreview: string;
   smsText: string;
+  smsUsesFreeText: boolean;
 };
 
 type Template = { id: number; name: string; smsText: string; steps: Step[] };
@@ -299,12 +300,14 @@ function PathEditor({
     label: "",
     freeText: "",
     templateName: "",
-    smsText: ""
+    smsText: "",
+    smsUsesFreeText: false
   });
 
   const picked = waTemplates.find((item) => item.name === step.templateName);
   const counted = smsSegments(smsText);
-  const stepSms = smsSegments(step.smsText);
+  const smsBody = step.smsUsesFreeText ? step.freeText : step.smsText;
+  const stepSms = smsSegments(smsBody);
 
   function copyIntoFreeText(source: WaTemplate) {
     const words = templateBodyToFreeText(source.bodyText);
@@ -331,7 +334,8 @@ function PathEditor({
       label: item.label,
       freeText: item.freeText,
       templateName: item.templateName,
-      smsText: item.smsText
+      smsText: item.smsText,
+      smsUsesFreeText: item.smsUsesFreeText
     });
     onError("");
   }
@@ -340,7 +344,16 @@ function PathEditor({
     setEditingId(null);
     setCopiedFrom("");
     setCopyOpen(false);
-    setStep({ week: 1, weekday: 0, sendTime: "07:00", label: "", freeText: "", templateName: "", smsText: "" });
+    setStep({
+      week: 1,
+      weekday: 0,
+      sendTime: "07:00",
+      label: "",
+      freeText: "",
+      templateName: "",
+      smsText: "",
+      smsUsesFreeText: false
+    });
   }
 
   async function saveStep() {
@@ -415,7 +428,13 @@ function PathEditor({
                 ) : (
                   <p className="hint">Template only — no free-text version.</p>
                 )}
-                {item.smsText ? (
+                {item.smsUsesFreeText && item.freeText ? (
+                  <p className="stepSms">
+                    <span>SMS, when WhatsApp cannot deliver it:</span> {item.freeText}{" "}
+                    <em>(the same words as the free text)</em>
+                  </p>
+                ) : null}
+                {!item.smsUsesFreeText && item.smsText ? (
                   <p className="stepFree">
                     <span>SMS, when WhatsApp cannot deliver it:</span> {item.smsText}
                   </p>
@@ -560,21 +579,46 @@ function PathEditor({
           <span className="hint">
             Write <code>{"{{name}}"}</code> anywhere and each member reads their own first name.
           </span>
+
+          <label className="inlineCheck">
+            <input
+              checked={step.smsUsesFreeText}
+              onChange={(event) => setStep({ ...step, smsUsesFreeText: event.target.checked })}
+              type="checkbox"
+            />
+            <span>Send these same words as the SMS too, when WhatsApp cannot deliver this step</span>
+          </label>
         </div>
 
-        <label className="full">
-          <span>
-            SMS for this step — sent when WhatsApp cannot deliver it, so the member stays on the path. Use{" "}
-            <code>{"{{name}}"}</code> for their first name.
-          </span>
-          <textarea
-            onChange={(event) => setStep({ ...step, smsText: event.target.value })}
-            placeholder="أهلا {{name}}، بلشنا أسبوع كلين. للتفاصيل ردّي علينا"
-            rows={2}
-            value={step.smsText}
-          />
-          <span className="hint">{stepSms.characters} characters · {stepSms.segments} SMS {stepSms.segments === 1 ? "message" : "messages"} each time it is used</span>
-        </label>
+        {step.smsUsesFreeText ? (
+          <div className="full">
+            <span className="fieldLabel">SMS for this step — the free text above, word for word</span>
+            <p className="smsMirror">{step.freeText || "Nothing written yet, so this step has no SMS."}</p>
+            <span className={stepSms.segments > 2 ? "hint warnText" : "hint"}>
+              {stepSms.characters} characters · {stepSms.segments} SMS{" "}
+              {stepSms.segments === 1 ? "message" : "messages"} per member, every time this step cannot be
+              delivered. Arabic fits 70 characters in one message, so a warm WhatsApp line is an expensive SMS —
+              untick the box to write a shorter one.
+            </span>
+          </div>
+        ) : (
+          <label className="full">
+            <span>
+              SMS for this step — sent when WhatsApp cannot deliver it, so the member stays on the path. Use{" "}
+              <code>{"{{name}}"}</code> for their first name.
+            </span>
+            <textarea
+              onChange={(event) => setStep({ ...step, smsText: event.target.value })}
+              placeholder="أهلا {{name}}، بلشنا أسبوع كلين. للتفاصيل ردّي علينا"
+              rows={2}
+              value={step.smsText}
+            />
+            <span className="hint">
+              {stepSms.characters} characters · {stepSms.segments} SMS{" "}
+              {stepSms.segments === 1 ? "message" : "messages"} each time it is used
+            </span>
+          </label>
+        )}
 
         <div className="full stepFormActions">
           <button disabled={!step.templateName} onClick={() => void saveStep()} type="button">

@@ -2351,3 +2351,29 @@ button.danger {
 .freeTextCopyPicker {
   margin-bottom: 8px;
 }
+
+.inlineCheck {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.inlineCheck input {
+  width: auto;
+  margin: 0;
+}
+
+.smsMirror {
+  margin: 0 0 4px;
+  padding: 10px 12px;
+  border: 1px dashed var(--line, #d9d9d9);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.02);
+  white-space: pre-wrap;
+}
+
+.warnText {
+  color: #9a3412;
+}

@@ -115,3 +115,39 @@ test("a number SMS cannot reach stops and opens a manual task instead", async ()
   assert.equal(manual.length, 1);
   assert.equal((await enrollmentState(journey.id)).state, "stopped", "nothing can reach them, so the path ends");
 });
+
+test("a step told to reuse its free text sends that, not the SMS box", async () => {
+  const { runDueJourneys } = await import("@/app/lib/journeys/runner");
+  const { listFollowups } = await import("@/app/lib/journeys/followups");
+  const { updateStep } = await import("@/app/lib/journeys/store");
+  const { member, step } = await cohort("+972521000701");
+
+  // What ticking the box does: one text serves both channels, so editing the
+  // free text later cannot leave a stale SMS behind.
+  updateStep(step.id, {
+    freeText: "مراحب {{name}} 👋 اليوم بلشنا، وأنا معك خطوة بخطوة",
+    smsUsesFreeText: true
+  });
+
+  await runDueJourneys(new Date("2026-08-30T05:00:00.000Z"));
+
+  const sms = listFollowups({ kind: "sms" }).filter((item) => item.memberId === member.id);
+  assert.equal(sms.length, 1);
+  assert.equal(sms[0].body, "مراحب سارة 👋 اليوم بلشنا، وأنا معك خطوة بخطوة");
+});
+
+test("an empty free text with the box ticked falls through, it does not send a blank", async () => {
+  const { runDueJourneys } = await import("@/app/lib/journeys/runner");
+  const { listFollowups } = await import("@/app/lib/journeys/followups");
+  const { updateStep } = await import("@/app/lib/journeys/store");
+  const { journey, member, step } = await cohort("+972521000702");
+
+  updateStep(step.id, { freeText: "", smsUsesFreeText: true });
+  await runDueJourneys(new Date("2026-08-30T05:00:00.000Z"));
+
+  // Nothing to say for this step, so the member drops to the path's own
+  // answer — the path SMS and a stop — rather than being sent an empty line.
+  const sms = listFollowups({ kind: "sms" }).filter((item) => item.memberId === member.id);
+  assert.deepEqual(sms.map((item) => item.body), ["حاولنا نوصلك وما نجحنا"]);
+  assert.equal((await enrollmentState(journey.id)).state, "stopped");
+});

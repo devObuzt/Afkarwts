@@ -114,5 +114,6 @@ export function migrateJourneyTables(db: DatabaseSync) {
   // Added after the first release: the SMS a step falls back to, and which step
   // a follow-up belongs to.
   addColumnIfMissing(db, "journey_steps", "sms_text", "TEXT NOT NULL DEFAULT ''");
+  addColumnIfMissing(db, "journey_steps", "sms_uses_free_text", "INTEGER NOT NULL DEFAULT 0");
   addColumnIfMissing(db, "followups", "step_id", "INTEGER");
 }
