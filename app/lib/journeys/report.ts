@@ -168,6 +168,20 @@ export function stepBreakdown(journeyId: number): StepRow[] {
           .get(journeyId, step.id) as { n: number }
       ).n;
 
+      // A send Meta accepted and then rejected is a failure too, and the
+      // rejection arrives long after the send. Counting only the send's own
+      // state would report a clean step while a message sat failed.
+      const failed = (
+        db
+          .prepare(
+            `SELECT COUNT(*) AS n FROM journey_sends s
+             JOIN journey_enrollments e ON e.id = s.enrollment_id
+             LEFT JOIN messages m ON m.id = s.message_id
+             WHERE e.journey_id = ? AND s.step_id = ? AND (s.state = 'failed' OR m.status = 'failed')`
+          )
+          .get(journeyId, step.id) as { n: number }
+      ).n;
+
       // A row still pending long after it was claimed means a process died
       // between claiming a step and recording it. It is never resent.
       const stuck = (
@@ -187,7 +201,7 @@ export function stepBreakdown(journeyId: number): StepRow[] {
         dueAt: stepDueAt(journey.anchorDate, step).toISOString(),
         sentText: channels.text ?? 0,
         sentTemplate: channels.template ?? 0,
-        failed: counts.failed ?? 0,
+        failed,
         deferred: counts.deferred ?? 0,
         missed: counts.missed ?? 0,
         skipped: counts.skipped ?? 0,

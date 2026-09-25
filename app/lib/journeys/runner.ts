@@ -12,6 +12,8 @@ import {
   listActiveJourneys,
   loadTickState,
   recordSend,
+  listLateFailures,
+  markSendFailed,
   recordSendState,
   remainingAllowance,
   stopEnrollment,
@@ -19,6 +21,42 @@ import {
 } from "./store";
 
 const globalForRunner = globalThis as typeof globalThis & { __afkarJourneyRunning?: boolean };
+
+/**
+ * What a failed step means, wherever the failure was noticed: the step goes out
+ * as its own SMS and the member stays on the path, or - when nothing can reach
+ * them - the path ends here and a person picks it up.
+ */
+function answerFailedSend(input: {
+  enrollmentId: number;
+  memberId: number;
+  stepId: number;
+  pathSmsText: string;
+  now: Date;
+}) {
+  const step = getStep(input.stepId);
+  const viaSms = step
+    ? queueStepSms({
+        enrollmentId: input.enrollmentId,
+        memberId: input.memberId,
+        stepId: input.stepId,
+        text: step.smsText
+      })
+    : false;
+
+  if (viaSms) {
+    return "sms" as const;
+  }
+
+  stopEnrollment(input.enrollmentId, "send_failed", input.now);
+  openFollowupsForStop({
+    enrollmentId: input.enrollmentId,
+    memberId: input.memberId,
+    reason: "send_failed",
+    smsText: input.pathSmsText
+  });
+  return "stopped" as const;
+}
 
 export type TickTotals = {
   sent: number;
@@ -56,6 +94,27 @@ export async function runDueJourneys(now = new Date()) {
 
       const smsText = getTemplate(journey.templateId)?.smsText ?? "";
       const round = { sent: 0, sentText: 0, sentTemplate: 0, failed: 0, deferred: 0, stopped: 0, smsFallback: 0 };
+
+      // Failures Meta reported after the send that made them are answered here,
+      // before anything is planned, so the plan works from the real state.
+      for (const late of listLateFailures(journey.id)) {
+        markSendFailed(late.sendId, late.error);
+        const answer = answerFailedSend({
+          enrollmentId: late.enrollmentId,
+          memberId: late.memberId,
+          stepId: late.stepId,
+          pathSmsText: smsText,
+          now
+        });
+        totals.failed += 1;
+        round.failed += 1;
+        if (answer === "sms") {
+          round.smsFallback += 1;
+        } else {
+          totals.stopped += 1;
+          round.stopped += 1;
+        }
+      }
       const enrollments = loadTickState(journey.id, now);
       const memberIdByEnrollment = new Map(enrollments.map((item) => [item.enrollmentId, item.memberId]));
       const actions = planTick({ now, allowance, enrollments });
@@ -145,28 +204,17 @@ export async function runDueJourneys(now = new Date()) {
           totals.failed += 1;
           round.failed += 1;
 
-          // WhatsApp could not deliver this step, so it goes out as the step's
-          // own SMS and the member stays on the path - a number that fails this
-          // week may work the next. When SMS cannot reach them either, the path
-          // ends here and a person picks it up.
-          const failedFor = memberIdByEnrollment.get(action.enrollmentId) ?? 0;
-          const viaSms = queueStepSms({
+          const answer = answerFailedSend({
             enrollmentId: action.enrollmentId,
-            memberId: failedFor,
+            memberId: memberIdByEnrollment.get(action.enrollmentId) ?? 0,
             stepId: action.stepId,
-            text: step.smsText
+            pathSmsText: smsText,
+            now
           });
 
-          if (viaSms) {
+          if (answer === "sms") {
             round.smsFallback += 1;
           } else {
-            stopEnrollment(action.enrollmentId, "send_failed", now);
-            openFollowupsForStop({
-              enrollmentId: action.enrollmentId,
-              memberId: failedFor,
-              reason: "send_failed",
-              smsText
-            });
             totals.stopped += 1;
             round.stopped += 1;
           }

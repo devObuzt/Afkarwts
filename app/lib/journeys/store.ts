@@ -574,3 +574,38 @@ export function liveJourneysUsingTemplate(templateId: number) {
 
   return rows.map((row) => ({ id: row.id, groupName: row.group_name, status: row.status }));
 }
+
+/**
+ * Sends Meta accepted and then rejected. The failure arrives over the webhook
+ * minutes later, long after the tick that sent it has finished, so nothing has
+ * answered it yet — this is how the next tick finds them.
+ */
+export function listLateFailures(journeyId: number) {
+  const rows = getDb()
+    .prepare(
+      `SELECT s.id AS send_id, s.enrollment_id, s.step_id, e.member_id, m.error
+       FROM journey_sends s
+       JOIN journey_enrollments e ON e.id = s.enrollment_id
+       JOIN messages m ON m.id = s.message_id
+       WHERE e.journey_id = ? AND e.state = 'active' AND s.state = 'sent' AND m.status = 'failed'`
+    )
+    .all(journeyId) as Array<{
+    send_id: number;
+    enrollment_id: number;
+    step_id: number;
+    member_id: number;
+    error: string | null;
+  }>;
+
+  return rows.map((row) => ({
+    sendId: row.send_id,
+    enrollmentId: row.enrollment_id,
+    stepId: row.step_id,
+    memberId: row.member_id,
+    error: row.error
+  }));
+}
+
+export function markSendFailed(sendId: number, error: string | null) {
+  getDb().prepare("UPDATE journey_sends SET state = 'failed', error = ? WHERE id = ?").run(error, sendId);
+}
