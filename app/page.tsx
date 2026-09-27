@@ -788,6 +788,9 @@ export default function Home() {
           <a className="toolbarLink" href="/journeys">
             <Icon path={icons.calendar} size={15} /> Journeys
           </a>
+          <a className="toolbarLink" href="/templates">
+            <Icon path={icons.tag} size={15} /> Templates
+          </a>
         </div>
 
         <section className="memberList" aria-label="Members">
