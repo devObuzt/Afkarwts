@@ -791,6 +791,9 @@ export default function Home() {
           <a className="toolbarLink" href="/templates">
             <Icon path={icons.tag} size={15} /> Templates
           </a>
+          <a className="toolbarLink" href="/leads">
+            <Icon path={icons.upload} size={15} /> Leads
+          </a>
         </div>
 
         <section className="memberList" aria-label="Members">

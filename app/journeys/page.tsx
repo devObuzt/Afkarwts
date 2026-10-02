@@ -1,8 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { smsSegments } from "@/app/lib/sms-format";
+import { AdminNav } from "@/app/components/AdminNav";
 import { TemplatePicker } from "./TemplatePicker";
 
 type Step = {
@@ -138,14 +138,9 @@ export default function JourneysPage() {
 
   return (
     <div className="journeyPage">
+      <AdminNav />
       <header className="journeyHeader">
         <div>
-          <Link className="backLink" href="/">
-            &larr; Inbox
-          </Link>
-          <Link className="backLink spaced" href="/templates">
-            Templates &rarr;
-          </Link>
           <h1>Journeys</h1>
           <p className="hint">
             A <strong>path</strong> is the flow: which message goes out on which day, written once. A{" "}

@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { AdminNav } from "@/app/components/AdminNav";
 import { InfoTip } from "./InfoTip";
 import { NewTemplateForm } from "./NewTemplateForm";
 
@@ -151,11 +151,9 @@ export default function TemplatesPage() {
 
   return (
     <div className="journeyPage">
+      <AdminNav />
       <header className="journeyHeader">
         <div>
-          <Link className="backLink" href="/journeys">
-            &larr; Journeys
-          </Link>
           <h1>Templates</h1>
           <p className="hint">
             Every template on this WhatsApp account, and everything Afkar keeps about it that Meta does not: an

@@ -2692,3 +2692,145 @@ button.danger {
   color: var(--muted);
   line-height: 1.8;
 }
+
+/* The menu across the pages behind the login */
+.adminNav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.adminNav a {
+  padding: 6px 14px;
+  border-radius: 999px;
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 13px;
+}
+
+.adminNav a:hover {
+  background: var(--green-tint);
+  color: var(--ink);
+}
+
+.adminNav a.current {
+  background: var(--green-900);
+  color: #fff;
+}
+
+/* Leads */
+.leadRow {
+  margin-bottom: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+}
+
+.leadRow > header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.leadRow > header > input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--green-700);
+}
+
+.badge.soft {
+  background: var(--line-soft);
+  color: var(--muted);
+}
+
+.bulkBar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--green-soft);
+  border: 1px solid var(--green-500);
+}
+
+.answerList {
+  margin: 10px 0 0;
+}
+
+.answerList > div {
+  padding: 8px 0;
+  border-top: 1px solid var(--line-soft);
+}
+
+.answerList dt {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.answerList dd {
+  margin: 2px 0 0;
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
+.formLink {
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--green-tint);
+}
+
+.formLink code {
+  direction: ltr;
+  unicode-bidi: embed;
+}
+
+/* The form's question list */
+.fieldEditor {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fieldRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  border-radius: 8px;
+}
+
+.fieldRow:hover {
+  background: var(--green-tint);
+}
+
+.fieldNum {
+  width: 22px;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+.fieldLabelText {
+  flex: 1 1 240px;
+  line-height: 1.6;
+}
+
+.fieldLabelText .req {
+  color: var(--danger);
+}
+
+.fieldRow button {
+  padding: 4px 10px;
+  font-size: 12px;
+}
