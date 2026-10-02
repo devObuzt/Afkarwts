@@ -10,6 +10,7 @@ type Form = {
   groupId: number;
   groupName: string;
   status: "open" | "closed";
+  title: string;
   intro: string;
   submissionCount: number;
   newCount: number;
@@ -19,7 +20,9 @@ type Field = {
   id: number;
   label: string;
   help: string;
-  kind: "text" | "textarea" | "phone" | "date" | "choice" | "multi" | "consent";
+  kind: "text" | "textarea" | "phone" | "date" | "choice" | "multi" | "consent" | "town" | "signature";
+  showWhenFieldId: number | null;
+  showWhenValue: string;
   required: boolean;
   options: string[];
   mapsTo: "" | "name" | "phone" | "city";
@@ -48,7 +51,9 @@ const KINDS: Array<{ value: Field["kind"]; label: string }> = [
   { value: "date", label: "Date" },
   { value: "choice", label: "Pick one" },
   { value: "multi", label: "Pick several" },
-  { value: "consent", label: "Agreement" }
+  { value: "consent", label: "Agreement" },
+  { value: "town", label: "Town (searchable list)" },
+  { value: "signature", label: "Signature" }
 ];
 
 const STATE_LABEL: Record<Lead["state"], string> = {
@@ -434,6 +439,7 @@ function FormsView({ onError }: { onError: (message: string) => void }) {
 
           {openId === form.id ? (
             <div className="templateBody">
+              <TitleEditor form={form} onChanged={() => reloadFields(form.id)} onError={onError} />
               <p className="formLink">
                 <code>
                   {typeof window === "undefined" ? "" : window.location.origin}/f/{form.token}
@@ -445,6 +451,59 @@ function FormsView({ onError }: { onError: (message: string) => void }) {
         </article>
       ))}
     </>
+  );
+}
+
+function TitleEditor({
+  form,
+  onChanged,
+  onError
+}: {
+  form: Form;
+  onChanged: () => Promise<void>;
+  onError: (message: string) => void;
+}) {
+  const [title, setTitle] = useState(form.title);
+  const [intro, setIntro] = useState(form.intro);
+  const [saved, setSaved] = useState(false);
+
+  async function save() {
+    try {
+      onError("");
+      await api(`/api/forms/${form.id}`, { method: "PATCH", body: JSON.stringify({ title, intro }) });
+      setSaved(true);
+      window.setTimeout(() => setSaved(false), 1600);
+      await onChanged();
+    } catch (caught) {
+      onError(caught instanceof Error ? caught.message : "Could not save the title.");
+    }
+  }
+
+  return (
+    <div className="stepForm">
+      <label className="full">
+        <span>
+          Title people see — <code>{"{{year}}"}</code> becomes the year when the page opens
+        </span>
+        <input
+          onChange={(event) => setTitle(event.target.value)}
+          placeholder="CLEAN - اسبوع كلين تنظيف السموم {{year}}"
+          value={title}
+        />
+      </label>
+      <label className="full">
+        <span>A line under it (optional)</span>
+        <textarea onChange={(event) => setIntro(event.target.value)} rows={2} value={intro} />
+      </label>
+      <div className="full stepFormActions">
+        <button onClick={() => void save()} type="button">
+          {saved ? "Saved ✓" : "Save the title"}
+        </button>
+        <span className="hint">
+          The name above (<strong>{form.name}</strong>) stays ours — nobody filling the form sees it.
+        </span>
+      </div>
+    </div>
   );
 }
 
@@ -460,13 +519,24 @@ function FieldEditor({
   onError: (message: string) => void;
 }) {
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [draft, setDraft] = useState<{ label: string; help: string; kind: Field["kind"]; required: boolean; options: string; mapsTo: Field["mapsTo"] }>({
+  const [draft, setDraft] = useState<{
+    label: string;
+    help: string;
+    kind: Field["kind"];
+    required: boolean;
+    options: string;
+    mapsTo: Field["mapsTo"];
+    showWhenFieldId: string;
+    showWhenValue: string;
+  }>({
     label: "",
     help: "",
     kind: "text",
     required: true,
     options: "",
-    mapsTo: ""
+    mapsTo: "",
+    showWhenFieldId: "",
+    showWhenValue: ""
   });
 
   function startEdit(field: Field) {
@@ -477,13 +547,24 @@ function FieldEditor({
       kind: field.kind,
       required: field.required,
       options: field.options.join("\n"),
-      mapsTo: field.mapsTo
+      mapsTo: field.mapsTo,
+      showWhenFieldId: field.showWhenFieldId ? String(field.showWhenFieldId) : "",
+      showWhenValue: field.showWhenValue
     });
   }
 
   function startNew() {
     setEditingId(-1);
-    setDraft({ label: "", help: "", kind: "text", required: true, options: "", mapsTo: "" });
+    setDraft({
+      label: "",
+      help: "",
+      kind: "text",
+      required: true,
+      options: "",
+      mapsTo: "",
+      showWhenFieldId: "",
+      showWhenValue: ""
+    });
   }
 
   async function save() {
@@ -493,7 +574,9 @@ function FieldEditor({
       kind: draft.kind,
       required: draft.required,
       options: draft.options.split("\n").map((line) => line.trim()).filter(Boolean),
-      mapsTo: draft.mapsTo
+      mapsTo: draft.mapsTo,
+      showWhenFieldId: draft.showWhenFieldId ? Number(draft.showWhenFieldId) : null,
+      showWhenValue: draft.showWhenValue
     };
 
     try {
@@ -532,6 +615,12 @@ function FieldEditor({
             {field.label}
             {field.required ? <span className="req"> *</span> : null}
             {field.mapsTo ? <span className="groupTag">→ {field.mapsTo}</span> : null}
+            {field.showWhenFieldId ? (
+              <span className="groupTag">
+                يظهر إذا: {fields.find((item) => item.id === field.showWhenFieldId)?.label.slice(0, 22) ?? "?"} ={" "}
+                {field.showWhenValue}
+              </span>
+            ) : null}
           </span>
           <span className="hint">{KINDS.find((kind) => kind.value === field.kind)?.label}</span>
           <button className="secondary" disabled={index === 0} onClick={() => void move(field.id, "up")} type="button">
@@ -603,6 +692,42 @@ function FieldEditor({
               />
             </label>
           ) : null}
+          <label className="full">
+            <span>Show this question only when…</span>
+            <select
+              onChange={(event) =>
+                setDraft({ ...draft, showWhenFieldId: event.target.value, showWhenValue: "" })
+              }
+              value={draft.showWhenFieldId}
+            >
+              <option value="">always show it</option>
+              {fields
+                .filter((item) => item.id !== editingId && item.options.length)
+                .map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.label.slice(0, 60)}
+                  </option>
+                ))}
+            </select>
+          </label>
+
+          {draft.showWhenFieldId ? (
+            <label className="full">
+              <span>…was answered</span>
+              <select
+                onChange={(event) => setDraft({ ...draft, showWhenValue: event.target.value })}
+                value={draft.showWhenValue}
+              >
+                <option value="">pick an answer…</option>
+                {(fields.find((item) => String(item.id) === draft.showWhenFieldId)?.options ?? []).map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+
           <label className="inlineCheck full">
             <input
               checked={draft.required}
