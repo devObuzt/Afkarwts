@@ -1,4 +1,13 @@
-export type FieldKind = "text" | "textarea" | "phone" | "date" | "choice" | "multi" | "consent";
+export type FieldKind =
+  | "text"
+  | "textarea"
+  | "phone"
+  | "date"
+  | "choice"
+  | "multi"
+  | "consent"
+  | "town"
+  | "signature";
 
 export type NewField = {
   label: string;
@@ -8,6 +17,14 @@ export type NewField = {
   options?: string[];
   /** Fills a member field when the lead is approved: name, phone or city. */
   mapsTo?: "" | "name" | "phone" | "city";
+  /**
+   * Shown only when another question was answered a certain way. Referenced by
+   * the question's position in this list, since ids do not exist until the
+   * form is created — see resolveTemplateConditions.
+   */
+  showWhenIndex?: number;
+  showWhenValue?: string;
+  showWhenFieldId?: number | null;
 };
 
 /**
@@ -17,12 +34,12 @@ export type NewField = {
  */
 export const CLEAN_TEMPLATE: NewField[] = [
   { label: "الاسم الكامل", kind: "text", required: true, mapsTo: "name" },
+  { label: "البلد", kind: "town", required: true, mapsTo: "city" },
   {
-    label: "البلد والعنوان",
-    help: "لسكان القدس والضفة: اكتب البلد والعنوان بالتفصيل لتوصيل العصائر يوم الثلاثاء (البلد، المنطقة، الضاحية، الشارع). مثال: رام الله - الماصيون - عين منجد",
+    label: "العنوان بالتفصيل",
+    help: "لتوصيل العصائر يوم الثلاثاء: المنطقة، الضاحية، الشارع ورقم البيت. مثال: الماصيون - عين منجد - شارع 12",
     kind: "textarea",
-    required: true,
-    mapsTo: "city"
+    required: true
   },
   { label: "رقم الهاتف", kind: "phone", required: true, mapsTo: "phone" },
   { label: "رقم الهوية", kind: "text", required: false },
@@ -35,9 +52,11 @@ export const CLEAN_TEMPLATE: NewField[] = [
   { label: "هل تعاني/ن من أمراض معينة؟", kind: "choice", required: true, options: ["نعم", "لا"] },
   { label: "هل تتلقى/ين علاجاً معيناً أو تتناول/ين الأدوية؟", kind: "choice", required: true, options: ["نعم", "لا"] },
   {
-    label: "في حال كنت تتلقى/تتلقين علاجاً أو تتناول/ين الأدوية، ما هي؟ وكم مرة باليوم/بالأسبوع؟ وما هدف العلاج؟",
+    label: "ما هي الأدوية أو العلاجات؟ وكم مرة باليوم أو بالأسبوع؟ وشو هدف العلاج؟",
     kind: "textarea",
-    required: false
+    required: true,
+    showWhenIndex: 7,
+    showWhenValue: "نعم"
   },
   {
     label: "هل تعاني/ين أو عانيت في السابق من أحد هذه الأمراض؟",
@@ -71,10 +90,12 @@ export const CLEAN_TEMPLATE: NewField[] = [
     options: ["نعم", "لا"]
   },
   {
-    label: "في حال لديك حساسية، من أي أنواع أكل؟",
+    label: "من أي أنواع أكل؟",
     help: "هام لإنتاج العصائر فقط",
     kind: "textarea",
-    required: false
+    required: true,
+    showWhenIndex: 12,
+    showWhenValue: "نعم"
   },
   {
     label:
@@ -104,9 +125,18 @@ export const CLEAN_TEMPLATE: NewField[] = [
     required: true,
     options: ["أنا موافق/ة"]
   },
-  { label: "توقيع (اكتب/ي الاسم)", kind: "text", required: true },
-  { label: "تاريخ تعبئة الاستمارة", kind: "date", required: true }
+  { label: "التوقيع", help: "وقّع/ي بإصبعك داخل المربع", kind: "signature", required: true }
 ];
 
 export const CLEAN_INTRO =
   "هدف الاستمارة هو معرفة التفاصيل وتقييم حالة المشترك من أجل بناء برنامج ملائم.";
+
+/**
+ * {{year}} is filled in when the page renders, not when the form is created —
+ * a form made in December for a January cohort should not carry last year.
+ */
+export const CLEAN_TITLE = "CLEAN - اسبوع كلين تنظيف السموم {{year}}";
+
+export function renderTitle(title: string, now = new Date()) {
+  return title.split("{{year}}").join(String(now.getFullYear()));
+}

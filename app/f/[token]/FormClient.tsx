@@ -1,7 +1,17 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { LocationPicker, type LocationValue } from "@/app/components/LocationPicker";
+import { SignaturePad } from "@/app/components/SignaturePad";
 import type { Field } from "@/app/lib/forms/store";
+
+/** Mirrors the server's rule — the page only decides what to draw. */
+function isShown(field: Field, answers: Record<string, string>) {
+  if (!field.showWhenFieldId) {
+    return true;
+  }
+  return (answers[String(field.showWhenFieldId)] ?? "").trim() === field.showWhenValue;
+}
 
 /**
  * Most people open this on a phone, with one hand, in Arabic. One question per
@@ -20,6 +30,7 @@ export function FormClient({
   token: string;
 }) {
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [towns, setTowns] = useState<Record<string, LocationValue>>({});
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
@@ -63,23 +74,31 @@ export function FormClient({
   if (done) {
     return (
       <main className="formPage" dir="rtl" lang="ar">
+        <div className="formTop">
+          <span className="kicker">AFKAR · EAT · LOVE · FIT</span>
+        </div>
         <section className="formCard">
           <h1>وصلنا تسجيلك ✅</h1>
           <p className="formNote">
             شكراً إلك. رح نراجع التفاصيل ونتواصل معك قريباً على نفس الرقم اللي كتبته.
           </p>
         </section>
+        <footer className="formFooter">أفكار — Eat · Love · Fit</footer>
       </main>
     );
   }
 
   return (
     <main className="formPage" dir="rtl" lang="ar">
+      <div className="formTop">
+        <span className="kicker">AFKAR · EAT · LOVE · FIT</span>
+      </div>
+
       <form className="formCard" onSubmit={submit}>
         <h1>{name}</h1>
         {intro ? <p className="formIntro">{intro}</p> : null}
 
-        {fields.map((field) => (
+        {fields.filter((field) => isShown(field, answers)).map((field) => (
           <div className="formField" key={field.id}>
             <label htmlFor={`f${field.id}`}>
               {field.label}
@@ -147,6 +166,22 @@ export function FormClient({
               </div>
             ) : null}
 
+            {field.kind === "town" ? (
+              <LocationPicker
+                onChange={(next) => {
+                  setTowns((current) => ({ ...current, [String(field.id)]: next }));
+                  // The answer is the town itself — the country only narrows
+                  // the list, and "إسرائيل — سخنين" as a contact's city is noise.
+                  set(field.id, next.city);
+                }}
+                value={towns[String(field.id)] ?? { country: "", countryKey: "", city: "" }}
+              />
+            ) : null}
+
+            {field.kind === "signature" ? (
+              <SignaturePad onChange={(dataUrl) => set(field.id, dataUrl)} value={answers[String(field.id)] ?? ""} />
+            ) : null}
+
             {field.kind === "consent" ? (
               <label className="formOption consent">
                 <input
@@ -160,12 +195,23 @@ export function FormClient({
           </div>
         ))}
 
+        <p className="formStamp">
+          تاريخ تعبئة الاستمارة:{" "}
+          <span className="ltr">{new Date().toLocaleDateString("en-GB")}</span>
+        </p>
+
         {error ? <p className="formError">{error}</p> : null}
 
         <button className="formSubmit" disabled={busy} type="submit">
           {busy ? "عم نبعت…" : "إرسال التسجيل"}
         </button>
       </form>
+
+      <footer className="formFooter">
+        أفكار — Eat · Love · Fit
+        <br />
+        لأي استفسار راسلنا على <a href="https://wa.me/972545227674">الواتساب</a>
+      </footer>
     </main>
   );
 }

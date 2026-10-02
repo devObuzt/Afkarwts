@@ -2555,58 +2555,113 @@ button.danger {
   gap: 6px;
 }
 
-/* The public registration form — opened on a phone, by someone with no login */
+/* ───────────────────────────────────────────────────────────────
+   The public registration form.
+
+   Afkar's own face, not the admin tool's: her cream ground, her Cairo,
+   her salmon and apricot as the warm accents — over the green the rest
+   of this app already uses, which stays the colour of an action.
+   Opened on a phone, by someone with no login, in Arabic.
+   ─────────────────────────────────────────────────────────────── */
 .formPage {
+  --brand-salmon: #e9967a;
+  --brand-apricot: #f5aa62;
+  --brand-rose: #dd518f;
+  --brand-cream: #faf9f3;
+  --brand-ink: #4f4d4d;
+  --brand-line: #e7e0d3;
+
   min-height: 100dvh;
-  padding: 24px 16px 48px;
-  display: flex;
-  justify-content: center;
-  background: var(--bg);
+  padding: 0 0 56px;
+  background:
+    radial-gradient(1100px 420px at 110% -8%, rgba(245, 170, 98, 0.16), transparent 60%),
+    radial-gradient(900px 380px at -10% 4%, rgba(233, 150, 122, 0.14), transparent 62%),
+    var(--brand-cream);
+  font-family: var(--font-brand, var(--font)), var(--font);
+  color: var(--brand-ink);
+}
+
+/* A warm band the page opens on, so the first thing seen is hers. */
+.formTop {
+  padding: 30px 18px 22px;
+  text-align: center;
+}
+
+.formTop .kicker {
+  display: inline-block;
+  margin-bottom: 10px;
+  padding: 4px 14px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid var(--brand-line);
+  color: var(--brand-salmon);
+  font-size: 11px;
+  font-weight: 700;
 }
 
 .formCard {
-  width: 100%;
-  max-width: 620px;
-  padding: 24px 20px 28px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--panel);
-  box-shadow: var(--shadow);
+  width: min(640px, calc(100% - 28px));
+  margin: 0 auto;
+  padding: 26px 22px 30px;
+  border: 1px solid var(--brand-line);
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(79, 77, 77, 0.04), 0 18px 48px rgba(79, 77, 77, 0.09);
 }
 
 .formCard h1 {
-  margin: 0 0 6px;
-  font-size: 21px;
-  line-height: 1.4;
+  margin: 0 0 8px;
+  font-size: 25px;
+  font-weight: 700;
+  line-height: 1.5;
+  color: #2f2d2d;
+}
+
+/* A short salmon rule under the title — the one decorative mark on the page. */
+.formCard h1::after {
+  content: "";
+  display: block;
+  width: 56px;
+  height: 3px;
+  margin-top: 12px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--brand-salmon), var(--brand-apricot));
 }
 
 .formIntro {
-  margin: 0 0 20px;
-  color: var(--muted);
-  line-height: 1.7;
+  margin: 0 0 8px;
+  color: #6f6c6c;
+  font-size: 15px;
+  line-height: 1.9;
 }
 
 .formField {
-  padding: 16px 0;
-  border-top: 1px solid var(--line-soft);
+  padding: 22px 0;
+  border-top: 1px solid #f1ece2;
 }
 
+/* The question itself — this is what people read, so it is the biggest
+   thing on the page after the title. */
 .formField > label {
   display: block;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
+  font-size: 17.5px;
   font-weight: 600;
-  line-height: 1.7;
+  line-height: 1.85;
+  color: #2f2d2d;
 }
 
 .formField .req {
-  color: var(--danger);
+  color: var(--brand-salmon);
 }
 
 .formHelp {
-  margin: 0 0 8px;
-  color: var(--muted);
-  font-size: 13px;
-  line-height: 1.7;
+  margin: 0 0 12px;
+  padding-inline-start: 11px;
+  border-inline-start: 2px solid #f3e3d6;
+  color: #837f7f;
+  font-size: 13.5px;
+  line-height: 1.85;
 }
 
 .formField input[type="text"],
@@ -2614,83 +2669,393 @@ button.danger {
 .formField input[type="date"],
 .formField textarea {
   width: 100%;
-  padding: 12px 14px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: #fff;
+  padding: 13px 15px;
+  border: 1px solid #e2dbcf;
+  border-radius: 12px;
+  background: #fffdfa;
+  font-family: inherit;
+  font-size: 16px; /* under 16px iOS zooms the page on focus */
+  line-height: 1.8;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .formField input:focus,
 .formField textarea:focus {
-  outline: 2px solid var(--green-500);
-  outline-offset: 1px;
+  outline: none;
+  border-color: var(--brand-salmon);
+  box-shadow: 0 0 0 3px rgba(233, 150, 122, 0.18);
+}
+
+.formPage input[type="tel"],
+.formPage input[type="date"] {
+  direction: ltr;
+  text-align: right;
 }
 
 .formOptions {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 6px;
 }
 
 .formOption {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  line-height: 1.7;
+  gap: 11px;
+  padding: 12px 14px;
+  border: 1px solid #ece5d9;
+  border-radius: 12px;
+  background: #fffdfa;
+  font-size: 16px;
+  line-height: 1.8;
   cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
 }
 
 .formOption:hover {
-  background: var(--green-tint);
+  border-color: var(--brand-apricot);
+  background: #fff8f0;
+}
+
+.formOption:has(input:checked) {
+  border-color: var(--brand-salmon);
+  background: #fdf3ec;
 }
 
 .formOption input {
-  width: 20px;
-  height: 20px;
-  margin: 2px 0 0;
+  width: 21px;
+  height: 21px;
+  margin: 1px 0 0;
   flex: 0 0 auto;
-  accent-color: var(--green-700);
+  accent-color: var(--brand-salmon);
 }
 
 .formOption.consent {
-  background: var(--green-tint);
-  align-items: flex-start;
+  background: #fdf6ef;
+  border-color: #f0ddcc;
+  font-size: 14.5px;
+  line-height: 1.95;
+}
+
+.formStamp {
+  margin: 22px 0 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #f7f5ee;
+  color: #6f6c6c;
+  font-size: 14px;
 }
 
 .formError {
   margin: 16px 0 0;
-  padding: 12px 14px;
-  border: 1px solid var(--danger);
-  border-radius: 10px;
-  background: var(--danger-soft);
-  color: var(--danger);
-  line-height: 1.7;
+  padding: 13px 15px;
+  border: 1px solid #e3a5a5;
+  border-radius: 12px;
+  background: #fdeeee;
+  color: #a33b3b;
+  font-size: 15px;
+  line-height: 1.85;
 }
 
 .formSubmit {
   width: 100%;
-  margin-top: 20px;
-  padding: 15px;
+  margin-top: 22px;
+  padding: 17px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--green-700);
+  color: #fff;
+  font-family: inherit;
+  font-size: 17px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.15s ease;
+  box-shadow: 0 8px 20px rgba(15, 92, 68, 0.22);
+}
+
+.formSubmit:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 26px rgba(15, 92, 68, 0.26);
+}
+
+.formSubmit:disabled {
+  opacity: 0.55;
+  cursor: default;
+  box-shadow: none;
+}
+
+.formNote {
+  margin: 10px 0 0;
+  color: #6f6c6c;
+  font-size: 15px;
+  line-height: 1.95;
+}
+
+/* A warm footer line — the salmon and apricot touch, where it cannot
+   compete with the question text. */
+.formFooter {
+  width: min(640px, calc(100% - 28px));
+  margin: 22px auto 0;
+  padding-top: 16px;
+  border-top: 2px solid transparent;
+  border-image: linear-gradient(90deg, var(--brand-salmon), var(--brand-apricot), var(--brand-rose)) 1;
+  text-align: center;
+  color: #8b8783;
+  font-size: 12.5px;
+  line-height: 1.9;
+}
+
+.formFooter a {
+  color: var(--brand-salmon);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.formFooter a:hover {
+  text-decoration: underline;
+}
+
+/* The town picker, shared with any form that needs one */
+.pickerSlots {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.pickerSlot {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 11px 15px;
+  border: 1px solid #e2dbcf;
+  border-radius: 12px;
+  background: #fffdfa;
+  font-family: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.pickerSlot:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.pickerSlotLabel {
+  color: #948f8f;
+  font-size: 11.5px;
+}
+
+.pickerSlotValue {
+  font-size: 16px;
+  font-weight: 600;
+  color: #2f2d2d;
+}
+
+.pickerSlotValue.empty {
+  font-weight: 400;
+  color: #a9a4a4;
+}
+
+.pickerBroken {
+  grid-column: 1 / -1;
+  margin: 0 0 6px;
+  color: #a33b3b;
+  font-size: 13px;
+}
+
+.pickerBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(47, 45, 45, 0.45);
+}
+
+.pickerSheet {
+  display: flex;
+  flex-direction: column;
+  width: min(520px, 100%);
+  max-height: 86dvh;
+  padding: 10px 16px 16px;
+  border-radius: 20px 20px 0 0;
+  background: #fff;
+  font-family: var(--font-brand, var(--font)), var(--font);
+}
+
+@media (min-width: 640px) {
+  .pickerBackdrop {
+    align-items: center;
+  }
+
+  .pickerSheet {
+    border-radius: 18px;
+    max-height: 76dvh;
+  }
+}
+
+.pickerGrip {
+  width: 42px;
+  height: 4px;
+  margin: 2px auto 10px;
+  border-radius: 2px;
+  background: #e4ded2;
+}
+
+.pickerSheet > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  font-size: 16px;
+}
+
+.pickerSheet > header button {
+  border: 0;
+  background: transparent;
+  color: #8b8783;
+  font-size: 17px;
+  cursor: pointer;
+}
+
+.pickerSearch {
+  width: 100%;
+  padding: 12px 15px;
+  margin-bottom: 8px;
+  border: 1px solid #e2dbcf;
+  border-radius: 12px;
+  background: #fffdfa;
+  font-family: inherit;
+  font-size: 16px;
+}
+
+.pickerSearch:focus {
+  outline: none;
+  border-color: var(--brand-salmon);
+  box-shadow: 0 0 0 3px rgba(233, 150, 122, 0.18);
+}
+
+.pickerList {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.pickerRow {
+  display: block;
+  width: 100%;
+  padding: 13px 14px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  font-family: inherit;
+  font-size: 16px;
+  text-align: start;
+  cursor: pointer;
+}
+
+.pickerRow:hover {
+  background: #fdf3ec;
+}
+
+.pickerRow.chosen {
+  background: #fdf3ec;
+  font-weight: 700;
+  color: var(--brand-salmon);
+}
+
+.pickerRow.manual {
+  margin-top: 6px;
+  border-top: 1px dashed #e4ded2;
+  border-radius: 0;
+  color: var(--brand-salmon);
+  font-weight: 600;
+}
+
+.pickerNote {
+  margin: 10px 4px;
+  color: #948f8f;
+  font-size: 13px;
+}
+
+.pickerManual {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 0 8px;
+}
+
+.pickerManual input {
+  padding: 13px 15px;
+  border: 1px solid #e2dbcf;
+  border-radius: 12px;
+  font-family: inherit;
+  font-size: 16px;
+}
+
+.pickerManual button {
+  padding: 13px;
   border: 0;
   border-radius: 12px;
   background: var(--green-700);
   color: #fff;
+  font-family: inherit;
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
 }
 
-.formSubmit:disabled {
-  opacity: 0.6;
-  cursor: default;
+.pickerManual button:disabled {
+  opacity: 0.5;
 }
 
-.formNote {
-  margin: 8px 0 0;
-  color: var(--muted);
-  line-height: 1.8;
+.pickerManual .pickerLink {
+  background: transparent;
+  color: #8b8783;
+  font-weight: 400;
+}
+
+/* The signature box, shared with any form that needs one */
+.signaturePad {
+  border: 1px solid #e2dbcf;
+  border-radius: 12px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.signatureCanvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: #fff;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.signatureFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-top: 1px solid #f1ece2;
+  background: #fffdfa;
+}
+
+.signatureFoot button {
+  padding: 5px 13px;
+  border: 1px solid #e2dbcf;
+  border-radius: 999px;
+  background: #fff;
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.hintSmall {
+  color: #948f8f;
+  font-size: 13px;
 }
 
 /* The menu across the pages behind the login */

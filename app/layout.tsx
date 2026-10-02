@@ -1,11 +1,23 @@
 import type { Metadata, Viewport } from "next";
-import { IBM_Plex_Sans_Arabic } from "next/font/google";
+import { Cairo, IBM_Plex_Sans_Arabic } from "next/font/google";
 import "./globals.css";
 
 const plexArabic = IBM_Plex_Sans_Arabic({
   subsets: ["latin", "arabic"],
   weight: ["400", "500", "600", "700"],
   variable: "--font-sans"
+});
+
+/**
+ * Afkar's own brand face. It is loaded for the public registration form,
+ * which her members see and which should look like her — not like the admin
+ * tool the rest of this app is.
+ */
+const cairo = Cairo({
+  subsets: ["arabic", "latin"],
+  weight: ["400", "600", "700"],
+  display: "swap",
+  variable: "--font-brand"
 });
 
 export const metadata: Metadata = {
@@ -27,7 +39,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body className={plexArabic.variable}>{children}</body>
+      <body className={`${plexArabic.variable} ${cairo.variable}`}>{children}</body>
     </html>
   );
 }

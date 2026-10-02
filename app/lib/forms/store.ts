@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { getDb, normalizeImportPhone } from "../db";
-import { CLEAN_INTRO, CLEAN_TEMPLATE, type FieldKind, type NewField } from "./clean-template";
+import { CLEAN_INTRO, CLEAN_TEMPLATE, CLEAN_TITLE, type FieldKind, type NewField } from "./clean-template";
 
 export type Form = {
   id: number;
@@ -9,6 +9,7 @@ export type Form = {
   groupId: number;
   groupName: string;
   status: "open" | "closed";
+  title: string;
   intro: string;
   submissionCount: number;
   newCount: number;
@@ -25,6 +26,9 @@ export type Field = {
   required: boolean;
   options: string[];
   mapsTo: "" | "name" | "phone" | "city";
+  /** This question appears only when another one was answered a certain way. */
+  showWhenFieldId: number | null;
+  showWhenValue: string;
 };
 
 export type SubmissionRow = {
@@ -49,6 +53,7 @@ type DbForm = {
   group_id: number;
   group_name: string | null;
   status: Form["status"];
+  title: string;
   intro: string;
   created_at: string;
   submission_count: number;
@@ -65,6 +70,8 @@ type DbField = {
   required: number;
   options: string;
   map_to: Field["mapsTo"];
+  show_when_field_id: number | null;
+  show_when_value: string;
 };
 
 type DbSubmission = {
@@ -89,6 +96,7 @@ function mapForm(row: DbForm): Form {
     groupId: row.group_id,
     groupName: row.group_name ?? "",
     status: row.status,
+    title: row.title ?? "",
     intro: row.intro,
     submissionCount: Number(row.submission_count ?? 0),
     newCount: Number(row.new_count ?? 0),
@@ -106,7 +114,9 @@ function mapField(row: DbField): Field {
     kind: row.kind,
     required: Boolean(row.required),
     options: JSON.parse(row.options || "[]") as string[],
-    mapsTo: row.map_to
+    mapsTo: row.map_to,
+    showWhenFieldId: row.show_when_field_id ?? null,
+    showWhenValue: row.show_when_value ?? ""
   };
 }
 
@@ -154,22 +164,49 @@ function formPhone(raw: string) {
   }
 }
 
-export function createForm(input: { name: string; groupId: number; fromTemplate?: boolean; intro?: string }) {
+export function createForm(input: {
+  name: string;
+  groupId: number;
+  fromTemplate?: boolean;
+  title?: string;
+  intro?: string;
+}) {
   const name = input.name.trim();
   if (!name) {
     throw new Error("The form needs a name.");
   }
 
   const result = getDb()
-    .prepare("INSERT INTO forms (name, token, group_id, intro) VALUES (?, ?, ?, ?)")
-    .run(name, newToken(), input.groupId, input.intro ?? (input.fromTemplate ? CLEAN_INTRO : ""));
+    .prepare("INSERT INTO forms (name, token, group_id, title, intro) VALUES (?, ?, ?, ?, ?)")
+    .run(
+      name,
+      newToken(),
+      input.groupId,
+      input.title ?? (input.fromTemplate ? CLEAN_TITLE : ""),
+      input.intro ?? (input.fromTemplate ? CLEAN_INTRO : "")
+    );
 
   const id = Number(result.lastInsertRowid);
 
   if (input.fromTemplate) {
-    for (const field of CLEAN_TEMPLATE) {
-      addField(id, field);
-    }
+    // A template refers to its questions by position, because the ids they
+    // will be given do not exist yet. Created in order, then the conditions
+    // are rewritten to point at the real ids.
+    const created = CLEAN_TEMPLATE.map((field) => addField(id, field));
+
+    CLEAN_TEMPLATE.forEach((field, index) => {
+      if (field.showWhenIndex === undefined) {
+        return;
+      }
+      const gate = created[field.showWhenIndex];
+      if (!gate) {
+        throw new Error(`Template question ${index} points at a question that is not there.`);
+      }
+      updateField(created[index].id, {
+        showWhenFieldId: gate.id,
+        showWhenValue: field.showWhenValue ?? ""
+      });
+    });
   }
 
   return getForm(id)!;
@@ -190,14 +227,14 @@ export function listForms(): Form[] {
   return rows.map(mapForm);
 }
 
-export function updateForm(id: number, patch: { name?: string; intro?: string }) {
+export function updateForm(id: number, patch: { name?: string; title?: string; intro?: string }) {
   const current = getForm(id);
   if (!current) {
     throw new Error("Form not found.");
   }
   getDb()
-    .prepare("UPDATE forms SET name = ?, intro = ? WHERE id = ?")
-    .run(patch.name?.trim() || current.name, patch.intro ?? current.intro, id);
+    .prepare("UPDATE forms SET name = ?, title = ?, intro = ? WHERE id = ?")
+    .run(patch.name?.trim() || current.name, patch.title ?? current.title, patch.intro ?? current.intro, id);
   return getForm(id)!;
 }
 
@@ -234,8 +271,8 @@ export function addField(formId: number, field: NewField) {
 
   const result = getDb()
     .prepare(
-      `INSERT INTO form_fields (form_id, position, label, help, kind, required, options, map_to)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO form_fields (form_id, position, label, help, kind, required, options, map_to, show_when_field_id, show_when_value)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       formId,
@@ -245,7 +282,9 @@ export function addField(formId: number, field: NewField) {
       field.kind,
       field.required ? 1 : 0,
       JSON.stringify(field.options ?? []),
-      field.mapsTo ?? ""
+      field.mapsTo ?? "",
+      field.showWhenFieldId ?? null,
+      field.showWhenValue ?? ""
     );
 
   return getField(Number(result.lastInsertRowid))!;
@@ -260,7 +299,8 @@ export function updateField(fieldId: number, patch: Partial<NewField>) {
   const next = { ...current, ...patch };
   getDb()
     .prepare(
-      `UPDATE form_fields SET label = ?, help = ?, kind = ?, required = ?, options = ?, map_to = ? WHERE id = ?`
+      `UPDATE form_fields SET label = ?, help = ?, kind = ?, required = ?, options = ?, map_to = ?,
+           show_when_field_id = ?, show_when_value = ? WHERE id = ?`
     )
     .run(
       next.label.trim(),
@@ -269,6 +309,8 @@ export function updateField(fieldId: number, patch: Partial<NewField>) {
       next.required ? 1 : 0,
       JSON.stringify(next.options ?? []),
       next.mapsTo ?? "",
+      next.showWhenFieldId ?? null,
+      next.showWhenValue ?? "",
       fieldId
     );
 
@@ -397,6 +439,20 @@ export function setSubmissionState(id: number, state: SubmissionRow["state"], me
  * actually has are stored. The browser's copy of the field list is a
  * convenience — this is the authority.
  */
+/**
+ * Whether a question is actually being asked, given what has been answered so
+ * far. A question hidden behind a condition is not merely invisible: it must
+ * not be required, and an answer sent for it is not kept. Otherwise someone
+ * who ticks "no allergies" is blocked by a question they were never shown,
+ * and a browser that fails to clear a field writes an answer nobody gave.
+ */
+function isShown(field: Field, answers: Record<string, string>) {
+  if (!field.showWhenFieldId) {
+    return true;
+  }
+  return (answers[String(field.showWhenFieldId)] ?? "").trim() === field.showWhenValue;
+}
+
 export function submitForm(token: string, answers: Record<string, string>) {
   const form = getFormByToken(token);
   if (!form) {
@@ -410,6 +466,10 @@ export function submitForm(token: string, answers: Record<string, string>) {
   const collected: Array<{ fieldId: number; value: string }> = [];
 
   for (const field of fields) {
+    if (!isShown(field, answers)) {
+      continue;
+    }
+
     const raw = answers[String(field.id)] ?? "";
     const value = raw.trim();
 

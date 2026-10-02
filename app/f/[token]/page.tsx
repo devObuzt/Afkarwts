@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { renderTitle } from "@/app/lib/forms/clean-template";
 import { getFormByToken, listFields } from "@/app/lib/forms/store";
 import { FormClient } from "./FormClient";
 
@@ -8,7 +9,7 @@ export const dynamic = "force-dynamic";
 export async function generateMetadata({ params }: { params: Promise<{ token: string }> }): Promise<Metadata> {
   const form = getFormByToken((await params).token);
   return {
-    title: form ? form.name : "استمارة التسجيل",
+    title: form ? renderTitle(form.title || form.name) : "استمارة التسجيل",
     // A registration link is shared person to person, not indexed.
     robots: { index: false, follow: false }
   };
@@ -33,12 +34,19 @@ export default async function PublicFormPage({ params }: { params: Promise<{ tok
     return (
       <main className="formPage" dir="rtl" lang="ar">
         <section className="formCard">
-          <h1>{form.name}</h1>
+          <h1>{renderTitle(form.title || form.name)}</h1>
           <p className="formNote">انتهى التسجيل عبر هذا الرابط. تواصل معنا على الواتساب لأي استفسار.</p>
         </section>
       </main>
     );
   }
 
-  return <FormClient fields={listFields(form.id)} intro={form.intro} name={form.name} token={token} />;
+  return (
+    <FormClient
+      fields={listFields(form.id)}
+      intro={form.intro}
+      name={renderTitle(form.title || form.name)}
+      token={token}
+    />
+  );
 }

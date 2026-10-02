@@ -10,6 +10,8 @@ const publicPrefixes = [
   // The registration form is meant to be opened by people who have no login.
   "/f",
   "/api/f",
+  // The town list the public form's picker reads.
+  "/api/locations",
   "/api/campaigns/tick",
   "/api/dev/simulate",
   "/api/journeys/tick",
