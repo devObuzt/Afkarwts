@@ -2554,3 +2554,141 @@ button.danger {
   flex-wrap: wrap;
   gap: 6px;
 }
+
+/* The public registration form — opened on a phone, by someone with no login */
+.formPage {
+  min-height: 100dvh;
+  padding: 24px 16px 48px;
+  display: flex;
+  justify-content: center;
+  background: var(--bg);
+}
+
+.formCard {
+  width: 100%;
+  max-width: 620px;
+  padding: 24px 20px 28px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.formCard h1 {
+  margin: 0 0 6px;
+  font-size: 21px;
+  line-height: 1.4;
+}
+
+.formIntro {
+  margin: 0 0 20px;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.formField {
+  padding: 16px 0;
+  border-top: 1px solid var(--line-soft);
+}
+
+.formField > label {
+  display: block;
+  margin-bottom: 4px;
+  font-weight: 600;
+  line-height: 1.7;
+}
+
+.formField .req {
+  color: var(--danger);
+}
+
+.formHelp {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.formField input[type="text"],
+.formField input[type="tel"],
+.formField input[type="date"],
+.formField textarea {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.formField input:focus,
+.formField textarea:focus {
+  outline: 2px solid var(--green-500);
+  outline-offset: 1px;
+}
+
+.formOptions {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.formOption {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  line-height: 1.7;
+  cursor: pointer;
+}
+
+.formOption:hover {
+  background: var(--green-tint);
+}
+
+.formOption input {
+  width: 20px;
+  height: 20px;
+  margin: 2px 0 0;
+  flex: 0 0 auto;
+  accent-color: var(--green-700);
+}
+
+.formOption.consent {
+  background: var(--green-tint);
+  align-items: flex-start;
+}
+
+.formError {
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  border: 1px solid var(--danger);
+  border-radius: 10px;
+  background: var(--danger-soft);
+  color: var(--danger);
+  line-height: 1.7;
+}
+
+.formSubmit {
+  width: 100%;
+  margin-top: 20px;
+  padding: 15px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--green-700);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.formSubmit:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.formNote {
+  margin: 8px 0 0;
+  color: var(--muted);
+  line-height: 1.8;
+}
