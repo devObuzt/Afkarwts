@@ -20,7 +20,7 @@ export default async function PublicFormPage({ params }: { params: Promise<{ tok
 
   if (!form) {
     return (
-      <main className="formPage">
+      <main className="formPage" dir="rtl" lang="ar">
         <section className="formCard">
           <h1>الرابط غير موجود</h1>
           <p className="formNote">تأكد من الرابط اللي وصلك، أو تواصل معنا على الواتساب.</p>
@@ -31,7 +31,7 @@ export default async function PublicFormPage({ params }: { params: Promise<{ tok
 
   if (form.status !== "open") {
     return (
-      <main className="formPage">
+      <main className="formPage" dir="rtl" lang="ar">
         <section className="formCard">
           <h1>{form.name}</h1>
           <p className="formNote">انتهى التسجيل عبر هذا الرابط. تواصل معنا على الواتساب لأي استفسار.</p>

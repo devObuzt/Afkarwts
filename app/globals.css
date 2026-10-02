@@ -2834,3 +2834,11 @@ button.danger {
   padding: 4px 10px;
   font-size: 12px;
 }
+
+/* A phone number is an LTR run even on an RTL page: keep its digits and
+   dashes in the order they were typed, but start it at the right edge. */
+.formPage input[type="tel"],
+.formPage input[type="date"] {
+  direction: ltr;
+  text-align: right;
+}

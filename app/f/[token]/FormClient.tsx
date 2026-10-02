@@ -62,7 +62,7 @@ export function FormClient({
 
   if (done) {
     return (
-      <main className="formPage">
+      <main className="formPage" dir="rtl" lang="ar">
         <section className="formCard">
           <h1>وصلنا تسجيلك ✅</h1>
           <p className="formNote">
@@ -74,7 +74,7 @@ export function FormClient({
   }
 
   return (
-    <main className="formPage">
+    <main className="formPage" dir="rtl" lang="ar">
       <form className="formCard" onSubmit={submit}>
         <h1>{name}</h1>
         {intro ? <p className="formIntro">{intro}</p> : null}
