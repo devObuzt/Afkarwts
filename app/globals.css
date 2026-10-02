@@ -3207,3 +3207,13 @@ button.danger {
   direction: ltr;
   text-align: right;
 }
+
+.answerSignature {
+  display: block;
+  max-width: 320px;
+  width: 100%;
+  margin-top: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}

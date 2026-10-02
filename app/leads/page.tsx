@@ -287,7 +287,17 @@ function LeadsView({ onError }: { onError: (message: string) => void }) {
                 {answers.map((answer, index) => (
                   <div key={index}>
                     <dt>{answer.label}</dt>
-                    <dd>{answer.value || "—"}</dd>
+                    <dd>
+                      {/* A signature is stored as a PNG; printed as text it is
+                          seven thousand characters of base64 where a name
+                          should be. */}
+                      {answer.value.startsWith("data:image/") ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img alt={answer.label} className="answerSignature" src={answer.value} />
+                      ) : (
+                        answer.value || "—"
+                      )}
+                    </dd>
                   </div>
                 ))}
               </dl>
