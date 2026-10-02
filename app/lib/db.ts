@@ -2,6 +2,7 @@ import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { getDataDir } from "./media-store";
 import { migrateJourneyTables } from "./journeys/schema";
+import { migrateFormTables } from "./forms/schema";
 
 export type Member = {
   id: number;
@@ -117,6 +118,7 @@ export function getDb() {
     migrateAudioMessageType(db);
     migrateJourneyTables(db);
     migrateSendKeyColumn(db);
+    migrateFormTables(db);
     globalForDb.__afkarDb = db;
   }
 
