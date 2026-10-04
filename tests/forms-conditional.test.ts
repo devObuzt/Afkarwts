@@ -98,13 +98,18 @@ test("the Clean template's follow-ups point at the right questions", async () =>
   const fields = listFields(form.id);
 
   const conditional = fields.filter((field) => field.showWhenFieldId);
-  assert.equal(conditional.length, 2, "the medication and allergy follow-ups");
+  assert.equal(conditional.length, 3, "medication, the other illness, and allergies");
 
+  // The template points at its questions by position, so an inserted question
+  // silently shifts every index after it. Each gate is checked for the answer
+  // its follow-up actually waits on.
   for (const field of conditional) {
     const gate = fields.find((item) => item.id === field.showWhenFieldId)!;
     assert.notEqual(gate.id, field.id, "a question cannot be its own condition");
-    assert.ok(gate.options.includes("نعم"), `the gate for «${field.label}» offers نعم`);
-    assert.equal(field.showWhenValue, "نعم");
+    assert.ok(
+      gate.options.includes(field.showWhenValue),
+      `the gate for «${field.label}» offers «${field.showWhenValue}» — it offers ${gate.options.join(" / ")}`
+    );
     assert.ok(fields.indexOf(gate) < fields.indexOf(field), "the gate is asked first");
   }
 });

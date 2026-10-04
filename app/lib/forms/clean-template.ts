@@ -76,6 +76,13 @@ export const CLEAN_TEMPLATE: NewField[] = [
       "لا توجد لدي أمراض"
     ]
   },
+  {
+    label: "شو هو المرض أو الحالة؟",
+    kind: "textarea",
+    required: true,
+    showWhenIndex: 9,
+    showWhenValue: "آخر"
+  },
   { label: "للنساء - هل أنت حامل؟", kind: "choice", required: true, options: ["نعم", "لا"] },
   {
     label: "للنساء - هل أنت مرضعة؟",
@@ -95,7 +102,7 @@ export const CLEAN_TEMPLATE: NewField[] = [
     help: "هام لإنتاج العصائر فقط",
     kind: "textarea",
     required: true,
-    showWhenIndex: 12,
+    showWhenIndex: 13,
     showWhenValue: "نعم"
   },
   {
