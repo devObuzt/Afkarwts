@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isInlineType } from "@/app/lib/person-file-kinds";
 import { findPersonFileByName, readPersonFileBytes } from "@/app/lib/person-files";
 
 export const runtime = "nodejs";
@@ -14,11 +15,20 @@ export async function GET(_request: Request, context: { params: Promise<{ filena
 
   try {
     const bytes = readPersonFileBytes(file.filename);
+
+    // A stored type is whatever the uploader's browser claimed. Only the few
+    // types a plan or a photo actually is are handed back as themselves and
+    // opened in the tab; everything else downloads as untyped bytes, so an
+    // .html can never run on this app's own origin beside the session cookie.
+    const inline = isInlineType(file.mimeType);
+    const name = encodeURIComponent(file.originalName || file.label);
+
     return new Response(bytes, {
       headers: {
-        "Content-Type": file.mimeType || "application/octet-stream",
-        // The original Arabic name, for whoever saves it to their machine.
-        "Content-Disposition": `inline; filename*=UTF-8''${encodeURIComponent(file.originalName || file.label)}`,
+        "Content-Type": inline ? file.mimeType : "application/octet-stream",
+        "Content-Disposition": `${inline ? "inline" : "attachment"}; filename*=UTF-8''${name}`,
+        "X-Content-Type-Options": "nosniff",
+        "Content-Security-Policy": "sandbox; default-src 'none'",
         "Cache-Control": "private, max-age=3600"
       }
     });

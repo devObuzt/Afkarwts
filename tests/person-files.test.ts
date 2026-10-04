@@ -108,3 +108,17 @@ test("files reach the person's record and its timeline", async () => {
     "an upload is something that happened to her, so it belongs in the stream"
   );
 });
+
+test("only a plan or a photo is served inline; anything else downloads", async () => {
+  const { isInlineType } = await import("@/app/lib/person-file-kinds");
+
+  assert.equal(isInlineType("application/pdf"), true, "the meal plan");
+  assert.equal(isInlineType("image/jpeg"), true, "a before photo");
+  assert.equal(isInlineType("IMAGE/PNG"), true, "however the browser spelled it");
+
+  // A stored type is whatever the uploader's browser claimed, and an .html
+  // served inline would run on this app's own origin, beside the cookie.
+  assert.equal(isInlineType("text/html"), false);
+  assert.equal(isInlineType("image/svg+xml"), false, "an SVG is a document that can script");
+  assert.equal(isInlineType("application/xhtml+xml"), false);
+});
