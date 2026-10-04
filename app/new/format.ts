@@ -68,3 +68,29 @@ export function initials(name: string) {
   }
   return words.length === 1 ? words[0].slice(0, 2) : `${words[0][0]}${words[1][0]}`;
 }
+
+/**
+ * Arabic counts one, two and many apart, and «3 مشترك» reads like a typo.
+ * Three forms are enough for the numbers these screens show.
+ */
+export function count(total: number, forms: { none: string; one: string; two: string; few: string; many: string }) {
+  if (total === 0) return forms.none;
+  if (total === 1) return forms.one;
+  if (total === 2) return forms.two;
+  if (total <= 10) return `${total} ${forms.few}`;
+  return `${total} ${forms.many}`;
+}
+
+export function members(total: number) {
+  return count(total, {
+    none: "ولا مشترك",
+    one: "مشتركة وحدة",
+    two: "مشتركتين",
+    few: "مشتركات",
+    many: "مشتركة"
+  });
+}
+
+export function people(total: number) {
+  return count(total, { none: "ولا حدا", one: "شخص واحد", two: "شخصين", few: "أشخاص", many: "شخص" });
+}

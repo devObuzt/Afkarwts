@@ -1,20 +1,11 @@
 import Link from "next/link";
 import { listGroups } from "@/app/lib/db";
 import { listPeople } from "@/app/lib/people";
-import { ago, initials } from "../format";
+import { ago, initials, people as peopleCount } from "../format";
 
 export const dynamic = "force-dynamic";
 
 const PAGE_SIZE = 50;
-
-/** Arabic counts one, two and many differently; «8 شخص» reads like a typo. */
-function countLine(total: number) {
-  if (total === 0) return "ولا حدا";
-  if (total === 1) return "شخص واحد";
-  if (total === 2) return "شخصين";
-  if (total <= 10) return `${total} أشخاص`;
-  return `${total} شخص`;
-}
 
 export default async function PeoplePage({
   searchParams
@@ -44,7 +35,7 @@ export default async function PeoplePage({
       <header className="crmHead">
         <h1>الناس</h1>
         <p>
-          {countLine(total)}
+          {peopleCount(total)}
           {query || groupId ? " بهذا الفلتر" : ""}.
         </p>
       </header>

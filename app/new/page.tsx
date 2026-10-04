@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getToday } from "@/app/lib/today";
-import { ago, clock, initials, weekdayAndDay } from "./format";
+import { ago, clock, initials, members, weekdayAndDay } from "./format";
 
 export const dynamic = "force-dynamic";
 
@@ -76,7 +76,7 @@ export default function TodayPage() {
                   </span>
                 </div>
                 <div className="crmRowDetail" style={{ marginTop: 10 }}>
-                  {cohort.members} مشترك · {cohort.pathName}
+                  {members(cohort.members)} · {cohort.pathName}
                   <br />
                   {cohort.nextAt
                     ? `الجاي: ${weekdayAndDay(new Date(cohort.nextAt))} ${clock(cohort.nextAt)} — «${cohort.nextLabel}»`

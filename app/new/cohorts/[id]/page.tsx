@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { getDb } from "@/app/lib/db";
 import { journeyFunnel, journeyLabel, stepBreakdown } from "@/app/lib/journeys/report";
 import { getJourney } from "@/app/lib/journeys/store";
-import { clock, day, initials } from "../../format";
+import { clock, day, initials, members as memberCount } from "../../format";
 
 export const dynamic = "force-dynamic";
 
@@ -61,7 +61,7 @@ export default async function CohortPage({ params }: { params: Promise<{ id: str
       <header className="crmHead">
         <h1>{label.group}</h1>
         <p>
-          {label.name} · بلّشت {day(`${journey.anchorDate}T00:00:00.000Z`)} · {funnel.enrolled} مشترك
+          {label.name} · بلّشت {day(`${journey.anchorDate}T00:00:00.000Z`)} · {memberCount(funnel.enrolled)}
         </p>
       </header>
 

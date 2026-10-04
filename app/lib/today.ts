@@ -173,7 +173,9 @@ export function getToday(now = new Date()): Today {
       members,
       stepsTotal: stepRows.length * Math.max(members, 1),
       stepsSent: Number(row.sent),
-      nextLabel: upcoming[0]?.label ?? "خلصت الخطوات",
+      // A step's label is ours, for the schedule screen, and some were left
+      // blank — «الجاي: 18:45 — «»» says nothing at all.
+      nextLabel: upcoming[0] ? upcoming[0].label || "الخطوة الجاية" : "خلصت الخطوات",
       nextAt: upcoming[0]?.at.toISOString() ?? null
     };
   });
