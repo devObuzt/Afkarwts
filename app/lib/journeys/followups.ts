@@ -107,6 +107,20 @@ export function openFollowupsForStop(input: {
   }
 }
 
+/**
+ * Closes whatever is still open for an enrollment that has left the cohort.
+ * A manual task is an instruction to chase somebody; once they are out of the
+ * group there is nobody to chase, and the task would otherwise sit in the list
+ * for good.
+ */
+export function closeFollowupsForEnrollment(enrollmentId: number, note: string) {
+  getDb()
+    .prepare(
+      "UPDATE followups SET state = 'done', note = ?, resolved_at = CURRENT_TIMESTAMP WHERE enrollment_id = ? AND state IN ('open', 'queued')"
+    )
+    .run(note, enrollmentId);
+}
+
 export function listFollowups(filter: { kind?: Followup["kind"]; state?: string } = {}) {
   const clauses: string[] = [];
   const params: Array<string> = [];

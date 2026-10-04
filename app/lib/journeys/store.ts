@@ -1,6 +1,7 @@
 import { getDb } from "../db";
 import { getMessagingLimit } from "../whatsapp";
 import { SEND_WINDOW_MS, type EnrollmentState, type LastSend, type PendingStep } from "./engine";
+import { closeFollowupsForEnrollment } from "./followups";
 import { stepDueAt } from "./schedule";
 
 export type JourneyTemplate = {
@@ -367,8 +368,13 @@ export function syncEnrollments(journeyId: number, now: Date) {
   const inGroup = new Set(memberIds);
   let removed = 0;
   for (const [memberId, row] of enrolled) {
-    if (!inGroup.has(memberId) && row.state === "active") {
+    // Any state but a finished one. It used to read `state === "active"`,
+    // which meant somebody already stopped — for an unreachable number, say —
+    // stayed on the path after being taken out of the cohort, with their
+    // manual tasks open and nothing able to close them.
+    if (!inGroup.has(memberId) && row.state !== "removed" && row.state !== "completed") {
       db.prepare("UPDATE journey_enrollments SET state = 'removed' WHERE id = ?").run(row.id);
+      closeFollowupsForEnrollment(row.id, "انشال من مجموعة المسار");
       removed += 1;
     }
   }
