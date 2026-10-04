@@ -119,10 +119,36 @@ export function getDb() {
     migrateJourneyTables(db);
     migrateSendKeyColumn(db);
     migrateFormTables(db);
+    migratePersonFileTables(db);
     globalForDb.__afkarDb = db;
   }
 
   return globalForDb.__afkarDb;
+}
+
+/**
+ * The files that belong to a person rather than to a message: meal plans,
+ * test results, before-and-after photos. Kept beside the database on the same
+ * volume, so a file survives a redeploy the way a row does.
+ */
+function migratePersonFileTables(db: DatabaseSync) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS person_files (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      member_id INTEGER NOT NULL,
+      kind TEXT NOT NULL DEFAULT 'other' CHECK (kind IN ('plan', 'test', 'photo', 'doc', 'other')),
+      label TEXT NOT NULL,
+      filename TEXT NOT NULL UNIQUE,
+      original_name TEXT NOT NULL DEFAULT '',
+      mime_type TEXT NOT NULL DEFAULT '',
+      size_bytes INTEGER NOT NULL DEFAULT 0,
+      note TEXT NOT NULL DEFAULT '',
+      uploaded_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_person_files_member ON person_files(member_id, uploaded_at);
+  `);
 }
 
 /**
@@ -1086,6 +1112,34 @@ export function listGroupMembers(groupId: number): Member[] {
 }
 
 /** Moves a contact to a different number, refusing to collide with an existing one. */
+/**
+ * The fields Afkar edits by hand on a contact. Notes are the ones that matter
+ * most: the registration answers what she was asked, and this is everything
+ * learned since.
+ */
+export function updateMemberProfile(
+  memberId: number,
+  patch: { name?: string; city?: string; notes?: string; service?: string }
+) {
+  const member = getMember(memberId);
+  if (!member) {
+    return null;
+  }
+
+  const name = patch.name?.trim();
+  getDb()
+    .prepare("UPDATE members SET name = ?, city = ?, notes = ?, service = ? WHERE id = ?")
+    .run(
+      name || member.name,
+      patch.city ?? member.city,
+      patch.notes ?? member.notes,
+      patch.service ?? member.service,
+      memberId
+    );
+
+  return getMember(memberId);
+}
+
 export function updateMemberPhone(memberId: number, phone: string) {
   const normalized = normalizePhone(phone);
   const existing = getDb().prepare("SELECT id FROM members WHERE phone = ? AND id <> ?").get(normalized, memberId) as

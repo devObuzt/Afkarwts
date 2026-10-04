@@ -1,10 +1,28 @@
 import { NextResponse } from "next/server";
-import { deleteMember, getMember } from "@/app/lib/db";
+import { deleteMember, getMember, updateMemberProfile } from "@/app/lib/db";
 
 export const runtime = "nodejs";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const member = getMember(Number((await params).id));
+
+  if (!member) {
+    return NextResponse.json({ error: "Member not found." }, { status: 404 });
+  }
+
+  return NextResponse.json({ member });
+}
+
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const id = Number((await params).id);
+  const body = (await request.json().catch(() => ({}))) as {
+    name?: string;
+    city?: string;
+    notes?: string;
+    service?: string;
+  };
+
+  const member = updateMemberProfile(id, body);
 
   if (!member) {
     return NextResponse.json({ error: "Member not found." }, { status: 404 });
