@@ -15,6 +15,7 @@ function enrollment(over: Partial<EnrollmentState> = {}): EnrollmentState {
     memberId: 1,
     lastIncomingAt: null,
     lastSend: null,
+    resumedAt: null,
     dueSteps: [],
     expiredSteps: [],
     hasUnsentStepsAhead: true,
@@ -248,4 +249,39 @@ test("completion waits until the last message has had its 48 hours", () => {
   });
 
   assert.deepEqual(actions, []);
+});
+
+test("putting someone back on the path does not stop them in the same breath", () => {
+  // Afkar pressed Resume on three testers and the very next tick stopped all
+  // three again, having sent nothing: the silence is measured from the last
+  // send, which a resume does not change. Resuming has to mean another chance.
+  const actions = planTick({
+    now: NOW,
+    allowance: 10,
+    enrollments: [
+      enrollment({
+        lastSend: sent(),
+        resumedAt: ago(HOUR),
+        dueSteps: [{ stepId: 7, dueAt: ago(HOUR), hasFreeText: false }]
+      })
+    ]
+  });
+
+  assert.deepEqual(
+    actions.map((action) => action.kind),
+    ["send"],
+    "the due step goes out instead of a stop"
+  );
+});
+
+test("a resume older than the last message does not hold the path open forever", () => {
+  // Resumed once, messaged after that, silent for two days since: a fresh
+  // silence, and it ends the path like any other.
+  const actions = planTick({
+    now: NOW,
+    allowance: 10,
+    enrollments: [enrollment({ lastSend: sent(), resumedAt: ago(60 * HOUR) })]
+  });
+
+  assert.deepEqual(actions.map((action) => action.kind), ["stop"]);
 });

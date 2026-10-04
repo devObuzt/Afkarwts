@@ -391,8 +391,8 @@ export function loadTickState(journeyId: number, now: Date): EnrollmentState[] {
 
   const steps = listSteps(journey.templateId);
   const enrollments = db
-    .prepare("SELECT id, member_id FROM journey_enrollments WHERE journey_id = ? AND state = 'active'")
-    .all(journeyId) as Array<{ id: number; member_id: number }>;
+    .prepare("SELECT id, member_id, resumed_at FROM journey_enrollments WHERE journey_id = ? AND state = 'active'")
+    .all(journeyId) as Array<{ id: number; member_id: number; resumed_at: string | null }>;
 
   return enrollments.map((enrollment) => {
     const incoming = db
@@ -459,6 +459,7 @@ export function loadTickState(journeyId: number, now: Date): EnrollmentState[] {
       enrollmentId: enrollment.id,
       memberId: enrollment.member_id,
       lastIncomingAt: incoming.at ? toIso(incoming.at) : null,
+      resumedAt: enrollment.resumed_at ? toIso(enrollment.resumed_at) : null,
       lastSend,
       dueSteps,
       expiredSteps,
@@ -533,8 +534,10 @@ export function completeEnrollment(enrollmentId: number) {
 
 export function resumeEnrollment(enrollmentId: number) {
   getDb()
-    .prepare("UPDATE journey_enrollments SET state = 'active', stop_reason = NULL, stopped_at = NULL WHERE id = ?")
-    .run(enrollmentId);
+    .prepare(
+      "UPDATE journey_enrollments SET state = 'active', stop_reason = NULL, stopped_at = NULL, resumed_at = ? WHERE id = ?"
+    )
+    .run(new Date().toISOString(), enrollmentId);
 }
 
 export function enrollmentMemberId(enrollmentId: number) {

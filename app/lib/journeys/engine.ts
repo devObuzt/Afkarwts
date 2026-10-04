@@ -20,6 +20,8 @@ export type EnrollmentState = {
   memberId: number;
   lastIncomingAt: string | null;
   lastSend: LastSend | null;
+  /** When someone was last put back on the path by hand. */
+  resumedAt: string | null;
   /** Window open, no journey_sends row yet. */
   dueSteps: PendingStep[];
   /** Window closed, no journey_sends row yet. */
@@ -56,9 +58,17 @@ function stopFor(enrollment: EnrollmentState, now: Date): Action | null {
     enrollment.lastIncomingAt !== null &&
     new Date(enrollment.lastIncomingAt).getTime() > new Date(last.attemptedAt).getTime();
 
+  // Somebody looked at this person and put them back. That is a decision about
+  // the same silence this rule is reading, so the rule yields to it — without
+  // this, pressing Resume stopped them again on the very next tick, having
+  // sent nothing, and the button did nothing at all.
+  const resumedAfter =
+    enrollment.resumedAt !== null &&
+    new Date(enrollment.resumedAt).getTime() > new Date(last.attemptedAt).getTime();
+
   // Someone who read it and said nothing was reached, which is what the path
   // is for. Only the unreached leave it.
-  if (silentFor < SILENCE_MS || repliedAfter || last.messageStatus === "read") {
+  if (silentFor < SILENCE_MS || repliedAfter || resumedAfter || last.messageStatus === "read") {
     return null;
   }
 

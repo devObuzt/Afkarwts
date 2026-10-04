@@ -128,6 +128,9 @@ export function migrateJourneyTables(db: DatabaseSync) {
   // a follow-up belongs to.
   addColumnIfMissing(db, "journey_steps", "sms_text", "TEXT NOT NULL DEFAULT ''");
   addColumnIfMissing(db, "journey_steps", "sms_uses_free_text", "INTEGER NOT NULL DEFAULT 0");
+  // When someone was last put back on the path by hand, so the silence rule
+  // can tell "never answered" from "we decided to try again".
+  addColumnIfMissing(db, "journey_enrollments", "resumed_at", "TEXT");
   addColumnIfMissing(db, "template_aliases", "frozen_at", "TEXT");
   addColumnIfMissing(db, "followups", "step_id", "INTEGER");
 }
