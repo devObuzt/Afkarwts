@@ -1098,6 +1098,44 @@ export function updateMemberPhone(memberId: number, phone: string) {
   return { ok: true as const, phone: normalized };
 }
 
+/**
+ * Removes a contact and everything hanging off them — messages, group
+ * membership, journey enrolments, follow-up tasks — through the foreign keys,
+ * which all cascade.
+ *
+ * The phone has to be passed in and match. An id is a number nobody reads, and
+ * this is the one call in the app that destroys a person's whole history: the
+ * check costs a caller nothing and makes deleting the wrong contact take more
+ * than a typo.
+ */
+export function deleteMember(memberId: number, confirmPhone: string) {
+  const member = getMember(memberId);
+  if (!member) {
+    return { ok: false as const, error: "Member not found." };
+  }
+
+  const expected = normalizePhone(confirmPhone);
+  if (!expected || expected !== member.phone) {
+    return { ok: false as const, error: "The phone number does not match this contact." };
+  }
+
+  const messages = (
+    getDb().prepare("SELECT COUNT(*) AS n FROM messages WHERE member_id = ?").get(memberId) as { n: number }
+  ).n;
+
+  // Explicit rather than trusting the cascade: foreign keys are only enforced
+  // when the pragma is on, and this must leave nothing behind either way.
+  const db = getDb();
+  db.prepare("DELETE FROM member_groups WHERE member_id = ?").run(memberId);
+  db.prepare("DELETE FROM messages WHERE member_id = ?").run(memberId);
+  db.prepare("DELETE FROM followups WHERE member_id = ?").run(memberId);
+  db.prepare("DELETE FROM journey_sends WHERE enrollment_id IN (SELECT id FROM journey_enrollments WHERE member_id = ?)").run(memberId);
+  db.prepare("DELETE FROM journey_enrollments WHERE member_id = ?").run(memberId);
+  db.prepare("DELETE FROM members WHERE id = ?").run(memberId);
+
+  return { ok: true as const, name: member.name, phone: member.phone, messages };
+}
+
 export function findMemberByPhone(phone: string) {
   const normalized = normalizePhone(phone);
   const row = getDb().prepare("SELECT * FROM members WHERE phone = ?").get(normalized) as
