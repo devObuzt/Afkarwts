@@ -51,14 +51,27 @@ export function LocationPicker({
   value,
   onChange,
   defaultCountryKey = "Israel",
-  allowManual = true
+  allowManual = true,
+  countryKeys
 }: {
   value: LocationValue;
   onChange: (value: LocationValue) => void;
   defaultCountryKey?: string | null;
   allowManual?: boolean;
+  /**
+   * The countries this form serves, in the order they should read. The
+   * register holds 152, and scrolling past Afghanistan to reach Israel is a
+   * tax on every single person who fills the form. Left out, all of them show.
+   */
+  countryKeys?: string[];
 }) {
   const [open, setOpen] = useState<null | "country" | "city">(null);
+  /**
+   * A stable key for the shortlist. The prop is normally written inline, which
+   * makes a fresh array on every render — depending on the array itself would
+   * refetch the register forever.
+   */
+  const countryFilter = countryKeys?.join(",") ?? "";
   const [countries, setCountries] = useState<Country[]>([]);
   const [cities, setCities] = useState<City[]>([]);
   const [loading, setLoading] = useState(false);
@@ -115,7 +128,11 @@ export function LocationPicker({
     fetch(`${LOCATIONS}/countries?lang=ar`)
       .then((response) => response.json())
       .then((payload) => {
-        const list: Country[] = payload.countries ?? [];
+        const all: Country[] = payload.countries ?? [];
+        const wanted = countryFilter ? countryFilter.split(",") : null;
+        const list = wanted
+          ? (wanted.map((key) => all.find((item) => item.key === key)).filter(Boolean) as Country[])
+          : all;
         setCountries(list);
         setBroken(list.length === 0);
         applyDefault(list);
@@ -124,7 +141,7 @@ export function LocationPicker({
         setCountries([]);
         setBroken(true);
       });
-  }, [applyDefault]);
+  }, [applyDefault, countryFilter]);
 
   /**
    * The search term goes to the server, and this is not an optimisation: the

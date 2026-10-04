@@ -19,19 +19,18 @@ test("the report lists steps in the order they actually fire", async () => {
     templatePreview: ""
   };
 
-  // Written out of order on purpose.
-  createStep({ ...base, week: 1, weekday: 0, sendTime: "07:00", label: "sunday" });
-  createStep({ ...base, week: 1, weekday: 2, sendTime: "07:00", label: "tuesday" });
-  createStep({ ...base, week: 1, weekday: 4, sendTime: "07:00", label: "thursday" });
+  // Written out of order on purpose, and spanning two weeks so that sorting by
+  // weekday alone would get it wrong.
+  createStep({ ...base, week: 2, weekday: 0, sendTime: "07:00", label: "week2 sunday" });
+  createStep({ ...base, week: 1, weekday: 4, sendTime: "07:00", label: "week1 thursday" });
+  createStep({ ...base, week: 1, weekday: 2, sendTime: "07:00", label: "week1 tuesday" });
 
-  // 2026-09-01 is a TUESDAY. Week 1 therefore runs Tue -> Mon, so the real
-  // order is tuesday, thursday, sunday — not the weekday numbers 0,2,4.
   const journey = createJourney({ templateId: template.id, groupId: group.id, anchorDate: "2026-09-01" });
   const rows = stepBreakdown(journey.id);
 
   assert.deepEqual(
     rows.map((r) => r.label),
-    ["tuesday", "thursday", "sunday"]
+    ["week1 tuesday", "week1 thursday", "week2 sunday"]
   );
 
   // And the dates themselves must climb.

@@ -168,6 +168,7 @@ export function FormClient({
 
             {field.kind === "town" ? (
               <LocationPicker
+                countryKeys={["Israel", "Palestine"]}
                 onChange={(next) => {
                   setTowns((current) => ({ ...current, [String(field.id)]: next }));
                   // The answer is the town itself — the country only narrows
@@ -210,7 +211,7 @@ export function FormClient({
       <footer className="formFooter">
         أفكار — Eat · Love · Fit
         <br />
-        لأي استفسار راسلنا على <a href="https://wa.me/972545227674">الواتساب</a>
+        لأي استفسار راسلنا على <a href="https://wa.me/972529155582">الواتساب</a>
       </footer>
     </main>
   );

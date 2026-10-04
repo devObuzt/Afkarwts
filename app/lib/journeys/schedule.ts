@@ -44,15 +44,25 @@ export function jerusalemHour(instant: Date) {
 }
 
 /**
- * Week N covers the seven days from the anchor: [anchor + 7(N-1), anchor + 7N).
- * The step falls on the day in that span carrying its weekday, so "week 1 -
- * Sunday - 07:00" on a Sunday anchor is the anchor day itself.
+ * A path week is a calendar week — Sunday to Saturday — counted from the week
+ * the cohort's start date falls in. Week 1 is that week, week 2 the next, and
+ * every day of one path week lands inside one week of the calendar.
+ *
+ * It used to be seven days rolling from the anchor itself, which looks the
+ * same when a cohort starts on a Sunday and comes apart when it does not:
+ * Afkar's cohort started on a Wednesday, so its week 2 ran Wednesday to the
+ * following Tuesday — the Wednesday-to-Saturday steps in one calendar week
+ * and the Sunday-to-Tuesday ones in the next. A week nobody can point at on a
+ * calendar is a week nobody can plan with.
+ *
+ * A week 1 weekday that falls before the start date is simply in the past, and
+ * the runner skips it rather than sending it late.
  */
 export function stepDueAt(anchorDate: string, step: { week: number; weekday: number; sendTime: string }) {
   const [year, month, day] = anchorDate.split("-").map(Number);
   const anchor = Date.UTC(year, month - 1, day);
-  const intoWeek = (step.weekday - new Date(anchor).getUTCDay() + 7) % 7;
-  const dayIso = new Date(anchor + ((step.week - 1) * 7 + intoWeek) * DAY_MS).toISOString().slice(0, 10);
+  const weekOpens = anchor - new Date(anchor).getUTCDay() * DAY_MS;
+  const dayIso = new Date(weekOpens + ((step.week - 1) * 7 + step.weekday) * DAY_MS).toISOString().slice(0, 10);
 
   return jerusalemToUtc(dayIso, step.sendTime);
 }
