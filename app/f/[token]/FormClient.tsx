@@ -10,7 +10,12 @@ function isShown(field: Field, answers: Record<string, string>) {
   if (!field.showWhenFieldId) {
     return true;
   }
-  return (answers[String(field.showWhenFieldId)] ?? "").trim() === field.showWhenValue;
+
+  const given = (answers[String(field.showWhenFieldId)] ?? "").trim();
+  // A pick-several answer is its ticked boxes joined together, so the gate
+  // asks whether one box is among them. A single answer is a list of one, and
+  // membership and equality say the same thing.
+  return given === field.showWhenValue || given.split("، ").includes(field.showWhenValue);
 }
 
 /**

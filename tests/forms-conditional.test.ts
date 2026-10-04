@@ -114,3 +114,31 @@ test("the title carries the current year rather than a typed one", async () => {
   assert.equal(renderTitle(CLEAN_TITLE, new Date("2027-01-15")), "CLEAN - اسبوع كلين تنظيف السموم 2027");
   assert.equal(renderTitle(CLEAN_TITLE, new Date("2026-12-31")), "CLEAN - اسبوع كلين تنظيف السموم 2026");
 });
+
+test("a condition on a pick-several question reads one ticked box, not the whole answer", async () => {
+  const { createGroup } = await import("@/app/lib/db");
+  const { createForm, addField, updateField, submitForm, getSubmission } = await import("@/app/lib/forms/store");
+  seq += 1;
+  const group = createGroup(`متعدد ${seq}`);
+  const form = createForm({ name: `متعدد ${seq}`, groupId: group.id });
+
+  const gate = addField(form.id, {
+    label: "هل عانيت من أحد هذه الأمراض؟",
+    kind: "multi",
+    required: true,
+    options: ["سكري", "آخر", "لا توجد لدي أمراض"]
+  });
+  const detail = addField(form.id, { label: "شو بالضبط؟", kind: "textarea", required: true });
+  updateField(detail.id, { showWhenFieldId: gate.id, showWhenValue: "آخر" });
+
+  // Several boxes ticked: the answer is a list, and «آخر» is one of them.
+  const both = submitForm(form.token, {
+    [String(gate.id)]: "سكري، آخر",
+    [String(detail.id)]: "ضغط دم"
+  }) as { ok: true; id: number };
+  assert.equal(getSubmission(both.id)!.answers.length, 2, "the follow-up was asked and kept");
+
+  // «آخر» not ticked: the follow-up is not asked, so it cannot block.
+  const without = submitForm(form.token, { [String(gate.id)]: "سكري", [String(detail.id)]: "" });
+  assert.equal(without.ok, true);
+});
