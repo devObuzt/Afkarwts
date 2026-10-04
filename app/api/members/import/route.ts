@@ -1,3 +1,4 @@
+import { requireApi } from "@/app/lib/users/current";
 import { NextResponse } from "next/server";
 import { addMembersToGroup, createMember, findMemberByPhone, getGroup, normalizeImportPhone } from "@/app/lib/db";
 
@@ -13,6 +14,11 @@ type ImportRow = {
 };
 
 export async function POST(request: Request) {
+  const auth = await requireApi("people.edit");
+  if (!auth.ok) {
+    return auth.response;
+  }
+
   try {
     const body = (await request.json()) as { rows?: ImportRow[]; groupId?: number | null };
     const rows = body.rows ?? [];

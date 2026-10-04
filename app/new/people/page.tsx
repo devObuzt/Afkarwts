@@ -1,3 +1,4 @@
+import { requireUser } from "@/app/lib/users/current";
 import Link from "next/link";
 import { listGroups } from "@/app/lib/db";
 import { listPeople } from "@/app/lib/people";
@@ -8,10 +9,13 @@ export const dynamic = "force-dynamic";
 const PAGE_SIZE = 50;
 
 export default async function PeoplePage({
+
   searchParams
 }: {
   searchParams: Promise<{ q?: string; group?: string; page?: string }>;
 }) {
+  await requireUser("people.view");
+
   const params = await searchParams;
   const query = (params.q ?? "").trim();
   const groupId = Number(params.group) || null;

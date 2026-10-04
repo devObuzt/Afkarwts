@@ -1,3 +1,5 @@
+import { recordAction } from "@/app/lib/users/audit";
+import { requireApi } from "@/app/lib/users/current";
 import { NextResponse } from "next/server";
 import { getJourney, listSteps, setJourneyStatus, syncEnrollments } from "@/app/lib/journeys/store";
 
@@ -6,6 +8,11 @@ export const runtime = "nodejs";
 const ALLOWED = new Set(["draft", "active", "paused", "done"]);
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireApi("journeys.manage");
+  if (!auth.ok) {
+    return auth.response;
+  }
+
   const id = Number((await params).id);
   const body = (await request.json()) as { status?: string };
 
@@ -30,6 +37,15 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   setJourneyStatus(id, body.status as "draft" | "active" | "paused" | "done");
+
+  recordAction({
+    userId: auth.user.id,
+    actor: auth.user.name,
+    action: "journey.status",
+    subjectType: "journey",
+    subjectId: id,
+    detail: body.status
+  });
 
   // Enrol straight away rather than leaving the group empty until the next
   // tick, so activating a journey shows its members immediately.

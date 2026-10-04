@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { AUTH_COOKIE, isValidSessionToken } from "@/app/lib/auth";
+import { SESSION_COOKIE, readSession } from "@/app/lib/users/session";
 
 const publicPrefixes = [
   "/login",
@@ -16,6 +16,8 @@ const publicPrefixes = [
   "/api/dev/simulate",
   "/api/journeys/tick",
   "/api/journeys/digest",
+  "/password",
+  "/api/auth/password",
   "/_next",
   "/favicon.ico"
 ];
@@ -26,7 +28,11 @@ function isPublicPath(pathname: string) {
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const isLoggedIn = await isValidSessionToken(request.cookies.get(AUTH_COOKIE)?.value);
+  // Only the signature is checked here: the edge runtime cannot open
+  // SQLite, so whether this account still exists, is still switched on, and
+  // still holds the permission being used is read by the page or route
+  // itself through requireUser.
+  const isLoggedIn = Boolean(await readSession(request.cookies.get(SESSION_COOKIE)?.value));
 
   if (pathname === "/login" && isLoggedIn) {
     return NextResponse.redirect(new URL("/", request.url));

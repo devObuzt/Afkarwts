@@ -1,3 +1,4 @@
+import { requireApi } from "@/app/lib/users/current";
 import { NextResponse } from "next/server";
 import { journeyFunnel, journeyLabel, stepBreakdown } from "@/app/lib/journeys/report";
 import { getJourney } from "@/app/lib/journeys/store";
@@ -5,6 +6,11 @@ import { getJourney } from "@/app/lib/journeys/store";
 export const runtime = "nodejs";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireApi("journeys.view");
+  if (!auth.ok) {
+    return auth.response;
+  }
+
   const id = Number((await params).id);
   const journey = getJourney(id);
 

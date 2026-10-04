@@ -1,3 +1,4 @@
+import { requireApi } from "@/app/lib/users/current";
 import { NextResponse } from "next/server";
 import {
   createCampaign,
@@ -30,6 +31,11 @@ type BulkResult = {
 };
 
 export async function POST(request: Request) {
+  const auth = await requireApi("messages.send");
+  if (!auth.ok) {
+    return auth.response;
+  }
+
   try {
     const body = (await request.json()) as {
       groupId?: number;

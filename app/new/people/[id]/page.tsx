@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getPersonRecord } from "@/app/lib/people";
+import { can } from "@/app/lib/users/permissions";
+import { requireUser } from "@/app/lib/users/current";
 import { ago, clock, day, hueOf, initials } from "../../format";
 import { PersonFiles } from "./PersonFiles";
 import { PersonNotes } from "./PersonNotes";
@@ -16,7 +18,8 @@ const STATE_LABEL: Record<string, string> = {
 };
 
 export default async function PersonPage({ params }: { params: Promise<{ id: string }> }) {
-  const record = getPersonRecord(Number((await params).id));
+  const user = await requireUser("people.view");
+  const record = getPersonRecord(Number((await params).id), { health: can(user, "people.health") });
 
   if (!record) {
     notFound();
@@ -88,6 +91,12 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
 
       <div className="crmSplit">
         <div className="main">
+          {!record.seesHealth && (
+            <p className="crmNote" style={{ padding: "12px 16px", border: "1px dashed var(--line-strong)", borderRadius: 12 }}>
+              الإجابات الصحية مخفية عنك — صلاحية «شوف الإجابات الصحية» مش معطاة لحسابك.
+            </p>
+          )}
+
           {record.highlights.length > 0 && (
             <div className="crmHighlight">
               <h3>لازم تعرفيه قبل ما تبني إلها متكون</h3>

@@ -1,9 +1,15 @@
+import { requireApi } from "@/app/lib/users/current";
 import { NextResponse } from "next/server";
 import { assignToGroup, deleteGroup, removeFromGroup, renameGroup } from "@/app/lib/template-catalogue";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireApi("templates.manage");
+  if (!auth.ok) {
+    return auth.response;
+  }
+
   const id = Number((await params).id);
   const body = (await request.json()) as { action?: string; templateName?: string; name?: string };
 
@@ -26,6 +32,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 }
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireApi("templates.manage");
+  if (!auth.ok) {
+    return auth.response;
+  }
+
   deleteGroup(Number((await params).id));
   return NextResponse.json({ ok: true });
 }

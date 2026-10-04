@@ -1,3 +1,4 @@
+import { requireApi } from "@/app/lib/users/current";
 import { NextResponse } from "next/server";
 import { createStoredMediaFilename, formatBytes, MAX_MEDIA_BYTES, MAX_MEDIA_LABEL, writeMediaFile } from "@/app/lib/media-store";
 import { createMessage, getMember, updateMessageStatus } from "@/app/lib/db";
@@ -6,6 +7,11 @@ import { mediaKindFromMime, sendWhatsAppMedia, uploadWhatsAppMedia, validateOutb
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
+  const auth = await requireApi("messages.send");
+  if (!auth.ok) {
+    return auth.response;
+  }
+
   try {
     const contentType = request.headers.get("content-type") || "application/octet-stream";
     if (contentType.includes("multipart/form-data")) {

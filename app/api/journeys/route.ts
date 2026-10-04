@@ -1,3 +1,4 @@
+import { requireApi } from "@/app/lib/users/current";
 import { NextResponse } from "next/server";
 import { createJourney, listJourneys } from "@/app/lib/journeys/store";
 import { journeyFunnel, journeyLabel } from "@/app/lib/journeys/report";
@@ -5,6 +6,11 @@ import { journeyFunnel, journeyLabel } from "@/app/lib/journeys/report";
 export const runtime = "nodejs";
 
 export async function GET() {
+  const auth = await requireApi("journeys.view");
+  if (!auth.ok) {
+    return auth.response;
+  }
+
   const journeys = listJourneys().map((journey) => ({
     ...journey,
     ...journeyLabel(journey.id),
@@ -14,6 +20,11 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const auth = await requireApi("journeys.manage");
+  if (!auth.ok) {
+    return auth.response;
+  }
+
   const body = (await request.json()) as { templateId?: number; groupId?: number; anchorDate?: string };
 
   if (!body.templateId || !body.groupId || !body.anchorDate) {

@@ -3,6 +3,7 @@ import { DatabaseSync } from "node:sqlite";
 import { getDataDir } from "./media-store";
 import { migrateJourneyTables } from "./journeys/schema";
 import { migrateFormTables } from "./forms/schema";
+import { migrateUserTables } from "./users/schema";
 
 export type Member = {
   id: number;
@@ -120,6 +121,7 @@ export function getDb() {
     migrateSendKeyColumn(db);
     migrateFormTables(db);
     migratePersonFileTables(db);
+    migrateUserTables(db);
     globalForDb.__afkarDb = db;
   }
 

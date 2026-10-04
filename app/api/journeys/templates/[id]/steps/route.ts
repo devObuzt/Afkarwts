@@ -1,13 +1,24 @@
+import { requireApi } from "@/app/lib/users/current";
 import { NextResponse } from "next/server";
 import { createStep, listSteps } from "@/app/lib/journeys/store";
 
 export const runtime = "nodejs";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireApi("journeys.view");
+  if (!auth.ok) {
+    return auth.response;
+  }
+
   return NextResponse.json({ steps: listSteps(Number((await params).id)) });
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireApi("journeys.manage");
+  if (!auth.ok) {
+    return auth.response;
+  }
+
   const templateId = Number((await params).id);
   const body = (await request.json()) as {
     week?: number;

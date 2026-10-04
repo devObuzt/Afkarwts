@@ -1,3 +1,4 @@
+import { requireApi } from "@/app/lib/users/current";
 import { NextResponse } from "next/server";
 import { createWhatsAppTemplate, type NewTemplate } from "@/app/lib/whatsapp";
 
@@ -9,6 +10,11 @@ function isValidName(name: string) {
 }
 
 export async function POST(request: Request) {
+  const auth = await requireApi("templates.manage");
+  if (!auth.ok) {
+    return auth.response;
+  }
+
   const body = (await request.json()) as NewTemplate;
 
   if (!isValidName(body.name ?? "")) {

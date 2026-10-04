@@ -1,3 +1,5 @@
+import { recordAction } from "@/app/lib/users/audit";
+import { requireApi } from "@/app/lib/users/current";
 import { NextResponse } from "next/server";
 import { getMember } from "@/app/lib/db";
 import {
@@ -12,6 +14,11 @@ import {
 export const runtime = "nodejs";
 
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
+  const auth = await requireApi("files.view");
+  if (!auth.ok) {
+    return auth.response;
+  }
+
   const memberId = Number((await context.params).id);
   if (!getMember(memberId)) {
     return NextResponse.json({ error: "Not found." }, { status: 404 });
@@ -20,6 +27,11 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
 }
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
+  const auth = await requireApi("files.manage");
+  if (!auth.ok) {
+    return auth.response;
+  }
+
   const memberId = Number((await context.params).id);
   if (!getMember(memberId)) {
     return NextResponse.json({ error: "Not found." }, { status: 404 });
@@ -47,6 +59,16 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     mimeType: upload.type || "application/octet-stream",
     bytes: new Uint8Array(await upload.arrayBuffer()),
     note: String(form.get("note") ?? "")
+  });
+
+  recordAction({
+    userId: auth.user.id,
+    actor: auth.user.name,
+    action: "file.upload",
+    subjectType: "member",
+    subjectId: memberId,
+    subjectLabel: file.label,
+    detail: `${file.kind} · ${file.sizeLabel}`
   });
 
   return NextResponse.json({ file });

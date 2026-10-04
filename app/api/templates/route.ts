@@ -1,3 +1,4 @@
+import { requireApi } from "@/app/lib/users/current";
 import { NextResponse } from "next/server";
 import { listWhatsAppTemplates, type WhatsAppTemplate } from "@/app/lib/whatsapp";
 import { listAliases } from "@/app/lib/template-aliases";
@@ -27,6 +28,11 @@ function withLocal(templates: WhatsAppTemplate[]) {
 }
 
 export async function GET(request: Request) {
+  const auth = await requireApi("journeys.view");
+  if (!auth.ok) {
+    return auth.response;
+  }
+
   const params = new URL(request.url).searchParams;
   const force = params.get("refresh") === "1";
   // The management screen asks for everything, including what is still under

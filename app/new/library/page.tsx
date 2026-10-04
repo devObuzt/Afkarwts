@@ -1,3 +1,4 @@
+import { requireUser } from "@/app/lib/users/current";
 import { listTemplates } from "@/app/lib/journeys/store";
 import { listForms } from "@/app/lib/forms/store";
 import { renderTitle } from "@/app/lib/forms/clean-template";
@@ -10,7 +11,10 @@ export const dynamic = "force-dynamic";
  * from the cohorts that run them, because editing a path mid-cohort and
  * starting a new cohort are different days' work.
  */
-export default function LibraryPage() {
+export default async function LibraryPage() {
+  await requireUser("journeys.view");
+
+
   const paths = listTemplates();
   const forms = listForms();
   const groups = listGroups();

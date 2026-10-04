@@ -1,3 +1,4 @@
+import { requireApi } from "@/app/lib/users/current";
 import { NextResponse } from "next/server";
 import { addMembersToGroup, getGroup, removeMemberFromGroup } from "@/app/lib/db";
 
@@ -9,6 +10,11 @@ function parseGroupId(id: string) {
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireApi("people.edit");
+  if (!auth.ok) {
+    return auth.response;
+  }
+
   const groupId = parseGroupId((await params).id);
   if (!groupId || !getGroup(groupId)) {
     return NextResponse.json({ error: "Group not found." }, { status: 404 });
@@ -29,6 +35,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 }
 
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireApi("people.edit");
+  if (!auth.ok) {
+    return auth.response;
+  }
+
   const groupId = parseGroupId((await params).id);
   if (!groupId || !getGroup(groupId)) {
     return NextResponse.json({ error: "Group not found." }, { status: 404 });

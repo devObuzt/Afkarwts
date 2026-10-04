@@ -1,9 +1,15 @@
+import { requireApi } from "@/app/lib/users/current";
 import { NextResponse } from "next/server";
 import { resolveManual, resumeFromFollowup } from "@/app/lib/journeys/followups";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireApi("journeys.manage");
+  if (!auth.ok) {
+    return auth.response;
+  }
+
   const id = Number((await params).id);
   const body = (await request.json()) as { action?: string; note?: string };
 

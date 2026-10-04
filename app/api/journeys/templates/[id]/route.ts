@@ -1,15 +1,26 @@
+import { requireApi } from "@/app/lib/users/current";
 import { NextResponse } from "next/server";
 import { archiveTemplate, liveJourneysUsingTemplate, updateTemplate } from "@/app/lib/journeys/store";
 
 export const runtime = "nodejs";
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireApi("journeys.manage");
+  if (!auth.ok) {
+    return auth.response;
+  }
+
   const id = Number((await params).id);
   const body = (await request.json()) as { name?: string; smsText?: string };
   return NextResponse.json({ template: updateTemplate(id, body) });
 }
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireApi("journeys.manage");
+  if (!auth.ok) {
+    return auth.response;
+  }
+
   const id = Number((await params).id);
 
   // Removing a path out from under a running journey would leave it with

@@ -1,3 +1,4 @@
+import { requireApi } from "@/app/lib/users/current";
 import { NextResponse } from "next/server";
 import { createCampaign, getGroup, listCampaigns, listGroupMembers } from "@/app/lib/db";
 import { campaignProgress, runCampaignBatch } from "@/app/lib/campaigns";
@@ -6,6 +7,11 @@ import { getMessagingLimit } from "@/app/lib/whatsapp";
 export const runtime = "nodejs";
 
 export async function GET() {
+  const auth = await requireApi("journeys.view");
+  if (!auth.ok) {
+    return auth.response;
+  }
+
   const campaigns = listCampaigns().map((campaign) => {
     const group = getGroup(campaign.groupId);
     return {
@@ -18,6 +24,11 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const auth = await requireApi("messages.send");
+  if (!auth.ok) {
+    return auth.response;
+  }
+
   try {
     const body = (await request.json()) as {
       groupId?: number;

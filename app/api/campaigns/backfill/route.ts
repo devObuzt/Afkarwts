@@ -1,3 +1,4 @@
+import { requireApi } from "@/app/lib/users/current";
 import { NextResponse } from "next/server";
 import {
   createCampaign,
@@ -14,6 +15,11 @@ export const runtime = "nodejs";
 
 /** Bulk sends that already went out before manual sends were logged as campaigns. */
 export async function GET(request: Request) {
+  const auth = await requireApi("journeys.view");
+  if (!auth.ok) {
+    return auth.response;
+  }
+
   const groupId = Number(new URL(request.url).searchParams.get("groupId"));
   if (!getGroup(groupId)) {
     return NextResponse.json({ error: "Group not found." }, { status: 404 });
@@ -24,6 +30,11 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const auth = await requireApi("journeys.manage");
+  if (!auth.ok) {
+    return auth.response;
+  }
+
   const body = (await request.json().catch(() => ({}))) as { groupId?: number; body?: string };
   // No groupId means "rebuild everything we can find" — used by the button in Campaigns.
   const groups = body.groupId

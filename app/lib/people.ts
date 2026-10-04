@@ -60,6 +60,8 @@ export type PersonRecord = {
   /** Whether a free-text reply is still allowed, and until when. */
   windowOpen: boolean;
   windowClosesAt: string | null;
+  /** False when the reader may not see the medical answers, so the screen can say so. */
+  seesHealth: boolean;
   /** The answers that decide a programme, lifted out of the registration. */
   highlights: Array<{ label: string; value: string }>;
   timeline: TimelineEntry[];
@@ -76,6 +78,14 @@ function toIso(value: string) {
  * edited per cohort and a form built from a different template still answers
  * the same things.
  */
+/** An answer is withheld by the wording of its question, the same test the highlights use. */
+function withoutHealth(submission: PersonSubmission): PersonSubmission {
+  return {
+    ...submission,
+    answers: submission.answers.filter((answer) => !HIGHLIGHT_WORDS.some((word) => answer.label.includes(word)))
+  };
+}
+
 const HIGHLIGHT_WORDS = ["أمراض", "أدوية", "علاج", "حساسية", "حامل", "مرضعة"];
 
 function highlightsFrom(submissions: PersonSubmission[]) {
@@ -112,7 +122,17 @@ function replyWindow(messages: Message[]) {
   return { windowOpen: closesAt.getTime() > Date.now(), windowClosesAt: closesAt.toISOString() };
 }
 
-export function getPersonRecord(memberId: number): PersonRecord | null {
+/**
+ * Reading a person, with or without her medical answers.
+ *
+ * The health questions are the reason permissions exist here at all, so
+ * they are withheld where the record is built — not hidden in the markup,
+ * where a view-source or an API call would hand them over anyway.
+ */
+export function getPersonRecord(
+  memberId: number,
+  options: { health?: boolean } = { health: true }
+): PersonRecord | null {
   const member = getMember(memberId);
   if (!member) {
     return null;
@@ -241,16 +261,19 @@ export function getPersonRecord(memberId: number): PersonRecord | null {
 
   timeline.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
 
+  const seesHealth = options.health !== false;
+
   return {
     member,
     groups,
     journeys,
-    submissions,
+    submissions: seesHealth ? submissions : submissions.map(withoutHealth),
     tasks,
     messages,
     files,
     ...replyWindow(messages),
-    highlights: highlightsFrom(submissions),
+    highlights: seesHealth ? highlightsFrom(submissions) : [],
+    seesHealth,
     timeline
   };
 }

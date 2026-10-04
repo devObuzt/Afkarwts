@@ -1,9 +1,15 @@
+import { requireApi } from "@/app/lib/users/current";
 import { NextResponse } from "next/server";
 import { listForms, listSubmissions } from "@/app/lib/forms/store";
 
 export const runtime = "nodejs";
 
 export async function GET(request: Request) {
+  const auth = await requireApi("leads.review");
+  if (!auth.ok) {
+    return auth.response;
+  }
+
   const params = new URL(request.url).searchParams;
   const formId = Number(params.get("formId")) || undefined;
   const state = params.get("state") || undefined;

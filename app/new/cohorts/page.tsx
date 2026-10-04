@@ -1,3 +1,4 @@
+import { requireUser } from "@/app/lib/users/current";
 import Link from "next/link";
 import { getGroup } from "@/app/lib/db";
 import { listJourneys, getTemplate } from "@/app/lib/journeys/store";
@@ -13,7 +14,10 @@ const STATUS: Record<string, { label: string; pill: string }> = {
   done: { label: "خلصت", pill: "crmPill" }
 };
 
-export default function CohortsPage() {
+export default async function CohortsPage() {
+  await requireUser("journeys.view");
+
+
   const journeys = listJourneys().map((journey) => ({
     ...journey,
     pathName: getTemplate(journey.templateId)?.name ?? `#${journey.templateId}`,

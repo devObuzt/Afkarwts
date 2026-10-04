@@ -1,3 +1,4 @@
+import { requireApi } from "@/app/lib/users/current";
 import { NextResponse } from "next/server";
 import { createMessage, getMember, updateMessageStatus } from "@/app/lib/db";
 import { fillNameToken, renderTemplateBody, sendWhatsAppTemplate } from "@/app/lib/whatsapp";
@@ -5,6 +6,11 @@ import { fillNameToken, renderTemplateBody, sendWhatsAppTemplate } from "@/app/l
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
+  const auth = await requireApi("messages.send");
+  if (!auth.ok) {
+    return auth.response;
+  }
+
   try {
     const body = (await request.json()) as {
       memberId?: number;

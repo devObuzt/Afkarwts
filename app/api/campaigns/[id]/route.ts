@@ -1,3 +1,4 @@
+import { requireApi } from "@/app/lib/users/current";
 import { NextResponse } from "next/server";
 import { getCampaign, updateCampaignStatus } from "@/app/lib/db";
 import { runCampaignBatch } from "@/app/lib/campaigns";
@@ -10,6 +11,11 @@ function parseCampaignId(id: string) {
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireApi("journeys.manage");
+  if (!auth.ok) {
+    return auth.response;
+  }
+
   const campaignId = parseCampaignId((await params).id);
   if (!campaignId || !getCampaign(campaignId)) {
     return NextResponse.json({ error: "Campaign not found." }, { status: 404 });

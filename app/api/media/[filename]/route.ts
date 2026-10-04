@@ -1,3 +1,4 @@
+import { requireApi } from "@/app/lib/users/current";
 import { NextResponse } from "next/server";
 import { readMediaFile, safeMediaFilename } from "@/app/lib/media-store";
 
@@ -21,6 +22,11 @@ const mimeByExtension: Record<string, string> = {
 };
 
 export async function GET(_request: Request, context: { params: Promise<{ filename: string }> }) {
+  const auth = await requireApi("people.view");
+  if (!auth.ok) {
+    return auth.response;
+  }
+
   const params = await context.params;
   const filename = safeMediaFilename(params.filename);
 

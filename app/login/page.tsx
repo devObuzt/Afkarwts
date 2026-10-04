@@ -25,24 +25,26 @@ export default function LoginPage() {
     setIsSubmitting(false);
 
     if (!response.ok) {
-      setError(payload.error ?? "Could not sign in.");
+      setError(payload.error ?? "ما قدرنا نسجّل دخولك.");
       return;
     }
 
-    const nextPath = new URLSearchParams(window.location.search).get("next") || "/";
+    const nextPath = payload.user?.mustChangePassword
+      ? "/password"
+      : new URLSearchParams(window.location.search).get("next") || "/";
     router.replace(nextPath);
     router.refresh();
   }
 
   return (
-    <main className="loginShell">
+    <main className="loginShell" dir="rtl" lang="ar">
       <form className="loginPanel" onSubmit={login}>
         <div>
-          <h1>Afkar WhatsApp</h1>
-          <p>Admin access</p>
+          <h1>أفكار</h1>
+          <p>سجّلي دخولك</p>
         </div>
         <label>
-          Username
+          اسم المستخدم
           <input
             autoComplete="username"
             autoFocus
@@ -51,7 +53,7 @@ export default function LoginPage() {
           />
         </label>
         <label>
-          Password
+          كلمة السر
           <input
             autoComplete="current-password"
             type="password"
@@ -61,12 +63,12 @@ export default function LoginPage() {
         </label>
         {error ? <div className="notice loginNotice">{error}</div> : null}
         <button disabled={isSubmitting || !username || !password} type="submit">
-          {isSubmitting ? "Signing in..." : "Sign in"}
+          {isSubmitting ? "لحظة…" : "فوتي"}
         </button>
         <div className="loginFooter">
-          <a href="/privacy">Privacy Policy</a>
+          <a href="/privacy">سياسة الخصوصية</a>
           <span>·</span>
-          <a href="/terms">Terms of Service</a>
+          <a href="/terms">شروط الاستخدام</a>
         </div>
       </form>
     </main>

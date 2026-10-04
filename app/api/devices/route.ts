@@ -1,13 +1,24 @@
+import { requireApi } from "@/app/lib/users/current";
 import { NextResponse } from "next/server";
 import { listDevices, registerDevice, removeDevice } from "@/app/lib/db";
 
 export const runtime = "nodejs";
 
 export async function GET() {
+  const auth = await requireApi();
+  if (!auth.ok) {
+    return auth.response;
+  }
+
   return NextResponse.json({ devices: listDevices().map(({ token, ...rest }) => ({ ...rest, tokenTail: token.slice(-6) })) });
 }
 
 export async function POST(request: Request) {
+  const auth = await requireApi();
+  if (!auth.ok) {
+    return auth.response;
+  }
+
   try {
     const body = (await request.json()) as { token?: string; platform?: string; label?: string };
     registerDevice({ token: body.token ?? "", platform: body.platform, label: body.label });
@@ -19,6 +30,11 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  const auth = await requireApi();
+  if (!auth.ok) {
+    return auth.response;
+  }
+
   try {
     const body = (await request.json()) as { token?: string };
     if (!body.token) {

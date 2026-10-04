@@ -1,3 +1,4 @@
+import { requireUser } from "@/app/lib/users/current";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDb } from "@/app/lib/db";
@@ -25,7 +26,10 @@ const STATE: Record<string, { label: string; pill: string }> = {
   removed: { label: "انشالت", pill: "crmPill" }
 };
 
-export default async function CohortPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function CohortPage({
+ params }: { params: Promise<{ id: string }> }) {
+  await requireUser("journeys.view");
+
   const journeyId = Number((await params).id);
   const journey = getJourney(journeyId);
 

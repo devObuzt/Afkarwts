@@ -1,3 +1,4 @@
+import { requireApi } from "@/app/lib/users/current";
 import { NextResponse } from "next/server";
 import { getMember, updateMemberPhone } from "@/app/lib/db";
 import { alternateCountryCode } from "@/app/lib/whatsapp-errors";
@@ -6,6 +7,11 @@ export const runtime = "nodejs";
 
 /** Switches a contact to the same subscriber number under the other country code. */
 export async function POST(request: Request) {
+  const auth = await requireApi("people.edit");
+  if (!auth.ok) {
+    return auth.response;
+  }
+
   const body = (await request.json().catch(() => ({}))) as { memberId?: number; phone?: string };
   const member = getMember(Number(body.memberId));
   if (!member) {

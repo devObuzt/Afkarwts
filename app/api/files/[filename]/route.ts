@@ -1,3 +1,4 @@
+import { requireApi } from "@/app/lib/users/current";
 import { NextResponse } from "next/server";
 import { isInlineType } from "@/app/lib/person-file-kinds";
 import { findPersonFileByName, readPersonFileBytes } from "@/app/lib/person-files";
@@ -6,6 +7,11 @@ export const runtime = "nodejs";
 
 /** Behind the login, like every page: these are members' health documents. */
 export async function GET(_request: Request, context: { params: Promise<{ filename: string }> }) {
+  const auth = await requireApi("files.view");
+  if (!auth.ok) {
+    return auth.response;
+  }
+
   const { filename } = await context.params;
   const file = findPersonFileByName(filename);
 

@@ -1,3 +1,4 @@
+import { requireApi } from "@/app/lib/users/current";
 import { NextResponse } from "next/server";
 import {
   findMemberByPhone,
@@ -14,6 +15,11 @@ export const runtime = "nodejs";
 const DELIVERED = new Set(["accepted", "sent", "delivered", "read"]);
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireApi("journeys.view");
+  if (!auth.ok) {
+    return auth.response;
+  }
+
   const campaignId = Number((await params).id);
   const campaign = Number.isInteger(campaignId) ? getCampaign(campaignId) : null;
 

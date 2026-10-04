@@ -1,9 +1,15 @@
+import { requireApi } from "@/app/lib/users/current";
 import { NextResponse } from "next/server";
 import { getMember, markMemberMessagesRead } from "@/app/lib/db";
 
 export const runtime = "nodejs";
 
 export async function POST(_request: Request, context: { params: Promise<{ id: string }> }) {
+  const auth = await requireApi("people.view");
+  if (!auth.ok) {
+    return auth.response;
+  }
+
   const params = await context.params;
   const memberId = Number(params.id);
 

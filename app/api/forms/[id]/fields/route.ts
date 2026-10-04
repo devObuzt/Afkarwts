@@ -1,3 +1,4 @@
+import { requireApi } from "@/app/lib/users/current";
 import { NextResponse } from "next/server";
 import { addField } from "@/app/lib/forms/store";
 import type { NewField } from "@/app/lib/forms/clean-template";
@@ -5,6 +6,11 @@ import type { NewField } from "@/app/lib/forms/clean-template";
 export const runtime = "nodejs";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireApi("forms.manage");
+  if (!auth.ok) {
+    return auth.response;
+  }
+
   const id = Number((await params).id);
   const body = (await request.json()) as NewField;
 

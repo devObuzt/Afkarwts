@@ -1,13 +1,24 @@
+import { requireApi } from "@/app/lib/users/current";
 import { NextResponse } from "next/server";
 import { listAliases, setAlias } from "@/app/lib/template-aliases";
 
 export const runtime = "nodejs";
 
 export async function GET() {
+  const auth = await requireApi("journeys.view");
+  if (!auth.ok) {
+    return auth.response;
+  }
+
   return NextResponse.json({ aliases: listAliases() });
 }
 
 export async function POST(request: Request) {
+  const auth = await requireApi("templates.manage");
+  if (!auth.ok) {
+    return auth.response;
+  }
+
   const body = (await request.json()) as { name?: string; alias?: string };
 
   if (!body.name?.trim()) {
