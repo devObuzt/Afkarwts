@@ -31,7 +31,7 @@ export default function CohortsPage() {
       </header>
 
       {waiting.length > 0 && (
-        <section className="crmCard">
+        <section className="crmCard" data-tone="rose">
           <header>
             <span className="crmDot" />
             <h2>تسجيلات مستنّية مراجعة</h2>
@@ -60,8 +60,9 @@ export default function CohortsPage() {
         </section>
       )}
 
-      <section className="crmCard">
+      <section className="crmCard" data-tone="apricot">
         <header>
+          <span className="crmDot" />
           <h2>المسارات الشغّالة</h2>
         </header>
         {journeys.length === 0 ? (
@@ -85,8 +86,9 @@ export default function CohortsPage() {
         )}
       </section>
 
-      <section className="crmCard">
+      <section className="crmCard" data-tone="mauve">
         <header>
+          <span className="crmDot" />
           <h2>استمارات التسجيل</h2>
         </header>
         {forms.length === 0 ? (

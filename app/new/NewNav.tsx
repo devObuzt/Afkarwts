@@ -2,29 +2,34 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { areaOf } from "./AreaShell";
 
 const AREAS = [
-  { href: "/new", label: "اليوم" },
-  { href: "/new/people", label: "الناس" },
-  { href: "/new/cohorts", label: "الدورات" },
-  { href: "/new/library", label: "المكتبة" }
+  { href: "/new", area: "today", label: "اليوم" },
+  { href: "/new/people", area: "people", label: "الناس" },
+  { href: "/new/cohorts", area: "cohorts", label: "الدورات" },
+  { href: "/new/library", area: "library", label: "المكتبة" }
 ];
 
 export function NewNav() {
-  const pathname = usePathname();
+  const current = areaOf(usePathname());
 
   return (
     <header className="crmNav">
-      <span className="crmBrand">Afkar</span>
+      <span className="crmBrand">أفكار</span>
       <nav aria-label="الأقسام">
-        {AREAS.map((area) => {
-          const current = area.href === "/new" ? pathname === "/new" : pathname.startsWith(area.href);
-          return (
-            <Link aria-current={current ? "page" : undefined} className={current ? "current" : ""} href={area.href} key={area.href}>
-              {area.label}
-            </Link>
-          );
-        })}
+        {AREAS.map((item) => (
+          <Link
+            aria-current={item.area === current ? "page" : undefined}
+            className={item.area === current ? "current" : ""}
+            data-area={item.area}
+            href={item.href}
+            key={item.href}
+          >
+            <span className="tick" />
+            {item.label}
+          </Link>
+        ))}
       </nav>
       <a className="crmOld" href="/">
         الواجهة القديمة

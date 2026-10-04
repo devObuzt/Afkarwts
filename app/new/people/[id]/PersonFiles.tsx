@@ -70,10 +70,11 @@ export function PersonFiles({ memberId, files }: { memberId: number; files: Pers
   }
 
   return (
-    <section className="crmCard">
+    <section className="crmCard" data-tone="apricot">
       <header>
+        <span className="crmDot" />
         <h2>ملفاتها</h2>
-        <span className="crmPill spacer">{files.length}</span>
+        <span className="crmPill tone spacer">{files.length}</span>
       </header>
 
       {files.length === 0 ? (
@@ -81,7 +82,9 @@ export function PersonFiles({ memberId, files }: { memberId: number; files: Pers
       ) : (
         files.map((file) => (
           <div className="crmFile" key={file.id}>
-            <span className="crmFileKind">{KIND_LABEL[file.kind]}</span>
+            <span className="crmFileKind" data-kind={file.kind}>
+              {KIND_LABEL[file.kind]}
+            </span>
             <span className="grow" style={{ flex: "999 1 220px", minWidth: 0 }}>
               <a href={file.url} rel="noreferrer" style={{ fontWeight: 600, fontSize: 14.5 }} target="_blank">
                 {file.label}

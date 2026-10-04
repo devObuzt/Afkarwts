@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { getDb } from "@/app/lib/db";
 import { journeyFunnel, journeyLabel, stepBreakdown } from "@/app/lib/journeys/report";
 import { getJourney } from "@/app/lib/journeys/store";
-import { clock, day, initials, members as memberCount } from "../../format";
+import { clock, day, hueOf, initials, members as memberCount } from "../../format";
 
 export const dynamic = "force-dynamic";
 
@@ -67,13 +67,13 @@ export default async function CohortPage({ params }: { params: Promise<{ id: str
 
       <section className="crmGrid">
         {[
-          { label: "انبعتت", value: funnel.sent },
-          { label: "وصلت", value: funnel.reached },
-          { label: "انقرأت", value: funnel.read },
-          { label: "ردّوا", value: funnel.replied }
+          { label: "انبعتت", value: funnel.sent, tone: "salmon" },
+          { label: "وصلت", value: funnel.reached, tone: "apricot" },
+          { label: "انقرأت", value: funnel.read, tone: "mauve" },
+          { label: "ردّوا", value: funnel.replied, tone: "mint" }
         ].map((stat) => (
-          <div className="crmCard crmPad" key={stat.label} style={{ flex: "1 1 160px" }}>
-            <div style={{ fontSize: 28, fontWeight: 700 }}>{stat.value}</div>
+          <div className="crmCard crmTile crmPad" data-tone={stat.tone} key={stat.label} style={{ flex: "1 1 160px" }}>
+            <div className="figure">{stat.value}</div>
             <div className="crmRowDetail">{stat.label}</div>
           </div>
         ))}
@@ -81,17 +81,18 @@ export default async function CohortPage({ params }: { params: Promise<{ id: str
 
       <div className="crmSplit">
         <div className="main">
-          <section className="crmCard">
+          <section className="crmCard" data-tone="mauve">
             <header>
+              <span className="crmDot" />
               <h2>المشتركات</h2>
-              <span className="crmPill spacer">{members.length}</span>
+              <span className="crmPill tone spacer">{members.length}</span>
             </header>
             {members.length === 0 ? (
               <p className="crmEmpty">ولا وحدة بالمجموعة لهلق.</p>
             ) : (
               members.map((row) => (
                 <Link className="crmRow" href={`/new/people/${row.member_id}`} key={row.member_id}>
-                  <span className={row.state === "stopped" ? "crmAvatar warm" : "crmAvatar"}>
+                  <span className="crmAvatar" data-hue={hueOf(row.name)}>
                     {initials(row.name)}
                   </span>
                   <span className="grow">
@@ -111,8 +112,9 @@ export default async function CohortPage({ params }: { params: Promise<{ id: str
         </div>
 
         <div className="side">
-          <section className="crmCard">
+          <section className="crmCard" data-tone="apricot">
             <header>
+              <span className="crmDot" />
               <h2>خطوات المسار</h2>
             </header>
             {steps.length === 0 ? (

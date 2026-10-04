@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { listGroups } from "@/app/lib/db";
 import { listPeople } from "@/app/lib/people";
-import { ago, initials, people as peopleCount } from "../format";
+import { ago, hueOf, initials, people as peopleCount } from "../format";
 
 export const dynamic = "force-dynamic";
 
@@ -68,7 +68,9 @@ export default async function PeoplePage({
         ) : (
           people.map((person) => (
             <Link className="crmRow" href={`/new/people/${person.id}`} key={person.id}>
-              <span className={person.unread ? "crmAvatar warm" : "crmAvatar"}>{initials(person.name)}</span>
+              <span className="crmAvatar" data-hue={hueOf(person.name)}>
+                {initials(person.name)}
+              </span>
               <span className="grow">
                 <span className="crmRowTitle" style={{ display: "block" }}>
                   {person.name}

@@ -55,10 +55,11 @@ export function PersonReply({
     : "";
 
   return (
-    <section className="crmCard">
+    <section className="crmCard" data-tone={windowOpen ? "mint" : "apricot"}>
       <header>
+        <span className="crmDot" />
         <h2>ردّي عليها</h2>
-        <span className={windowOpen ? "crmPill live spacer" : "crmPill open spacer"}>
+        <span className="crmPill tone spacer">
           {windowOpen ? `النافذة مفتوحة لـ${closes}` : "النافذة مسكّرة"}
         </span>
       </header>

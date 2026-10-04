@@ -94,3 +94,16 @@ export function members(total: number) {
 export function people(total: number) {
   return count(total, { none: "ولا حدا", one: "شخص واحد", two: "شخصين", few: "أشخاص", many: "شخص" });
 }
+
+/**
+ * A stable colour for a name, so a column of initials tells apart at a
+ * glance. Five buckets, one per brand hue — the point is difference between
+ * neighbours, not an identity.
+ */
+export function hueOf(name: string) {
+  let sum = 0;
+  for (const character of name) {
+    sum = (sum + character.codePointAt(0)!) % 1000;
+  }
+  return sum % 5;
+}

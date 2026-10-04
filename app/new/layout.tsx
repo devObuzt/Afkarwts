@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { AreaShell } from "./AreaShell";
 import { NewNav } from "./NewNav";
 import "./crm.css";
 
@@ -9,9 +10,9 @@ import "./crm.css";
  */
 export default function NewLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="crm" dir="rtl" lang="ar">
+    <AreaShell>
       <NewNav />
       <div className="crmBody">{children}</div>
-    </div>
+    </AreaShell>
   );
 }

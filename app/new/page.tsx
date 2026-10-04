@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getToday } from "@/app/lib/today";
-import { ago, clock, initials, members, weekdayAndDay } from "./format";
+import { ago, clock, hueOf, initials, members, weekdayAndDay } from "./format";
 
 export const dynamic = "force-dynamic";
 
@@ -37,9 +37,9 @@ export default function TodayPage() {
         </p>
       </header>
 
-      <section className="crmCard">
+      <section className="crmCard" data-tone={today.decisions.length ? "rose" : "mint"}>
         <header>
-          <span className={today.decisions.length ? "crmDot" : "crmDot calm"} />
+          <span className="crmDot" />
           <h2>بدها قرار منك</h2>
         </header>
 
@@ -47,7 +47,7 @@ export default function TodayPage() {
           <p className="crmEmpty">كلشي ماشي. الدورات بتبعت لحالها، وما في ولا إشي عالق.</p>
         ) : (
           today.decisions.map((item) => (
-            <div className="crmRow" key={item.key}>
+            <div className="crmRow" data-tone={item.weight === "now" ? "rose" : "apricot"} key={item.key}>
               <div className="grow">
                 <div className="crmRowTitle">{item.title}</div>
                 <div className="crmRowDetail">{item.detail}</div>
@@ -63,7 +63,7 @@ export default function TodayPage() {
       {today.cohorts.length > 0 && (
         <section className="crmGrid">
           {today.cohorts.map((cohort) => (
-            <article className="crmCard" key={cohort.journeyId}>
+            <article className="crmCard crmTile" data-tone={cohort.status === "active" ? "mint" : "apricot"} key={cohort.journeyId}>
               <div className="crmPad">
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
                   <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>
@@ -95,8 +95,9 @@ export default function TodayPage() {
         </section>
       )}
 
-      <section className="crmCard">
+      <section className="crmCard" data-tone="mauve">
         <header>
+          <span className="crmDot" />
           <h2>ردود مستنّية</h2>
           <Link className="spacer" href="/new/people" style={{ fontSize: 13.5 }}>
             كل الناس ←
@@ -108,7 +109,9 @@ export default function TodayPage() {
         ) : (
           today.replies.map((reply) => (
             <Link className="crmRow" href={`/new/people/${reply.memberId}`} key={reply.memberId}>
-              <span className="crmAvatar warm">{initials(reply.name)}</span>
+              <span className="crmAvatar" data-hue={hueOf(reply.name)}>
+                {initials(reply.name)}
+              </span>
               <span className="grow">
                 <span className="crmRowTitle" style={{ display: "block" }}>
                   {reply.name}

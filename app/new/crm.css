@@ -1,30 +1,129 @@
 /*
- * The rebuilt surface. Scoped under .crm so it cannot reach the old pages,
- * which keep running on globals.css until this one replaces them.
+ * The rebuilt surface, painted in Afkar's own palette rather than the admin
+ * green the old pages inherited.
+ *
+ * Every brand colour is too light to read as text — the salmon is 2.31 on
+ * white, the apricot 1.94 — so each hue appears twice: the brand value for
+ * fills, edges and washes, and a measured darker ink for anything with
+ * words in it (all of them above 5.4 on cream).
+ *
+ * The four areas each own a hue, so the colour tells you where you are
+ * before the label does, and a card inside a page carries the tone of what
+ * it holds: rose for what needs a decision, mint for what is running by
+ * itself, apricot for cohorts and files, mauve for people.
+ *
+ * Scoped under .crm so it cannot reach the old pages, which keep running on
+ * globals.css until this one replaces them.
  */
 
 .crm {
-  --paper: #f4f1ea;
-  --card: #ffffff;
-  --line: #e3ded3;
-  --line-soft: #f1ece2;
-  --ink: #1c2620;
-  --muted: #6d766f;
-  --faint: #9a948c;
-  --green: #0f5c44;
-  --green-deep: #0b3d2e;
-  --green-bright: #16835f;
-  --green-wash: #dff0e6;
+  /* Afkar's palette, from the site's own Elementor globals. */
   --salmon: #e9967a;
-  --salmon-wash: #fdeae2;
-  --amber: #8a6a2f;
-  --amber-wash: #fdf0da;
+  --rose: #dd518f;
+  --apricot: #f5aa62;
+  --mint: #b9dcd2;
+  --mauve: #c48fa6;
+  --peach: #fcbfaa;
+
+  /* The same hues, dark enough to read. */
+  --salmon-ink: #a8482a;
+  --rose-ink: #b02a66;
+  --apricot-ink: #8a5713;
+  --mint-ink: #2c6b5b;
+  --mauve-ink: #8a4e68;
+
+  /* And light enough to sit behind a line of text. */
+  --salmon-wash: #fdede7;
+  --rose-wash: #fceaf2;
+  --apricot-wash: #fdf1e1;
+  --mint-wash: #e8f4f0;
+  --mauve-wash: #f8ecf1;
+
+  --paper: #faf9f3;
+  --card: #ffffff;
+  --line: #e7e2d6;
+  --line-soft: #f1ede3;
+  --line-strong: #cfc9bb;
+  --ink: #3a3836;
+  --body: #4f4d4d;
+  --muted: #65625c;
+  --faint: #75726b;
   --radius: 16px;
+
+  /* Repainted per area by the rules below. */
+  --tone: var(--salmon);
+  --tone-ink: var(--salmon-ink);
+  --tone-wash: var(--salmon-wash);
+  --tone-mid: color-mix(in srgb, var(--tone) 55%, var(--tone-ink));
 
   min-height: 100vh;
   background: var(--paper);
-  color: var(--ink);
+  color: var(--body);
   font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+.crm[data-area="today"] {
+  --tone: var(--salmon);
+  --tone-ink: var(--salmon-ink);
+  --tone-mid: color-mix(in srgb, var(--tone) 55%, var(--tone-ink));
+  --tone-wash: var(--salmon-wash);
+}
+
+.crm[data-area="people"] {
+  --tone: var(--mauve);
+  --tone-ink: var(--mauve-ink);
+  --tone-mid: color-mix(in srgb, var(--tone) 55%, var(--tone-ink));
+  --tone-wash: var(--mauve-wash);
+}
+
+.crm[data-area="cohorts"] {
+  --tone: var(--apricot);
+  --tone-ink: var(--apricot-ink);
+  --tone-mid: color-mix(in srgb, var(--tone) 55%, var(--tone-ink));
+  --tone-wash: var(--apricot-wash);
+}
+
+.crm[data-area="library"] {
+  --tone: var(--mint);
+  --tone-ink: var(--mint-ink);
+  --tone-mid: color-mix(in srgb, var(--tone) 55%, var(--tone-ink));
+  --tone-wash: var(--mint-wash);
+}
+
+/* A card can carry a tone of its own, whatever area it sits in. */
+.crm [data-tone="rose"] {
+  --tone: var(--rose);
+  --tone-ink: var(--rose-ink);
+  --tone-mid: color-mix(in srgb, var(--tone) 55%, var(--tone-ink));
+  --tone-wash: var(--rose-wash);
+}
+
+.crm [data-tone="salmon"] {
+  --tone: var(--salmon);
+  --tone-ink: var(--salmon-ink);
+  --tone-mid: color-mix(in srgb, var(--tone) 55%, var(--tone-ink));
+  --tone-wash: var(--salmon-wash);
+}
+
+.crm [data-tone="apricot"] {
+  --tone: var(--apricot);
+  --tone-ink: var(--apricot-ink);
+  --tone-mid: color-mix(in srgb, var(--tone) 55%, var(--tone-ink));
+  --tone-wash: var(--apricot-wash);
+}
+
+.crm [data-tone="mint"] {
+  --tone: var(--mint);
+  --tone-ink: var(--mint-ink);
+  --tone-mid: color-mix(in srgb, var(--tone) 55%, var(--tone-ink));
+  --tone-wash: var(--mint-wash);
+}
+
+.crm [data-tone="mauve"] {
+  --tone: var(--mauve);
+  --tone-ink: var(--mauve-ink);
+  --tone-mid: color-mix(in srgb, var(--tone) 55%, var(--tone-ink));
+  --tone-wash: var(--mauve-wash);
 }
 
 .crm *,
@@ -34,7 +133,7 @@
 }
 
 .crm a {
-  color: var(--green);
+  color: var(--tone-ink);
 }
 
 /* ---- chrome ---- */
@@ -43,7 +142,7 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  height: 56px;
+  height: 58px;
   padding: 0 20px;
   background: var(--card);
   border-bottom: 1px solid var(--line);
@@ -54,10 +153,11 @@
 }
 
 .crm .crmBrand {
+  font-family: var(--font-brand), var(--font-sans), sans-serif;
   font-weight: 700;
-  font-size: 15px;
-  margin-inline-end: 20px;
-  letter-spacing: 0.02em;
+  font-size: 19px;
+  color: var(--salmon-ink);
+  margin-inline-end: 18px;
 }
 
 .crm .crmNav nav {
@@ -66,12 +166,37 @@
 }
 
 .crm .crmNav nav a {
-  padding: 6px 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
   border-radius: 999px;
   font-size: 13.5px;
+  font-weight: 600;
   color: var(--muted);
   text-decoration: none;
   white-space: nowrap;
+}
+
+/* Each area keeps its colour in the menu, so the four read as four. */
+.crm .crmNav nav a .tick {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--salmon) 55%, var(--salmon-ink));
+  flex: none;
+}
+
+.crm .crmNav nav a[data-area="people"] .tick {
+  background: color-mix(in srgb, var(--mauve) 55%, var(--mauve-ink));
+}
+
+.crm .crmNav nav a[data-area="cohorts"] .tick {
+  background: color-mix(in srgb, var(--apricot) 55%, var(--apricot-ink));
+}
+
+.crm .crmNav nav a[data-area="library"] .tick {
+  background: color-mix(in srgb, var(--mint) 55%, var(--mint-ink));
 }
 
 .crm .crmNav nav a:hover {
@@ -80,12 +205,18 @@
 }
 
 .crm .crmNav nav a.current {
-  background: var(--green-deep);
-  color: #fff;
+  background: var(--tone-wash);
+  color: var(--tone-ink);
+}
+
+.crm .crmNav nav a.current .tick {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--tone) 35%, transparent);
 }
 
 .crm .crmOld {
   margin-inline-start: auto;
+  padding-inline-start: 14px;
+  flex: none;
   font-size: 12.5px;
   color: var(--faint);
   text-decoration: none;
@@ -111,14 +242,27 @@
 /* ---- headings ---- */
 
 .crm .crmHead h1 {
-  margin: 0 0 6px;
-  font-size: 28px;
+  margin: 0;
+  font-family: var(--font-brand), var(--font-sans), sans-serif;
+  font-size: 30px;
   font-weight: 700;
-  line-height: 1.3;
+  line-height: 1.35;
+  color: var(--ink);
+}
+
+/* A short rule in the area's colour, so the page is placed at a glance. */
+.crm .crmHead h1::after {
+  content: "";
+  display: block;
+  width: 46px;
+  height: 4px;
+  margin-top: 9px;
+  border-radius: 2px;
+  background: var(--tone-mid);
 }
 
 .crm .crmHead p {
-  margin: 0;
+  margin: 11px 0 0;
   font-size: 15px;
   color: var(--muted);
   line-height: 1.85;
@@ -128,6 +272,7 @@
   display: inline-block;
   margin-bottom: 10px;
   font-size: 13.5px;
+  font-weight: 600;
   text-decoration: none;
 }
 
@@ -140,12 +285,15 @@
   overflow: hidden;
 }
 
+/* The header carries the card's tone: a wash, and an edge down its side. */
 .crm .crmCard > header {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--line-soft);
+  padding: 15px 20px;
+  background: var(--tone-wash);
+  border-bottom: 1px solid color-mix(in srgb, var(--tone) 45%, transparent);
+  box-shadow: inset 4px 0 0 0 var(--tone-mid);
   flex-wrap: wrap;
 }
 
@@ -153,6 +301,7 @@
   margin: 0;
   font-size: 16px;
   font-weight: 700;
+  color: var(--tone-ink);
 }
 
 .crm .crmCard > header .spacer {
@@ -164,15 +313,12 @@
 }
 
 .crm .crmDot {
-  width: 9px;
-  height: 9px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
-  background: var(--salmon);
+  background: var(--tone-mid);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--tone) 35%, transparent);
   flex: none;
-}
-
-.crm .crmDot.calm {
-  background: var(--green-bright);
 }
 
 /* ---- rows ---- */
@@ -192,8 +338,14 @@
   border-bottom: 0;
 }
 
+.crm a.crmRow {
+  position: relative;
+}
+
+/* A link row says so on hover, in the colour of where it goes. */
 .crm a.crmRow:hover {
-  background: #fcfbf8;
+  background: var(--tone-wash);
+  box-shadow: inset 3px 0 0 0 var(--tone-mid);
 }
 
 .crm .crmRow .grow {
@@ -204,6 +356,7 @@
 .crm .crmRowTitle {
   font-size: 15px;
   font-weight: 600;
+  color: var(--ink);
   margin-bottom: 3px;
 }
 
@@ -219,28 +372,47 @@
   white-space: nowrap;
 }
 
+/* ---- avatars ---- */
+
 .crm .crmAvatar {
   flex: none;
   width: 42px;
   height: 42px;
   border-radius: 50%;
-  background: var(--green);
-  color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 15px;
   font-weight: 700;
+  color: #fff;
+  background: var(--mauve-ink);
 }
 
-.crm .crmAvatar.warm {
-  background: var(--salmon);
+/* Faces are a wall of initials; a colour per name makes them tell apart. */
+.crm .crmAvatar[data-hue="0"] {
+  background: var(--salmon-ink);
+}
+
+.crm .crmAvatar[data-hue="1"] {
+  background: var(--mauve-ink);
+}
+
+.crm .crmAvatar[data-hue="2"] {
+  background: var(--mint-ink);
+}
+
+.crm .crmAvatar[data-hue="3"] {
+  background: var(--apricot-ink);
+}
+
+.crm .crmAvatar[data-hue="4"] {
+  background: var(--rose-ink);
 }
 
 .crm .crmAvatar.big {
-  width: 60px;
-  height: 60px;
-  font-size: 20px;
+  width: 64px;
+  height: 64px;
+  font-size: 22px;
 }
 
 /* ---- buttons ---- */
@@ -252,7 +424,7 @@
   justify-content: center;
   gap: 6px;
   padding: 0 16px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-strong);
   border-radius: 10px;
   background: var(--card);
   color: var(--ink);
@@ -264,66 +436,83 @@
 }
 
 .crm .crmBtn:hover {
-  background: #fbfaf6;
+  background: var(--tone-wash);
+  border-color: var(--tone);
+  color: var(--tone-ink);
 }
 
 .crm .crmBtn.primary {
-  background: var(--green);
-  border-color: var(--green);
+  background: var(--tone-ink);
+  border-color: var(--tone-ink);
   color: #fff;
 }
 
 .crm .crmBtn.primary:hover {
-  background: var(--green-deep);
+  background: var(--ink);
+  border-color: var(--ink);
+  color: #fff;
 }
 
 .crm .crmBtn.quiet {
   min-height: 34px;
   padding: 0 11px;
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .crm .crmBtn.danger {
   background: var(--card);
-  color: #a23b26;
-  border-color: #ecd6cf;
+  color: var(--rose-ink);
+  border-color: color-mix(in srgb, var(--rose) 45%, #fff);
 }
 
 .crm .crmBtn.danger:hover {
-  background: #fdf1ed;
+  background: var(--rose-wash);
+  border-color: var(--rose);
+  color: var(--rose-ink);
 }
 
 .crm .crmBtn:disabled {
-  opacity: 0.55;
+  opacity: 0.5;
   cursor: default;
+}
+
+.crm .crmBtn:disabled:hover {
+  background: var(--card);
+  border-color: var(--line-strong);
+  color: var(--ink);
 }
 
 /* ---- pills ---- */
 
 .crm .crmPill {
   font-size: 12px;
-  font-weight: 600;
-  padding: 3px 10px;
+  font-weight: 700;
+  padding: 4px 11px;
   border-radius: 999px;
   background: var(--line-soft);
-  color: var(--muted);
+  color: #56534e;
   white-space: nowrap;
 }
 
 .crm .crmPill.live {
-  background: var(--green-wash);
-  color: var(--green);
+  background: var(--mint-wash);
+  color: var(--mint-ink);
 }
 
 .crm .crmPill.open {
-  background: var(--amber-wash);
-  color: var(--amber);
+  background: var(--apricot-wash);
+  color: var(--apricot-ink);
 }
 
 .crm .crmPill.alert {
-  background: var(--salmon-wash);
-  color: #a24e2c;
+  background: var(--rose-wash);
+  color: var(--rose-ink);
+}
+
+.crm .crmPill.tone {
+  background: var(--tone-wash);
+  color: var(--tone-ink);
 }
 
 /* ---- grids ---- */
@@ -361,12 +550,24 @@
   gap: 18px;
 }
 
-/* ---- meter ---- */
+/* ---- a cohort card, and the stat tiles ---- */
+
+.crm .crmTile {
+  border-top: 4px solid var(--tone-mid);
+}
+
+.crm .crmTile .figure {
+  font-family: var(--font-brand), var(--font-sans), sans-serif;
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--tone-ink);
+}
 
 .crm .crmMeter {
-  margin-top: 12px;
-  height: 6px;
-  border-radius: 3px;
+  margin-top: 13px;
+  height: 7px;
+  border-radius: 4px;
   background: var(--line-soft);
   overflow: hidden;
 }
@@ -374,7 +575,8 @@
 .crm .crmMeter > span {
   display: block;
   height: 100%;
-  background: var(--green-bright);
+  border-radius: 4px;
+  background: var(--tone-ink);
 }
 
 /* ---- facts ---- */
@@ -383,7 +585,7 @@
   margin: 0;
   display: grid;
   grid-template-columns: auto 1fr;
-  gap: 8px 14px;
+  gap: 9px 14px;
   font-size: 13.5px;
   line-height: 1.75;
 }
@@ -394,6 +596,8 @@
 
 .crm .crmFacts dd {
   margin: 0;
+  font-weight: 600;
+  color: var(--ink);
 }
 
 .crm .crmLtr {
@@ -402,39 +606,41 @@
   display: inline-block;
 }
 
-/* ---- highlights: the answers that decide a programme ---- */
+/* ---- the answers that decide a programme ---- */
 
 .crm .crmHighlight {
-  padding: 14px 16px;
-  border: 1px solid var(--salmon);
-  border-radius: 12px;
-  background: var(--salmon-wash);
+  padding: 16px 18px;
+  border: 1px solid var(--rose);
+  border-inline-start: 5px solid var(--rose-ink);
+  border-radius: 14px;
+  background: var(--rose-wash);
 }
 
 .crm .crmHighlight h3 {
-  margin: 0 0 8px;
-  font-size: 13px;
+  margin: 0 0 10px;
+  font-size: 13.5px;
   font-weight: 700;
-  color: #8e4525;
+  color: var(--rose-ink);
 }
 
 .crm .crmHighlight dl {
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 9px;
   font-size: 13.5px;
   line-height: 1.7;
 }
 
 .crm .crmHighlight dt {
-  color: #a0603f;
+  color: #9e4a6b;
   font-size: 12.5px;
 }
 
 .crm .crmHighlight dd {
   margin: 0;
-  font-weight: 600;
+  font-weight: 700;
+  color: var(--ink);
 }
 
 /* ---- timeline ---- */
@@ -457,24 +663,32 @@
 
 .crm .crmEvent .mark {
   flex: none;
-  width: 8px;
-  height: 8px;
+  width: 9px;
+  height: 9px;
   margin-top: 7px;
   border-radius: 50%;
-  background: var(--line);
+  background: var(--line-strong);
 }
 
+/* What happened is readable by colour down the left edge of the stream. */
 .crm .crmEvent[data-kind="reply"] .mark {
-  background: var(--salmon);
+  background: var(--rose-ink);
 }
 
 .crm .crmEvent[data-kind="message"] .mark {
-  background: var(--green-bright);
+  background: var(--mint-ink);
 }
 
-.crmEvent[data-kind="submission"] .mark,
+.crm .crmEvent[data-kind="submission"] .mark {
+  background: var(--mauve-ink);
+}
+
 .crm .crmEvent[data-kind="file"] .mark {
-  background: var(--amber);
+  background: var(--apricot-ink);
+}
+
+.crm .crmEvent[data-kind="joined"] .mark {
+  background: var(--salmon-ink);
 }
 
 .crm .crmEvent .what {
@@ -486,6 +700,7 @@
   display: block;
   font-size: 14px;
   font-weight: 600;
+  color: var(--ink);
 }
 
 .crm .crmEvent .what span {
@@ -507,6 +722,7 @@
 
 .crm .crmField > span {
   color: var(--muted);
+  font-weight: 600;
 }
 
 .crm input[type="text"],
@@ -517,7 +733,7 @@
   width: 100%;
   min-height: 42px;
   padding: 10px 12px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-strong);
   border-radius: 10px;
   background: var(--card);
   color: var(--ink);
@@ -536,7 +752,7 @@
 .crm textarea:focus-visible,
 .crm .crmBtn:focus-visible,
 .crm a:focus-visible {
-  outline: 2px solid var(--green-bright);
+  outline: 2px solid var(--tone-ink);
   outline-offset: 2px;
 }
 
@@ -567,22 +783,39 @@
 
 .crm .crmFileKind {
   flex: none;
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
-  background: var(--amber-wash);
-  color: var(--amber);
+  min-width: 46px;
+  height: 40px;
+  padding: 0 8px;
+  border-radius: 11px;
+  background: var(--apricot-wash);
+  color: var(--apricot-ink);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
+  font-size: 11.5px;
   font-weight: 700;
+}
+
+.crm .crmFileKind[data-kind="test"] {
+  background: var(--mint-wash);
+  color: var(--mint-ink);
+}
+
+.crm .crmFileKind[data-kind="photo"] {
+  background: var(--mauve-wash);
+  color: var(--mauve-ink);
+}
+
+.crm .crmFileKind[data-kind="doc"],
+.crm .crmFileKind[data-kind="other"] {
+  background: var(--line-soft);
+  color: var(--muted);
 }
 
 /* ---- empty + notes ---- */
 
 .crm .crmEmpty {
-  padding: 26px 20px;
+  padding: 28px 20px;
   text-align: center;
   font-size: 14px;
   color: var(--faint);
@@ -599,18 +832,19 @@
 .crm .crmError {
   margin: 0;
   padding: 11px 14px;
-  border: 1px solid #ecd6cf;
+  border: 1px solid var(--rose);
   border-radius: 10px;
-  background: #fdf1ed;
-  color: #a23b26;
+  background: var(--rose-wash);
+  color: var(--rose-ink);
   font-size: 13.5px;
+  font-weight: 600;
   line-height: 1.7;
 }
 
 .crm .crmAnswers {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 13px;
   font-size: 14px;
 }
 
@@ -623,12 +857,13 @@
 .crm .crmAnswers > div > dd {
   margin: 0;
   line-height: 1.75;
+  color: var(--ink);
   overflow-wrap: anywhere;
 }
 
 .crm .crmAnswers img {
   max-width: 220px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-strong);
   border-radius: 8px;
   background: #fff;
 }
@@ -639,13 +874,13 @@
   }
 
   .crm .crmHead h1 {
-    font-size: 23px;
+    font-size: 24px;
   }
 
-  .crmRow,
-  .crmEvent,
-  .crmFile,
-  .crmCard > header,
+  .crm .crmRow,
+  .crm .crmEvent,
+  .crm .crmFile,
+  .crm .crmCard > header,
   .crm .crmPad {
     padding-inline: 14px;
   }

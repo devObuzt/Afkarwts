@@ -18,8 +18,9 @@ export function PersonNotes({ memberId, notes }: { memberId: number; notes: stri
   }
 
   return (
-    <section className="crmCard">
+    <section className="crmCard" data-tone="mint">
       <header>
+        <span className="crmDot" />
         <h2>ملاحظات</h2>
         {state === "saved" && <span className="crmPill live spacer">انحفظت</span>}
         {state === "failed" && <span className="crmPill alert spacer">ما انحفظت</span>}

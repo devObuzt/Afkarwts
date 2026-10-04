@@ -22,8 +22,9 @@ export default function LibraryPage() {
         <p>اللي بتبنيه مرة وبتستعمليه كل دورة: المسارات، الاستمارات والمجموعات.</p>
       </header>
 
-      <section className="crmCard">
+      <section className="crmCard" data-tone="apricot">
         <header>
+          <span className="crmDot" />
           <h2>المسارات</h2>
           <a className="crmBtn quiet spacer" href="/journeys">
             عدّلي
@@ -43,8 +44,9 @@ export default function LibraryPage() {
         )}
       </section>
 
-      <section className="crmCard">
+      <section className="crmCard" data-tone="mauve">
         <header>
+          <span className="crmDot" />
           <h2>الاستمارات</h2>
           <a className="crmBtn quiet spacer" href="/leads">
             عدّلي
@@ -65,8 +67,9 @@ export default function LibraryPage() {
         ))}
       </section>
 
-      <section className="crmCard">
+      <section className="crmCard" data-tone="mint">
         <header>
+          <span className="crmDot" />
           <h2>المجموعات</h2>
         </header>
         {groups.map((group) => (
@@ -83,8 +86,9 @@ export default function LibraryPage() {
         ))}
       </section>
 
-      <section className="crmCard">
+      <section className="crmCard" data-tone="salmon">
         <header>
+          <span className="crmDot" />
           <h2>قوالب واتساب</h2>
           <a className="crmBtn quiet spacer" href="/templates">
             افتحي
