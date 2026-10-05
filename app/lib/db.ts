@@ -4,6 +4,7 @@ import { getDataDir } from "./media-store";
 import { migrateJourneyTables } from "./journeys/schema";
 import { migrateFormTables } from "./forms/schema";
 import { migrateUserTables } from "./users/schema";
+import { migrateLabelColumns } from "./labels/schema";
 
 export type Member = {
   id: number;
@@ -122,6 +123,7 @@ export function getDb() {
     migrateFormTables(db);
     migratePersonFileTables(db);
     migrateUserTables(db);
+    migrateLabelColumns(db);
     globalForDb.__afkarDb = db;
   }
 

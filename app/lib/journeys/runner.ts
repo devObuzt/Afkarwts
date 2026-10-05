@@ -1,3 +1,4 @@
+import { syncManagedStates } from "../labels/store";
 import { createMessage, getMember, updateMessageStatus } from "../db";
 import { sendTelegramMessage } from "../telegram";
 import { fillNameInText, fillNameToken, renderTemplateBody, sendWhatsAppTemplate, sendWhatsAppText } from "../whatsapp";
@@ -237,6 +238,11 @@ export async function runDueJourneys(now = new Date()) {
     totals.smsSent = sms.sent;
     totals.smsFailed = sms.failed;
     totals.smsHeld = sms.held;
+
+    // The two states the screens read — «متابعة مسار» and «بانتظار أفكار» —
+    // are recomputed on every tick, so they cannot drift from what the data
+    // says. Hand-placed labels are left alone.
+    syncManagedStates(now);
 
     return totals;
   } finally {

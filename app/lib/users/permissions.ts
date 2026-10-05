@@ -12,6 +12,7 @@
 
 export const PERMISSIONS = [
   "people.view",
+  "people.all",
   "people.health",
   "people.edit",
   "people.delete",
@@ -42,6 +43,13 @@ export const PERMISSION_INFO: PermissionInfo[] = [
     key: "people.view",
     label: "عرض المنتسبين",
     detail: "الأسماء وأرقام الهاتف والمحادثات والمسارات. بدونها تبدو المنظومة فارغة.",
+    group: "المنتسبون"
+  },
+  {
+    key: "people.all",
+    label: "عرض كل المنتسبين",
+    detail:
+      "بدونها يرى المستخدم المنتسبين المسندين إليه فقط — وهي الطريقة التي تتابع بها مرافِقة مجموعتها دون غيرها.",
     group: "المنتسبون"
   },
   {
@@ -147,10 +155,11 @@ export const ROLE_DETAIL: Record<Role, string> = {
  */
 export const ROLE_PRESET: Record<Role, Permission[]> = {
   owner: [...PERMISSIONS],
-  assistant: ["people.view", "people.edit", "files.view", "messages.send", "leads.review", "journeys.view"],
+  assistant: ["people.view", "people.all", "people.edit", "files.view", "messages.send", "leads.review", "journeys.view"],
   coach: ["people.view", "people.health", "people.edit", "files.view", "files.manage", "messages.send", "journeys.view"],
   developer: [
     "people.view",
+    "people.all",
     "people.health",
     "people.edit",
     "files.view",

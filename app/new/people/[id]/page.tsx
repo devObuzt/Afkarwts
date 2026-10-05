@@ -4,7 +4,10 @@ import { getPersonRecord } from "@/app/lib/people";
 import { can } from "@/app/lib/users/permissions";
 import { requireUser } from "@/app/lib/users/current";
 import { ago, clock, day, hueOf, initials } from "../../format";
+import { listLabels } from "@/app/lib/labels/store";
+import { listUsers } from "@/app/lib/users/store";
 import { PersonFiles } from "./PersonFiles";
+import { PersonLabels } from "./PersonLabels";
 import { PersonNotes } from "./PersonNotes";
 import { PersonReply } from "./PersonReply";
 
@@ -26,6 +29,11 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
   }
 
   const { member } = record;
+
+  // Only the people who could actually be following someone up.
+  const coaches = listUsers()
+    .filter((candidate) => candidate.active && candidate.permissions.includes("people.view"))
+    .map((candidate) => ({ id: candidate.id, name: candidate.name }));
   const registration = record.submissions[0];
   const openTasks = record.tasks.filter((task) => task.state === "open" || task.state === "failed");
 
@@ -50,13 +58,8 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
             {member.city ? ` · ${member.city}` : ""}
             {member.joined ? ` · من ${member.joined}` : ""}
           </div>
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 9 }}>
-            {record.groups.map((group) => (
-              <span className="crmPill" key={group.id}>
-                {group.name}
-              </span>
-            ))}
-            {record.groups.length === 0 && <span className="crmPill">بلا مجموعة</span>}
+          <div className="crmRowDetail" style={{ marginTop: 7 }}>
+            {record.coach ? `المرافِقة: ${record.coach.name}` : "بلا مرافِقة"}
           </div>
         </div>
         <a
@@ -168,6 +171,15 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
         </div>
 
         <div className="side">
+          <PersonLabels
+            all={listLabels()}
+            canEdit={can(user, "people.edit")}
+            coach={record.coach}
+            coaches={coaches}
+            labels={record.labels}
+            memberId={member.id}
+          />
+
           <PersonReply
             memberId={member.id}
             windowClosesAt={record.windowClosesAt}

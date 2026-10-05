@@ -1,5 +1,6 @@
 import { getDb, getMember, listMessages, type Member, type Message } from "./db";
 import { listPersonFiles, type PersonFile } from "./person-files";
+import { coachOf, labelsFor } from "./labels/store";
 
 /**
  * One person, gathered.
@@ -52,6 +53,8 @@ export type TimelineEntry = {
 export type PersonRecord = {
   member: Member;
   groups: PersonGroup[];
+  labels: Array<{ id: number; name: string; kind: string; pinned: boolean }>;
+  coach: { id: number; name: string } | null;
   journeys: PersonJourney[];
   submissions: PersonSubmission[];
   tasks: PersonTask[];
@@ -266,6 +269,8 @@ export function getPersonRecord(
   return {
     member,
     groups,
+    labels: labelsFor(memberId),
+    coach: coachOf(memberId),
     journeys,
     submissions: seesHealth ? submissions : submissions.map(withoutHealth),
     tasks,
@@ -287,6 +292,8 @@ export type PersonSummary = {
   cohort: string;
   files: number;
   unread: number;
+  labels: Array<{ id: number; name: string; kind: string }>;
+  coach: string;
   lastAt: string | null;
   lastDirection: "incoming" | "outgoing" | null;
   lastBody: string;
@@ -305,7 +312,16 @@ export type PeoplePage = {
  * and the row is stored as +972521234567.
  */
 export function listPeople(
-  filter: { query?: string; groupId?: number | null; limit?: number; offset?: number } = {}
+  filter: {
+    query?: string;
+    groupId?: number | null;
+    labelIds?: number[];
+    coachId?: number | null;
+    /** Set when the reader may see only the members assigned to them. */
+    onlyAssignedTo?: number | null;
+    limit?: number;
+    offset?: number;
+  } = {}
 ): PeoplePage {
   const db = getDb();
   const limit = Math.min(Math.max(filter.limit ?? 50, 1), 200);
@@ -333,6 +349,23 @@ export function listPeople(
     args.push(filter.groupId);
   }
 
+  // Several labels narrow together, the way Afkar reads her own lists:
+  // «Extra+ من دفعة 1.10 وحامل» is three labels, not a choice between them.
+  for (const labelId of filter.labelIds ?? []) {
+    where.push("EXISTS (SELECT 1 FROM member_groups mg WHERE mg.member_id = members.id AND mg.group_id = ?)");
+    args.push(labelId);
+  }
+
+  if (filter.coachId) {
+    where.push("members.assigned_user_id = ?");
+    args.push(filter.coachId);
+  }
+
+  if (filter.onlyAssignedTo) {
+    where.push("members.assigned_user_id = ?");
+    args.push(filter.onlyAssignedTo);
+  }
+
   const clause = where.length ? `WHERE ${where.join(" AND ")}` : "";
 
   const total = Number(
@@ -349,6 +382,7 @@ export function listPeople(
               (SELECT COUNT(*) FROM form_submissions fs
                 WHERE fs.member_id = members.id OR (fs.phone <> '' AND fs.phone = members.phone)) AS submissions,
               last.created_at AS last_at, last.direction AS last_direction, last.body AS last_body,
+              (SELECT users.name FROM users WHERE users.id = members.assigned_user_id) AS coach,
               (SELECT g.name FROM journey_enrollments e
                  JOIN journeys j ON j.id = e.journey_id
                  LEFT JOIN groups g ON g.id = j.group_id
@@ -364,10 +398,18 @@ export function listPeople(
     .all(...args, limit, offset) as Array<Record<string, string | number | null>>;
 
   const groupsFor = db.prepare(
-    `SELECT groups.name FROM member_groups
+    `SELECT groups.id, groups.name, groups.kind FROM member_groups
       JOIN groups ON groups.id = member_groups.group_id
-     WHERE member_groups.member_id = ? ORDER BY groups.name`
+     WHERE member_groups.member_id = ? ORDER BY groups.kind, groups.name`
   );
+
+  const labelCache = db.prepare(
+    `SELECT groups.id, groups.name, groups.kind FROM member_groups
+      JOIN groups ON groups.id = member_groups.group_id
+     WHERE member_groups.member_id = ? ORDER BY groups.kind, groups.name`
+  );
+  const labelsOf = (memberId: number) =>
+    labelCache.all(memberId) as Array<{ id: number; name: string; kind: string }>;
 
   const people: PersonSummary[] = rows.map((row) => ({
     id: Number(row.id),
@@ -375,6 +417,8 @@ export function listPeople(
     phone: String(row.phone),
     city: String(row.city ?? ""),
     groups: (groupsFor.all(Number(row.id)) as Array<{ name: string }>).map((group) => group.name),
+    labels: labelsOf(Number(row.id)),
+    coach: row.coach ? String(row.coach) : "",
     cohort: row.cohort ? String(row.cohort) : "",
     files: Number(row.files ?? 0),
     unread: Number(row.unread ?? 0),
