@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { count } from "../format";
 import {
   PERMISSION_INFO,
   ROLES,
@@ -24,6 +25,16 @@ type User = {
 };
 
 const GROUPS = [...new Set(PERMISSION_INFO.map((info) => info.group))];
+
+function permissionCount(total: number) {
+  return count(total, {
+    none: "بلا صلاحيات",
+    one: "صلاحية واحدة",
+    two: "صلاحيتان",
+    few: "صلاحيات",
+    many: "صلاحية"
+  });
+}
 
 function Checkboxes({
   granted,
@@ -102,7 +113,7 @@ export function UsersClient({ users, meId }: { users: User[]; meId: number }) {
     setBusy(false);
 
     if (!response.ok) {
-      setError(payload.error ?? "ما زبطت.");
+      setError(payload.error ?? "لم تنجح العملية.");
       return false;
     }
 
@@ -122,7 +133,7 @@ export function UsersClient({ users, meId }: { users: User[]; meId: number }) {
       <section className="crmCard" data-tone="mauve">
         <header>
           <span className="crmDot" />
-          <h2>المستخدمين</h2>
+          <h2>المستخدمون</h2>
           <button
             className="crmBtn quiet spacer"
             onClick={() => {
@@ -144,7 +155,7 @@ export function UsersClient({ users, meId }: { users: User[]; meId: number }) {
                 <input onChange={(event) => setDraft({ ...draft, name: event.target.value })} type="text" value={draft.name} />
               </label>
               <label className="crmField" style={{ flex: "1 1 180px" }}>
-                <span>اسم المستخدم (إنجليزي)</span>
+                <span>اسم المستخدم (أحرف لاتينية)</span>
                 <input
                   onChange={(event) => setDraft({ ...draft, username: event.target.value })}
                   placeholder="maryam"
@@ -154,7 +165,7 @@ export function UsersClient({ users, meId }: { users: User[]; meId: number }) {
                 />
               </label>
               <label className="crmField" style={{ flex: "1 1 180px" }}>
-                <span>كلمة سر مؤقتة</span>
+                <span>كلمة مرور مؤقتة</span>
                 <input
                   onChange={(event) => setDraft({ ...draft, password: event.target.value })}
                   style={{ direction: "ltr", textAlign: "right" }}
@@ -166,7 +177,7 @@ export function UsersClient({ users, meId }: { users: User[]; meId: number }) {
 
             <div style={{ marginTop: 14 }}>
               <div className="crmField">
-                <span>الدور — بيعبّي الصلاحيات، وبعدها بتعدّليها وحدة وحدة</span>
+                <span>الدور — يملأ الصلاحيات، ثم تُعدَّل واحدة واحدة</span>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   {ROLES.map((role) => (
                     <button
@@ -200,7 +211,7 @@ export function UsersClient({ users, meId }: { users: User[]; meId: number }) {
               />
               {draft.role === "owner" && (
                 <p className="crmNote" style={{ marginTop: 10 }}>
-                  المالكة عندها كل الصلاحيات دايماً — ما بتنسحب منها ولا وحدة.
+                  حساب المالك يملك كل الصلاحيات دائماً، ولا تُسحب منه أي واحدة.
                 </p>
               )}
             </div>
@@ -223,7 +234,7 @@ export function UsersClient({ users, meId }: { users: User[]; meId: number }) {
               style={{ marginTop: 14 }}
               type="button"
             >
-              {busy ? "عمّال يضيف…" : "أضيفي المستخدم"}
+              {busy ? "جارٍ الإضافة…" : "إضافة المستخدم"}
             </button>
           </div>
         )}
@@ -236,7 +247,7 @@ export function UsersClient({ users, meId }: { users: User[]; meId: number }) {
                   {user.name}
                   {user.id === meId && (
                     <span className="crmPill tone" style={{ marginInlineStart: 8 }}>
-                      إنتي
+                      أنت
                     </span>
                   )}
                   {!user.active && (
@@ -246,18 +257,18 @@ export function UsersClient({ users, meId }: { users: User[]; meId: number }) {
                   )}
                   {user.mustChangePassword && user.active && (
                     <span className="crmPill open" style={{ marginInlineStart: 8 }}>
-                      لازم يغيّر كلمة السر
+                      مطلوب تغيير كلمة المرور
                     </span>
                   )}
                 </span>
                 <span className="crmRowDetail" style={{ display: "block" }}>
                   <span className="crmLtr">{user.username}</span> · {ROLE_LABEL[user.role]} ·{" "}
-                  {user.permissions.length} صلاحية
-                  {user.lastSeenAt ? ` · آخر دخول ${user.lastSeenAt.slice(0, 10)}` : " · ما فات بعد"}
+                  {permissionCount(user.permissions.length)}
+                  {user.lastSeenAt ? ` · آخر دخول ${user.lastSeenAt.slice(0, 10)}` : " · لم يدخل بعد"}
                 </span>
               </span>
               <button className="crmBtn quiet" onClick={() => (editing === user.id ? setEditing(null) : openEdit(user))} type="button">
-                {editing === user.id ? "سكّري" : "صلاحياته"}
+                {editing === user.id ? "إغلاق" : "الصلاحيات"}
               </button>
             </div>
 
@@ -269,7 +280,7 @@ export function UsersClient({ users, meId }: { users: User[]; meId: number }) {
                     <input onChange={(event) => setEdit({ ...edit, name: event.target.value })} type="text" value={edit.name} />
                   </label>
                   <label className="crmField" style={{ flex: "1 1 200px" }}>
-                    <span>كلمة سر جديدة (اتركيها فاضية إذا ما بدك تغيّريها)</span>
+                    <span>كلمة مرور جديدة (تُترك فارغة إن لم يُقصد تغييرها)</span>
                     <input
                       onChange={(event) => setEdit({ ...edit, password: event.target.value })}
                       style={{ direction: "ltr", textAlign: "right" }}
@@ -335,7 +346,7 @@ export function UsersClient({ users, meId }: { users: User[]; meId: number }) {
                     }}
                     type="button"
                   >
-                    {busy ? "عمّال يحفظ…" : "احفظي"}
+                    {busy ? "جارٍ الحفظ…" : "حفظ"}
                   </button>
 
                   {user.id !== meId && (
@@ -345,7 +356,7 @@ export function UsersClient({ users, meId }: { users: User[]; meId: number }) {
                       onClick={() => send(`/api/users/${user.id}`, "PATCH", { active: !user.active })}
                       type="button"
                     >
-                      {user.active ? "عطّلي الحساب" : "رجّعي شغّليه"}
+                      {user.active ? "تعطيل الحساب" : "إعادة تفعيله"}
                     </button>
                   )}
                 </div>

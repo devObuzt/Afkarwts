@@ -99,15 +99,15 @@ export function createUser(input: {
   const username = normalizeUsername(input.username);
 
   if (!username || !/^[a-z0-9._-]{3,32}$/.test(username)) {
-    return { ok: false as const, error: "اسم المستخدم بالإنجليزي، 3 حروف وفوق، بلا مسافات." };
+    return { ok: false as const, error: "اسم المستخدم بالأحرف اللاتينية، 3 أحرف فأكثر، بلا مسافات." };
   }
 
   if (input.password.length < 8) {
-    return { ok: false as const, error: "كلمة السر لازم تكون 8 خانات وفوق." };
+    return { ok: false as const, error: "كلمة المرور 8 خانات فأكثر." };
   }
 
   if (findByUsername(username)) {
-    return { ok: false as const, error: "في مستخدم بنفس الاسم." };
+    return { ok: false as const, error: "يوجد مستخدم بالاسم نفسه." };
   }
 
   const permissions = (input.permissions ?? ROLE_PRESET[input.role]).filter(isPermission);
@@ -154,14 +154,14 @@ export function updateUser(
 ) {
   const user = getUser(id);
   if (!user) {
-    return { ok: false as const, error: "المستخدم مش موجود." };
+    return { ok: false as const, error: "المستخدم غير موجود." };
   }
 
   // The last owner standing cannot be switched off or demoted — otherwise
   // nobody is left who can put it back.
   const losingOwner = (patch.role && patch.role !== "owner") || patch.active === false;
   if (user.role === "owner" && losingOwner && countActiveOwners() <= 1) {
-    return { ok: false as const, error: "هاي آخر مالكة شغّالة — لازم تضلّ وحدة على الأقل." };
+    return { ok: false as const, error: "هاي آخر مالكة يعمل — لازم تضلّ وحدة على الأقل." };
   }
 
   const db = getDb();
@@ -184,7 +184,7 @@ export function countActiveOwners() {
 
 export function setPassword(id: number, password: string, mustChange = false) {
   if (password.length < 8) {
-    return { ok: false as const, error: "كلمة السر لازم تكون 8 خانات وفوق." };
+    return { ok: false as const, error: "كلمة المرور 8 خانات فأكثر." };
   }
 
   const result = getDb()
@@ -192,7 +192,7 @@ export function setPassword(id: number, password: string, mustChange = false) {
     .run(hashPassword(password), mustChange ? 1 : 0, id);
 
   if (Number(result.changes) === 0) {
-    return { ok: false as const, error: "المستخدم مش موجود." };
+    return { ok: false as const, error: "المستخدم غير موجود." };
   }
 
   return { ok: true as const };

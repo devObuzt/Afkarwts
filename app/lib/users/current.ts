@@ -55,13 +55,13 @@ export async function requireApi(permission?: Permission) {
   const user = await currentUser();
 
   if (!user) {
-    return { ok: false as const, response: NextResponse.json({ error: "بدك تسجّل دخول." }, { status: 401 }) };
+    return { ok: false as const, response: NextResponse.json({ error: "تسجيل الدخول مطلوب." }, { status: 401 }) };
   }
 
   if (permission && !can(user, permission)) {
     return {
       ok: false as const,
-      response: NextResponse.json({ error: "ما عندك صلاحية لهاي العملية." }, { status: 403 })
+      response: NextResponse.json({ error: "لا تملك صلاحية لهذه العملية." }, { status: 403 })
     };
   }
 

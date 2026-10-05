@@ -45,9 +45,9 @@ const SEND_UNTIL_HOUR = 20;
 const MAX_ATTEMPTS = 3;
 
 const REASON_TEXT: Record<string, string> = {
-  not_delivered: "الرسالة ما وصلت لجهازه خلال يومين",
-  not_read: "وصلت وما انقرأت خلال يومين",
-  send_failed: "الرقم ما بيستقبل واتساب — أو كود الدولة غلط"
+  not_delivered: "لم تصل الرسالة إلى جهازه خلال يومين",
+  not_read: "وصلت ولم تُقرأ خلال يومين",
+  send_failed: "الرقم لا يستقبل واتساب، أو مفتاح الدولة غير صحيح"
 };
 
 function mapFollowup(row: DbFollowup): Followup {
@@ -92,7 +92,7 @@ export function openFollowupsForStop(input: {
   }
 
   if (!reachableBySms) {
-    reason += " · رقم مش إسرائيلي — ما بيدخل طابور SMS";
+    reason += " · رقم غير إسرائيلي، لا يدخل طابور الـSMS";
   }
 
   const db = getDb();

@@ -25,7 +25,7 @@ export default function LoginPage() {
     setIsSubmitting(false);
 
     if (!response.ok) {
-      setError(payload.error ?? "ما قدرنا نسجّل دخولك.");
+      setError(payload.error ?? "تعذّر تسجيل الدخول.");
       return;
     }
 
@@ -41,7 +41,7 @@ export default function LoginPage() {
       <form className="loginPanel" onSubmit={login}>
         <div>
           <h1>أفكار</h1>
-          <p>سجّلي دخولك</p>
+          <p>تسجيل الدخول</p>
         </div>
         <label>
           اسم المستخدم
@@ -53,7 +53,7 @@ export default function LoginPage() {
           />
         </label>
         <label>
-          كلمة السر
+          كلمة المرور
           <input
             autoComplete="current-password"
             type="password"
@@ -63,7 +63,7 @@ export default function LoginPage() {
         </label>
         {error ? <div className="notice loginNotice">{error}</div> : null}
         <button disabled={isSubmitting || !username || !password} type="submit">
-          {isSubmitting ? "لحظة…" : "فوتي"}
+          {isSubmitting ? "لحظة…" : "دخول"}
         </button>
         <div className="loginFooter">
           <a href="/privacy">سياسة الخصوصية</a>

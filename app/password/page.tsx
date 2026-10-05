@@ -21,7 +21,7 @@ export default async function PasswordPage() {
             <p>
               {user.mustChangePassword
                 ? "هاي كلمة سر مؤقتة — معروفة لأكتر من واحد. حطّي وحدة من عندك قبل ما تكمّلي."
-                : "غيّري كلمة سرّك."}
+                : "تغيير كلمة المرور الخاصة بك."}
             </p>
           </header>
           <PasswordForm mustChange={user.mustChangePassword} />

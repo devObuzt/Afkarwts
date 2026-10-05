@@ -16,11 +16,11 @@ export type DecisionItem = {
   detail: string;
   href: string;
   action: string;
-  /** `now` is something that stops a cohort; `soon` is something to catch up on. */
+  /** `now` is something that stops a path; `soon` is something to catch up on. */
   weight: "now" | "soon";
 };
 
-export type RunningCohort = {
+export type RunningPath = {
   journeyId: number;
   pathName: string;
   groupName: string;
@@ -43,7 +43,7 @@ export type WaitingReply = {
 
 export type Today = {
   decisions: DecisionItem[];
-  cohorts: RunningCohort[];
+  paths: RunningPath[];
   replies: WaitingReply[];
 };
 
@@ -59,7 +59,7 @@ export function getToday(now = new Date()): Today {
   const db = getDb();
   const decisions: DecisionItem[] = [];
 
-  // Registrations waiting to be let into a cohort.
+  // Registrations waiting to be let into a item.
   const pending = db
     .prepare(
       `SELECT f.id AS form_id, f.name AS form_name, COUNT(*) AS waiting
@@ -75,9 +75,9 @@ export function getToday(now = new Date()): Today {
     decisions.push({
       key: `form-${row.form_id}`,
       title: `${plural(Number(row.waiting), "تسجيل جديد", "تسجيلات جديدة")} على «${row.form_name}»`,
-      detail: "بدها مراجعة قبل ما تدخل للمجموعة",
-      href: `/new/cohorts?form=${row.form_id}`,
-      action: "راجعيهن",
+      detail: "بانتظار المراجعة قبل الإضافة إلى المجموعة",
+      href: `/new/paths?form=${row.form_id}`,
+      action: "مراجعة",
       weight: "now"
     });
   }
@@ -98,14 +98,14 @@ export function getToday(now = new Date()): Today {
     decisions.push({
       key: `task-${task.id}`,
       title: String(task.name),
-      detail: String(task.reason) || (task.kind === "sms" ? "الـSMS البديل فشل" : "بدها تواصل يدوي"),
+      detail: String(task.reason) || (task.kind === "sms" ? "الـSMS البديل فشل" : "تحتاج تواصلاً يدوياً"),
       href: `/new/people/${Number(task.member_id)}`,
-      action: "افتحي الملف",
+      action: "فتح الملف",
       weight: "now"
     });
   }
 
-  // People a live cohort stopped writing to, because nothing was being read.
+  // People a live path stopped writing to, because nothing was being read.
   const stopped = db
     .prepare(
       `SELECT j.id AS journey_id, g.name AS group_name, COUNT(*) AS stopped
@@ -120,15 +120,15 @@ export function getToday(now = new Date()): Today {
   for (const row of stopped) {
     decisions.push({
       key: `stopped-${row.journey_id}`,
-      title: `${plural(Number(row.stopped), "وحدة وقفت", "وقفوا")} عن «${row.group_name}»`,
-      detail: "ولا رسالة انقرأت — بتقدري ترجّعيهن أو تتركيهن",
-      href: `/new/cohorts/${row.journey_id}`,
-      action: "شوفيهن",
+      title: `${plural(Number(row.stopped), "وحدة متوقف", "وقفوا")} عن «${row.group_name}»`,
+      detail: "لم تُقرأ أي رسالة — يمكن إعادتهم إلى المسار أو تركهم",
+      href: `/new/paths/${row.journey_id}`,
+      action: "عرض",
       weight: "soon"
     });
   }
 
-  const cohortRows = db
+  const pathRows = db
     .prepare(
       `SELECT j.id, j.anchor_date, j.status, t.id AS template_id, t.name AS path_name, g.name AS group_name,
               (SELECT COUNT(*) FROM journey_enrollments e WHERE e.journey_id = j.id AND e.state = 'active') AS members,
@@ -147,7 +147,7 @@ export function getToday(now = new Date()): Today {
     "SELECT week, weekday, send_time, label FROM journey_steps WHERE template_id = ? AND archived_at IS NULL ORDER BY week, weekday, send_time"
   );
 
-  const cohorts: RunningCohort[] = cohortRows.map((row) => {
+  const paths: RunningPath[] = pathRows.map((row) => {
     const anchorDate = String(row.anchor_date);
     const stepRows = steps.all(Number(row.template_id)) as Array<Record<string, string | number>>;
 
@@ -175,7 +175,7 @@ export function getToday(now = new Date()): Today {
       stepsSent: Number(row.sent),
       // A step's label is ours, for the schedule screen, and some were left
       // blank — «الجاي: 18:45 — «»» says nothing at all.
-      nextLabel: upcoming[0] ? upcoming[0].label || "الخطوة الجاية" : "خلصت الخطوات",
+      nextLabel: upcoming[0] ? upcoming[0].label || "الخطوة التالية" : "انتهت الخطوات",
       nextAt: upcoming[0]?.at.toISOString() ?? null
     };
   });
@@ -200,5 +200,5 @@ export function getToday(now = new Date()): Today {
     at: toIso(String(row.created_at))
   }));
 
-  return { decisions, cohorts, replies };
+  return { decisions, paths, replies };
 }

@@ -39,7 +39,7 @@ test("a stop opens a manual task, and an SMS item only for an Israeli mobile", a
   assert.equal(manual.length, 2);
   assert.equal(sms.length, 1);
   assert.equal(sms[0].memberId, israeli.id);
-  assert.ok(manual.find((item) => item.memberId === palestinian.id)?.reason.includes("مش إسرائيلي"));
+  assert.ok(manual.find((item) => item.memberId === palestinian.id)?.reason.includes("غير إسرائيلي"));
 });
 
 test("an undeliverable number is told which country code to try", async () => {

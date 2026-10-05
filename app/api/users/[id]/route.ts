@@ -16,7 +16,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const before = getUser(id);
 
   if (!before) {
-    return NextResponse.json({ error: "المستخدم مش موجود." }, { status: 404 });
+    return NextResponse.json({ error: "المستخدم غير موجود." }, { status: 404 });
   }
 
   const body = (await request.json().catch(() => ({}))) as {

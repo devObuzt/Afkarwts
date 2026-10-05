@@ -35,7 +35,7 @@ export function PersonReply({
     setBusy(false);
 
     if (!response.ok) {
-      setError(payload.error ?? "الإرسال فشل.");
+      setError(payload.error ?? "فشل الإرسال.");
       return;
     }
 
@@ -58,9 +58,9 @@ export function PersonReply({
     <section className="crmCard" data-tone={windowOpen ? "mint" : "apricot"}>
       <header>
         <span className="crmDot" />
-        <h2>ردّي عليها</h2>
+        <h2>الرد</h2>
         <span className="crmPill tone spacer">
-          {windowOpen ? `النافذة مفتوحة لـ${closes}` : "النافذة مسكّرة"}
+          {windowOpen ? `النافذة مفتوحة لـ${closes}` : "النافذة مغلقة"}
         </span>
       </header>
       <div className="crmPad">
@@ -68,7 +68,7 @@ export function PersonReply({
           <>
             <textarea
               onChange={(event) => setText(event.target.value)}
-              placeholder="اكتبي ردّك…"
+              placeholder="اكتب الرد…"
               value={text}
             />
             {error && (
@@ -83,17 +83,17 @@ export function PersonReply({
               style={{ marginTop: 12 }}
               type="button"
             >
-              {busy ? "عمّال يبعت…" : "ابعتي"}
+              {busy ? "جارٍ الإرسال…" : "إرسال"}
             </button>
           </>
         ) : (
           <>
             <p className="crmNote" style={{ fontSize: 13.5 }}>
-              صار أكثر من 24 ساعة من آخر رسالة منها، فالنص الحر ما بيوصل — واتساب بيقبله وبيرميه بلا خطأ. لازم قالب
-              معتمد.
+              مضى أكثر من 24 ساعة على آخر رسالة منه، والنص الحر لا يصل: واتساب يقبله ثم يُسقطه بلا خطأ.
+              الإرسال الآن يحتاج قالباً معتمداً.
             </p>
             <a className="crmBtn" href="/templates" style={{ marginTop: 12 }}>
-              افتحي القوالب
+              فتح القوالب
             </a>
           </>
         )}

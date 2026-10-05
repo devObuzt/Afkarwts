@@ -10,7 +10,7 @@ export async function POST(request: Request) {
   const user = await currentUser();
 
   if (!user) {
-    return NextResponse.json({ error: "بدك تسجّل دخول." }, { status: 401 });
+    return NextResponse.json({ error: "تسجيل الدخول مطلوب." }, { status: 401 });
   }
 
   const body = (await request.json().catch(() => ({}))) as { current?: string; next?: string };

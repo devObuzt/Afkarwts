@@ -11,10 +11,10 @@ import { PersonReply } from "./PersonReply";
 export const dynamic = "force-dynamic";
 
 const STATE_LABEL: Record<string, string> = {
-  active: "شغّالة",
-  stopped: "وقفت",
-  completed: "خلّصت",
-  removed: "انشالت"
+  active: "يعمل",
+  stopped: "متوقف",
+  completed: "أنهى",
+  removed: "أُزيل"
 };
 
 export default async function PersonPage({ params }: { params: Promise<{ id: string }> }) {
@@ -32,7 +32,7 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
   return (
     <div className="crmPage wide">
       <Link className="crmBack" href="/new/people">
-        ← الناس
+        ← المنتسبون
       </Link>
 
       <header
@@ -73,14 +73,14 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
         <section className="crmCard" data-tone="rose">
           <header>
             <span className="crmDot" />
-            <h2>بدها منك</h2>
+            <h2>مهام مفتوحة</h2>
           </header>
           {openTasks.map((task) => (
             <div className="crmRow" key={task.id}>
               <div className="grow">
                 <div className="crmRowTitle">{task.reason || "متابعة"}</div>
                 <div className="crmRowDetail">
-                  {task.kind === "sms" ? "الـSMS البديل" : "تواصل يدوي"} · {ago(task.createdAt)}
+                  {task.kind === "sms" ? "رسالة SMS بديلة" : "تواصل يدوي"} · {ago(task.createdAt)}
                   {task.body && task.body !== task.reason ? ` · ${task.body.slice(0, 120)}` : ""}
                 </div>
               </div>
@@ -93,13 +93,13 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
         <div className="main">
           {!record.seesHealth && (
             <p className="crmNote" style={{ padding: "12px 16px", border: "1px dashed var(--line-strong)", borderRadius: 12 }}>
-              الإجابات الصحية مخفية عنك — صلاحية «شوف الإجابات الصحية» مش معطاة لحسابك.
+              الإجابات الصحية مخفية عنك — صلاحية «عرض الإجابات الصحية» مش معطاة لحسابك.
             </p>
           )}
 
           {record.highlights.length > 0 && (
             <div className="crmHighlight">
-              <h3>لازم تعرفيه قبل ما تبني إلها متكون</h3>
+              <h3>ما يجب معرفته قبل بناء البرنامج الغذائي</h3>
               <dl>
                 {record.highlights.map((highlight) => (
                   <div key={highlight.label}>
@@ -116,7 +116,7 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
           <section className="crmCard" data-tone="salmon">
             <header>
               <span className="crmDot" />
-              <h2>كل اللي صار</h2>
+              <h2>كل ما جرى</h2>
               <span className="crmPill tone spacer">{record.timeline.length}</span>
             </header>
             {record.timeline.length === 0 ? (
@@ -143,7 +143,7 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
             <section className="crmCard" data-tone="mauve">
               <header>
                 <span className="crmDot" />
-                <h2>استمارتها</h2>
+                <h2>استمارة التسجيل</h2>
                 <span className="crmPill tone spacer">{registration.formName}</span>
               </header>
               <div className="crmPad crmAnswers">
@@ -177,19 +177,19 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
           <section className="crmCard" data-tone="apricot">
             <header>
               <span className="crmDot" />
-              <h2>دوراتها</h2>
+              <h2>مساراته</h2>
             </header>
             {record.journeys.length === 0 ? (
-              <p className="crmEmpty">ولا دورة.</p>
+              <p className="crmEmpty">لا توجد مسارات.</p>
             ) : (
               record.journeys.map((journey) => (
-                <Link className="crmRow" href={`/new/cohorts/${journey.journeyId}`} key={journey.journeyId}>
+                <Link className="crmRow" href={`/new/paths/${journey.journeyId}`} key={journey.journeyId}>
                   <span className="grow">
                     <span className="crmRowTitle" style={{ display: "block" }}>
                       {journey.groupName || journey.pathName}
                     </span>
                     <span className="crmRowDetail" style={{ display: "block" }}>
-                      {journey.anchorDate} · {journey.sent} انبعتت · {journey.read} انقرأت
+                      {journey.anchorDate} · {journey.sent} أُرسلت · {journey.read} قُرئت
                       {journey.stopReason ? ` · ${journey.stopReason}` : ""}
                     </span>
                   </span>

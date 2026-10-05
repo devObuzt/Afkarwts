@@ -1,24 +1,16 @@
 import Link from "next/link";
 import { getToday } from "@/app/lib/today";
-import { ago, clock, hueOf, initials, members, weekdayAndDay } from "./format";
+import { ago, clock, hueOf, initials, items, members, paths as pathCount, weekdayAndDay } from "./format";
 
 export const dynamic = "force-dynamic";
 
-function openingLine(counts: { decisions: number; cohorts: number }) {
-  const parts: string[] = [];
+function openingLine(counts: { decisions: number; paths: number }) {
+  const parts = [
+    counts.decisions === 0 ? "لا شيء بانتظار قرار" : `${items(counts.decisions)} بانتظار قرار`
+  ];
 
-  if (counts.decisions === 0) {
-    parts.push("ما في إشي مستنّي قرار منك");
-  } else if (counts.decisions === 1) {
-    parts.push("في إشي واحد بده قرار منك");
-  } else {
-    parts.push(`عندك ${counts.decisions} أشياء بدها قرار منك`);
-  }
-
-  if (counts.cohorts === 1) {
-    parts.push("ودورة شغّالة");
-  } else if (counts.cohorts > 1) {
-    parts.push(`و${counts.cohorts} دورات شغّالات`);
+  if (counts.paths > 0) {
+    parts.push(`و${pathCount(counts.paths)} قيد التشغيل`);
   }
 
   return `${parts.join("، ")}.`;
@@ -31,20 +23,20 @@ export default function TodayPage() {
   return (
     <div className="crmPage">
       <header className="crmHead">
-        <h1>مراحب أفكار</h1>
+        <h1>اليوم</h1>
         <p>
-          {weekdayAndDay(now)} · {openingLine({ decisions: today.decisions.length, cohorts: today.cohorts.length })}
+          {weekdayAndDay(now)} · {openingLine({ decisions: today.decisions.length, paths: today.paths.length })}
         </p>
       </header>
 
       <section className="crmCard" data-tone={today.decisions.length ? "rose" : "mint"}>
         <header>
           <span className="crmDot" />
-          <h2>بدها قرار منك</h2>
+          <h2>بانتظار قرار</h2>
         </header>
 
         {today.decisions.length === 0 ? (
-          <p className="crmEmpty">كلشي ماشي. الدورات بتبعت لحالها، وما في ولا إشي عالق.</p>
+          <p className="crmEmpty">لا شيء معلّق. المسارات ترسل من تلقائها.</p>
         ) : (
           today.decisions.map((item) => (
             <div className="crmRow" data-tone={item.weight === "now" ? "rose" : "apricot"} key={item.key}>
@@ -60,32 +52,32 @@ export default function TodayPage() {
         )}
       </section>
 
-      {today.cohorts.length > 0 && (
+      {today.paths.length > 0 && (
         <section className="crmGrid">
-          {today.cohorts.map((cohort) => (
-            <article className="crmCard crmTile" data-tone={cohort.status === "active" ? "mint" : "apricot"} key={cohort.journeyId}>
+          {today.paths.map((item) => (
+            <article className="crmCard crmTile" data-tone={item.status === "active" ? "mint" : "apricot"} key={item.journeyId}>
               <div className="crmPad">
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
                   <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>
-                    <Link href={`/new/cohorts/${cohort.journeyId}`} style={{ textDecoration: "none", color: "inherit" }}>
-                      {cohort.groupName || cohort.pathName}
+                    <Link href={`/new/paths/${item.journeyId}`} style={{ textDecoration: "none", color: "inherit" }}>
+                      {item.groupName || item.pathName}
                     </Link>
                   </h2>
-                  <span className={cohort.status === "active" ? "crmPill live" : "crmPill open"}>
-                    {cohort.status === "active" ? "شغّالة" : "موقوفة"}
+                  <span className={item.status === "active" ? "crmPill live" : "crmPill open"}>
+                    {item.status === "active" ? "يعمل" : "موقوف"}
                   </span>
                 </div>
                 <div className="crmRowDetail" style={{ marginTop: 10 }}>
-                  {members(cohort.members)} · {cohort.pathName}
+                  {members(item.members)} · {item.pathName}
                   <br />
-                  {cohort.nextAt
-                    ? `الجاي: ${weekdayAndDay(new Date(cohort.nextAt))} ${clock(cohort.nextAt)} — «${cohort.nextLabel}»`
-                    : "خلصت كل الخطوات"}
+                  {item.nextAt
+                    ? `التالي: ${weekdayAndDay(new Date(item.nextAt))} ${clock(item.nextAt)} — «${item.nextLabel}»`
+                    : "انتهت كل الخطوات"}
                 </div>
                 <div className="crmMeter">
                   <span
                     style={{
-                      width: `${cohort.stepsTotal ? Math.min(100, Math.round((cohort.stepsSent / cohort.stepsTotal) * 100)) : 0}%`
+                      width: `${item.stepsTotal ? Math.min(100, Math.round((item.stepsSent / item.stepsTotal) * 100)) : 0}%`
                     }}
                   />
                 </div>
@@ -98,14 +90,14 @@ export default function TodayPage() {
       <section className="crmCard" data-tone="mauve">
         <header>
           <span className="crmDot" />
-          <h2>ردود مستنّية</h2>
+          <h2>ردود بلا جواب</h2>
           <Link className="spacer" href="/new/people" style={{ fontSize: 13.5 }}>
-            كل الناس ←
+            كل المنتسبين ←
           </Link>
         </header>
 
         {today.replies.length === 0 ? (
-          <p className="crmEmpty">ما في ولا رسالة بلا جواب.</p>
+          <p className="crmEmpty">لا توجد رسالة بلا جواب.</p>
         ) : (
           today.replies.map((reply) => (
             <Link className="crmRow" href={`/new/people/${reply.memberId}`} key={reply.memberId}>

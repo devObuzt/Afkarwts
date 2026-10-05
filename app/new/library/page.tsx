@@ -23,7 +23,7 @@ export default async function LibraryPage() {
     <div className="crmPage">
       <header className="crmHead">
         <h1>المكتبة</h1>
-        <p>اللي بتبنيه مرة وبتستعمليه كل دورة: المسارات، الاستمارات والمجموعات.</p>
+        <p>ما يُبنى مرة واحدة ويُستعمل في كل مسار: جداول الرسائل والاستمارات والمجموعات.</p>
       </header>
 
       <section className="crmCard" data-tone="apricot">
@@ -31,17 +31,17 @@ export default async function LibraryPage() {
           <span className="crmDot" />
           <h2>المسارات</h2>
           <a className="crmBtn quiet spacer" href="/journeys">
-            عدّلي
+            تعديل
           </a>
         </header>
         {paths.length === 0 ? (
-          <p className="crmEmpty">ولا مسار.</p>
+          <p className="crmEmpty">لا توجد مسارات.</p>
         ) : (
           paths.map((path) => (
             <div className="crmRow" key={path.id}>
               <div className="grow">
                 <div className="crmRowTitle">{path.name}</div>
-                <div className="crmRowDetail">{path.smsText ? "فيه نص SMS بديل" : "بلا نص SMS بديل"}</div>
+                <div className="crmRowDetail">{path.smsText ? "له نص SMS بديل" : "بلا نص SMS بديل"}</div>
               </div>
             </div>
           ))
@@ -53,7 +53,7 @@ export default async function LibraryPage() {
           <span className="crmDot" />
           <h2>الاستمارات</h2>
           <a className="crmBtn quiet spacer" href="/leads">
-            عدّلي
+            تعديل
           </a>
         </header>
         {forms.map((form) => (
@@ -65,7 +65,7 @@ export default async function LibraryPage() {
               </div>
             </div>
             <span className={form.status === "open" ? "crmPill live" : "crmPill"}>
-              {form.status === "open" ? "مفتوحة" : "مسكّرة"}
+              {form.status === "open" ? "مفتوحة" : "مغلقة"}
             </span>
           </div>
         ))}
@@ -95,11 +95,11 @@ export default async function LibraryPage() {
           <span className="crmDot" />
           <h2>قوالب واتساب</h2>
           <a className="crmBtn quiet spacer" href="/templates">
-            افتحي
+            فتح
           </a>
         </header>
         <p className="crmEmpty">
-          إدارة القوالب والمجموعات والتجميد لسّه بالواجهة القديمة — انبنت قبل شهر وما في داعي تنبنى من جديد.
+          إدارة القوالب والمجموعات والتجميد ما زالت في الواجهة السابقة.
         </p>
       </section>
     </div>

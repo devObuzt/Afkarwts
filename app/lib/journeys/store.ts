@@ -374,7 +374,7 @@ export function syncEnrollments(journeyId: number, now: Date) {
     // manual tasks open and nothing able to close them.
     if (!inGroup.has(memberId) && row.state !== "removed" && row.state !== "completed") {
       db.prepare("UPDATE journey_enrollments SET state = 'removed' WHERE id = ?").run(row.id);
-      closeFollowupsForEnrollment(row.id, "انشال من مجموعة المسار");
+      closeFollowupsForEnrollment(row.id, "أُزيل من مجموعة المسار");
       removed += 1;
     }
   }

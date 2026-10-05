@@ -52,11 +52,11 @@ test("the day opens on what needs a decision, not on a list of chats", async () 
     `a pending registration is a decision — got ${today.decisions.map((d) => d.title).join(" / ")}`
   );
 
-  const cohort = today.cohorts.find((item) => item.journeyId === journey.id)!;
-  assert.equal(cohort.groupName, "كلين 04.10");
-  assert.equal(cohort.members, 1);
-  assert.equal(cohort.nextLabel, "تعليمات الظهر", "the next thing that will go out by itself");
-  assert.ok(cohort.nextAt && new Date(cohort.nextAt) > new Date("2026-10-04T06:00:00.000Z"));
+  const path = today.paths.find((item) => item.journeyId === journey.id)!;
+  assert.equal(path.groupName, "كلين 04.10");
+  assert.equal(path.members, 1);
+  assert.equal(path.nextLabel, "تعليمات الظهر", "the next thing that will go out by itself");
+  assert.ok(path.nextAt && new Date(path.nextAt) > new Date("2026-10-04T06:00:00.000Z"));
 
   assert.deepEqual(
     today.replies.map((reply) => reply.name),

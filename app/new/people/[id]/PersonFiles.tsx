@@ -24,7 +24,7 @@ export function PersonFiles({ memberId, files }: { memberId: number; files: Pers
     const picked = input.current?.files?.[0];
 
     if (!picked) {
-      setError("اختاري ملف.");
+      setError("اختر ملفاً.");
       return;
     }
 
@@ -41,7 +41,7 @@ export function PersonFiles({ memberId, files }: { memberId: number; files: Pers
     setBusy(false);
 
     if (!response.ok) {
-      setError(payload.error ?? "الرفع فشل.");
+      setError(payload.error ?? "فشل الرفع.");
       return;
     }
 
@@ -62,7 +62,7 @@ export function PersonFiles({ memberId, files }: { memberId: number; files: Pers
     setBusy(false);
 
     if (!response.ok) {
-      setError("المحو فشل.");
+      setError("فشل الحذف.");
       return;
     }
 
@@ -73,7 +73,7 @@ export function PersonFiles({ memberId, files }: { memberId: number; files: Pers
     <section className="crmCard" data-tone="apricot">
       <header>
         <span className="crmDot" />
-        <h2>ملفاتها</h2>
+        <h2>الملفات</h2>
         <span className="crmPill tone spacer">{files.length}</span>
       </header>
 
@@ -95,7 +95,7 @@ export function PersonFiles({ memberId, files }: { memberId: number; files: Pers
               </span>
             </span>
             <button className="crmBtn quiet danger" disabled={busy} onClick={() => remove(file)} type="button">
-              امحي
+              حذف
             </button>
           </div>
         ))
@@ -133,7 +133,7 @@ export function PersonFiles({ memberId, files }: { memberId: number; files: Pers
           </p>
         )}
         <button className="crmBtn primary" disabled={busy} style={{ marginTop: 12 }} type="submit">
-          {busy ? "عمّال يرفع…" : "ارفعي"}
+          {busy ? "جارٍ الرفع…" : "رفع"}
         </button>
       </form>
     </section>

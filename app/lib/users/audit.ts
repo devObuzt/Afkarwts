@@ -21,21 +21,21 @@ export type AuditEntry = {
 };
 
 export const ACTION_LABEL: Record<string, string> = {
-  "session.login": "فات على المنظومة",
-  "session.logout": "طلع",
+  "session.login": "تسجيل دخول",
+  "session.logout": "تسجيل خروج",
   "session.failed": "محاولة دخول فاشلة",
-  "message.send": "بعت رسالة",
-  "member.update": "عدّل بيانات كونتاكت",
-  "member.delete": "محى كونتاكت",
+  "message.send": "إرسال رسالة",
+  "member.update": "تعديل بيانات منتسب",
+  "member.delete": "حذف منتسب",
   "file.upload": "رفع ملف",
-  "file.delete": "محى ملف",
-  "file.rename": "غيّر اسم ملف",
-  "lead.approve": "وافق على تسجيل",
+  "file.delete": "حذف ملف",
+  "file.rename": "تغيير اسم ملف",
+  "lead.approve": "الموافقة على تسجيل",
   "lead.reject": "رفض تسجيل",
-  "journey.status": "غيّر حالة مسار",
-  "user.create": "أنشأ مستخدم",
-  "user.update": "عدّل صلاحيات مستخدم",
-  "user.password": "غيّر كلمة سر"
+  "journey.status": "تغيير حالة مسار",
+  "user.create": "إنشاء مستخدم",
+  "user.update": "تعديل صلاحيات مستخدم",
+  "user.password": "تغيير كلمة المرور"
 };
 
 export function recordAction(input: {

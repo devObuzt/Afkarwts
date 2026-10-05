@@ -6,10 +6,10 @@ import { areaOf } from "./AreaShell";
 
 const AREAS = [
   { href: "/new", area: "today", label: "اليوم" },
-  { href: "/new/people", area: "people", label: "الناس" },
-  { href: "/new/cohorts", area: "cohorts", label: "الدورات" },
+  { href: "/new/people", area: "people", label: "المنتسبون" },
+  { href: "/new/paths", area: "paths", label: "المسارات" },
   { href: "/new/library", area: "library", label: "المكتبة" },
-  { href: "/new/users", area: "users", label: "المستخدمين" }
+  { href: "/new/users", area: "users", label: "المستخدمون" }
 ];
 
 export function NewNav({ canManageUsers, me }: { canManageUsers: boolean; me: string }) {
@@ -34,7 +34,7 @@ export function NewNav({ canManageUsers, me }: { canManageUsers: boolean; me: st
         ))}
       </nav>
       <span className="crmWho">
-        <a href="/password" title="غيّري كلمة السر">
+        <a href="/password" title="تغيير كلمة المرور">
           {me}
         </a>
         <button
@@ -44,11 +44,11 @@ export function NewNav({ canManageUsers, me }: { canManageUsers: boolean; me: st
           }}
           type="button"
         >
-          اطلعي
+          خروج
         </button>
       </span>
       <a className="crmOld" href="/">
-        القديمة
+        السابقة
       </a>
     </header>
   );

@@ -37,7 +37,7 @@ export default async function PeoplePage({
   return (
     <div className="crmPage">
       <header className="crmHead">
-        <h1>الناس</h1>
+        <h1>المنتسبون</h1>
         <p>
           {peopleCount(total)}
           {query || groupId ? " بهذا الفلتر" : ""}.
@@ -47,7 +47,7 @@ export default async function PeoplePage({
       {/* A plain GET form: searching is a link, so it can be shared and gone back to. */}
       <form className="crmCard crmPad crmSearch" method="get">
         <label className="crmField">
-          <span>بحث بالاسم، البلد أو التلفون</span>
+          <span>بحث بالاسم أو البلدة أو رقم الهاتف</span>
           <input defaultValue={query} name="q" placeholder="ليلى · عرابة · 0521234567" type="search" />
         </label>
         <label className="crmField" style={{ flex: "1 1 200px" }}>
@@ -62,13 +62,13 @@ export default async function PeoplePage({
           </select>
         </label>
         <button className="crmBtn primary" style={{ alignSelf: "flex-end" }} type="submit">
-          دوّري
+          بحث
         </button>
       </form>
 
       <section className="crmCard">
         {people.length === 0 ? (
-          <p className="crmEmpty">ما في ولا نتيجة. جرّبي اسم أقصر، أو شيلي الفلتر.</p>
+          <p className="crmEmpty">لا توجد نتائج. جرّب اسماً أقصر أو أزل الفلتر.</p>
         ) : (
           people.map((person) => (
             <Link className="crmRow" href={`/new/people/${person.id}`} key={person.id}>
@@ -111,7 +111,7 @@ export default async function PeoplePage({
           </span>
           {page < pages ? (
             <Link className="crmBtn" href={linkTo(page + 1)}>
-              الجاي
+              التالي
             </Link>
           ) : (
             <span />

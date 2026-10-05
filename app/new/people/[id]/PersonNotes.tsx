@@ -22,8 +22,8 @@ export function PersonNotes({ memberId, notes }: { memberId: number; notes: stri
       <header>
         <span className="crmDot" />
         <h2>ملاحظات</h2>
-        {state === "saved" && <span className="crmPill live spacer">انحفظت</span>}
-        {state === "failed" && <span className="crmPill alert spacer">ما انحفظت</span>}
+        {state === "saved" && <span className="crmPill live spacer">حُفظت</span>}
+        {state === "failed" && <span className="crmPill alert spacer">ما حُفظت</span>}
       </header>
       <div className="crmPad">
         <textarea
@@ -31,7 +31,7 @@ export function PersonNotes({ memberId, notes }: { memberId: number; notes: stri
             setText(event.target.value);
             setState("idle");
           }}
-          placeholder="حساسية على المكسرات · بتشتغل بالليل فالصبح مش مناسب إلها"
+          placeholder="حساسية من المكسرات · تعمل ليلاً، فالصباح غير مناسب لها"
           value={text}
         />
         <button
@@ -41,7 +41,7 @@ export function PersonNotes({ memberId, notes }: { memberId: number; notes: stri
           style={{ marginTop: 12 }}
           type="button"
         >
-          {state === "saving" ? "عمّال يحفظ…" : "احفظي"}
+          {state === "saving" ? "جارٍ الحفظ…" : "حفظ"}
         </button>
       </div>
     </section>

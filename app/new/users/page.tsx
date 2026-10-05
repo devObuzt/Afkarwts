@@ -14,9 +14,9 @@ export default async function UsersPage() {
   return (
     <div className="crmPage">
       <header className="crmHead">
-        <h1>المستخدمين</h1>
+        <h1>المستخدمون</h1>
         <p>
-          كل واحد بحسابه، وكل حساب بصلاحياته. الدور بيعبّي الصلاحيات أول مرة، وبعدها بتعدّليها وحدة وحدة.
+          لكل شخص حساب، ولكل حساب صلاحياته. الدور يملأ الصلاحيات أول مرة، ثم تُعدَّل واحدة واحدة.
         </p>
       </header>
 
@@ -25,12 +25,12 @@ export default async function UsersPage() {
       <section className="crmCard" data-tone="salmon">
         <header>
           <span className="crmDot" />
-          <h2>مين عمل شو</h2>
+          <h2>سجل العمليات</h2>
           <span className="crmPill tone spacer">آخر {log.length}</span>
         </header>
 
         {log.length === 0 ? (
-          <p className="crmEmpty">لسّه ما انسجّل إشي.</p>
+          <p className="crmEmpty">لم يُسجَّل شيء بعد.</p>
         ) : (
           <div className="crmStream">
             {log.map((entry) => (

@@ -10,7 +10,7 @@
  * The four areas each own a hue, so the colour tells you where you are
  * before the label does, and a card inside a page carries the tone of what
  * it holds: rose for what needs a decision, mint for what is running by
- * itself, apricot for cohorts and files, mauve for people.
+ * itself, apricot for paths and files, mauve for people.
  *
  * Scoped under .crm so it cannot reach the old pages, which keep running on
  * globals.css until this one replaces them.
@@ -76,7 +76,7 @@
   --tone-wash: var(--mauve-wash);
 }
 
-.crm[data-area="cohorts"] {
+.crm[data-area="paths"] {
   --tone: var(--apricot);
   --tone-ink: var(--apricot-ink);
   --tone-mid: color-mix(in srgb, var(--tone) 55%, var(--tone-ink));
@@ -198,7 +198,7 @@
   background: color-mix(in srgb, var(--mauve) 55%, var(--mauve-ink));
 }
 
-.crm .crmNav nav a[data-area="cohorts"] .tick {
+.crm .crmNav nav a[data-area="paths"] .tick {
   background: color-mix(in srgb, var(--apricot) 55%, var(--apricot-ink));
 }
 

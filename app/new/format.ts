@@ -38,15 +38,21 @@ export function ago(iso: string, now = new Date()) {
   const minutes = Math.round((now.getTime() - new Date(iso).getTime()) / 60000);
 
   if (minutes < 1) {
-    return "هلق";
+    return "الآن";
   }
   if (minutes < 60) {
-    return `قبل ${minutes} دقيقة`;
+    return `قبل ${count(minutes, {
+      none: "لحظة",
+      one: "دقيقة",
+      two: "دقيقتين",
+      few: "دقائق",
+      many: "دقيقة"
+    })}`;
   }
 
   const hours = Math.round(minutes / 60);
   if (hours < 24) {
-    return hours === 1 ? "قبل ساعة" : hours === 2 ? "قبل ساعتين" : `قبل ${hours} ساعات`;
+    return `قبل ${count(hours, { none: "", one: "ساعة", two: "ساعتين", few: "ساعات", many: "ساعة" })}`;
   }
 
   const days = Math.round(hours / 24);
@@ -54,7 +60,7 @@ export function ago(iso: string, now = new Date()) {
     return `أمس ${clock(iso)}`;
   }
   if (days < 7) {
-    return `قبل ${days} أيام`;
+    return `قبل ${count(days, { none: "", one: "يوم", two: "يومين", few: "أيام", many: "يوماً" })}`;
   }
 
   return `${day(iso)} ${clock(iso)}`;
@@ -83,16 +89,42 @@ export function count(total: number, forms: { none: string; one: string; two: st
 
 export function members(total: number) {
   return count(total, {
-    none: "ولا مشترك",
-    one: "مشتركة وحدة",
-    two: "مشتركتين",
-    few: "مشتركات",
-    many: "مشتركة"
+    none: "لا يوجد منتسبون",
+    one: "منتسب واحد",
+    two: "منتسبان",
+    few: "منتسبين",
+    many: "منتسباً"
+  });
+}
+
+export function paths(total: number) {
+  return count(total, {
+    none: "لا توجد مسارات",
+    one: "مسار واحد",
+    two: "مساران",
+    few: "مسارات",
+    many: "مساراً"
+  });
+}
+
+export function items(total: number) {
+  return count(total, {
+    none: "لا شيء",
+    one: "عنصر واحد",
+    two: "عنصران",
+    few: "عناصر",
+    many: "عنصراً"
   });
 }
 
 export function people(total: number) {
-  return count(total, { none: "ولا حدا", one: "شخص واحد", two: "شخصين", few: "أشخاص", many: "شخص" });
+  return count(total, {
+    none: "لا يوجد منتسبون",
+    one: "منتسب واحد",
+    two: "منتسبان",
+    few: "منتسبين",
+    many: "منتسباً"
+  });
 }
 
 /**
