@@ -147,6 +147,16 @@ export function coachOf(memberId: number) {
  * because a state that drifts is worse than no state — and both leave
  * pinned rows alone, so a hand-placed label stays where it was put.
  */
+/**
+ * How far back «بانتظار أفكار» reaches.
+ *
+ * Measured against the live database: «whoever wrote last» with no bound
+ * marked 57 people, and 45 of them had written more than a month ago —
+ * conversations nobody is waiting on any more. Afkar's own list holds
+ * eight. A state that names 57 things to do is a state nobody reads.
+ */
+export const AWAITING_DAYS = 14;
+
 export function syncManagedStates(now = new Date()) {
   const db = getDb();
   const following = ensureManagedLabel(MANAGED_FOLLOWING);
@@ -164,6 +174,12 @@ export function syncManagedStates(now = new Date()) {
     ).map((row) => row.id)
   );
 
+  // SQLite stores these without a zone, so the bound is written the same way.
+  const cutoff = new Date(now.getTime() - AWAITING_DAYS * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .replace("T", " ")
+    .slice(0, 19);
+
   const shouldAwait = new Set(
     (
       db
@@ -172,9 +188,9 @@ export function syncManagedStates(now = new Date()) {
              JOIN messages last ON last.id = (
                SELECT id FROM messages WHERE member_id = m.id ORDER BY created_at DESC, id DESC LIMIT 1
              )
-            WHERE last.direction = 'incoming'`
+            WHERE last.direction = 'incoming' AND last.created_at >= ?`
         )
-        .all() as Array<{ id: number }>
+        .all(cutoff) as Array<{ id: number }>
     ).map((row) => row.id)
   );
 

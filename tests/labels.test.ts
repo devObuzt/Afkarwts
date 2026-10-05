@@ -175,3 +175,33 @@ test("what the record hands a screen is plain, not a database row", async () => 
     assert.equal(Object.getPrototypeOf(value), Object.prototype, JSON.stringify(value));
   }
 });
+
+test("«بانتظار أفكار» lets go of a conversation nobody is waiting on", async () => {
+  const { getDb } = await import("@/app/lib/db");
+  const { syncManagedStates, labelsFor, ensureManagedLabel, AWAITING_DAYS } = await import("@/app/lib/labels/store");
+  const { MANAGED_AWAITING } = await import("@/app/lib/labels/kinds");
+
+  const recent = await member("كتبت هالأسبوع");
+  const ancient = await member("كتبت من زمان");
+  const db = getDb();
+  const now = new Date("2026-10-05T12:00:00.000Z");
+
+  const stamp = (daysAgo: number) =>
+    new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000).toISOString().replace("T", " ").slice(0, 19);
+
+  db.prepare(
+    "INSERT INTO messages (member_id, direction, body, status, created_at) VALUES (?, 'incoming', 'سؤال', 'received', ?)"
+  ).run(recent.id, stamp(2));
+  db.prepare(
+    "INSERT INTO messages (member_id, direction, body, status, created_at) VALUES (?, 'incoming', 'سؤال قديم', 'received', ?)"
+  ).run(ancient.id, stamp(AWAITING_DAYS + 20));
+
+  syncManagedStates(now);
+  const awaiting = ensureManagedLabel(MANAGED_AWAITING);
+
+  assert.ok(labelsFor(recent.id).some((label) => label.id === awaiting.id), "this week's question is still open");
+  assert.ok(
+    !labelsFor(ancient.id).some((label) => label.id === awaiting.id),
+    "a message from months ago is not a task — 45 of 57 on the live database were that"
+  );
+});
