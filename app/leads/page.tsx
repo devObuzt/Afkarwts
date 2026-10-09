@@ -164,19 +164,34 @@ function LeadsView({ onError }: { onError: (message: string) => void }) {
     }
 
     setBusy(true);
-    try {
-      onError("");
-      for (const id of ids) {
+    onError("");
+
+    // One bad row used to abort the loop: the ones before it were already
+    // added, the ones after were never tried, and the screen named neither.
+    // Every row is attempted, and the failures are reported together.
+    const failedIds: number[] = [];
+    const failures: string[] = [];
+
+    for (const id of ids) {
+      try {
         await api(`/api/leads/${id}`, {
           method: "POST",
           body: JSON.stringify({ action: "approve", overwrite })
         });
+      } catch (caught) {
+        failedIds.push(id);
+        const name = leads.find((lead) => lead.id === id)?.name || `#${id}`;
+        failures.push(`${name}: ${caught instanceof Error ? caught.message : "لم تنجح الإضافة."}`);
       }
-      setPicked([]);
-      await load();
-    } catch (caught) {
-      onError(caught instanceof Error ? caught.message : "Could not add them.");
     }
+
+    // Only the ones that failed stay selected, so a second click retries
+    // exactly those and nothing is added twice.
+    setPicked(failedIds);
+    if (failures.length) {
+      onError(failures.join(" · "));
+    }
+    await load();
     setBusy(false);
   }
 

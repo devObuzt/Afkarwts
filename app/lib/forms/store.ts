@@ -164,6 +164,20 @@ function formPhone(raw: string) {
   }
 }
 
+/**
+ * The shortest number that can become a member.
+ *
+ * createMember refuses anything under eight characters, so a registration
+ * below that can be taken and then never approved — which is what happened:
+ * «+535353» sat in the queue and «أضف للمجموعة» answered 500. The limit
+ * belongs at the door, where the person can still fix their own typo.
+ */
+export const MIN_PHONE_LENGTH = 8;
+
+export function phoneIsUsable(phone: string) {
+  return phone.length >= MIN_PHONE_LENGTH;
+}
+
 export function createForm(input: {
   name: string;
   groupId: number;
@@ -482,7 +496,7 @@ export function submitForm(token: string, answers: Record<string, string>) {
       return { ok: false as const, error: `هذا السؤال مطلوب: ${field.label}` };
     }
 
-    if (field.mapsTo === "phone" && value && !formPhone(value)) {
+    if (field.mapsTo === "phone" && value && !phoneIsUsable(formPhone(value))) {
       return { ok: false as const, error: `رقم الهاتف غير صالح: ${field.label}` };
     }
 

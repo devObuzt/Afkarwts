@@ -1,5 +1,5 @@
 import { addMembersToGroup, createMember, findMemberByPhone, getDb } from "../db";
-import { getForm, getSubmission, setSubmissionState } from "./store";
+import { getForm, getSubmission, phoneIsUsable, setSubmissionState } from "./store";
 
 /**
  * A registration becomes a member of the cohort only when someone says so.
@@ -21,7 +21,17 @@ export function approveSubmission(id: number, options: { overwrite?: boolean } =
   }
 
   if (!submission.phone) {
-    return { ok: false as const, error: "ما في رقم هاتف بهذا التسجيل — ما بنقدر نضيفه كعضو." };
+    return { ok: false as const, error: "لا يوجد رقم هاتف في هذا التسجيل، فلا يمكن إضافته كمنتسب." };
+  }
+
+  // Registrations taken before the form enforced a minimum are still in the
+  // queue, and createMember throws on them. A throw here reaches the screen
+  // as «Request failed (500)» and says nothing about what to do.
+  if (!phoneIsUsable(submission.phone)) {
+    return {
+      ok: false as const,
+      error: `رقم الهاتف «${submission.phone}» أقصر من أن يكون رقم واتساب. صحّح الرقم أو ارفض التسجيل.`
+    };
   }
 
   const existing = findMemberByPhone(submission.phone);
@@ -34,13 +44,21 @@ export function approveSubmission(id: number, options: { overwrite?: boolean } =
       updateMemberDetails(existing.id, { name: submission.name, city: submission.city });
     }
   } else {
-    const member = createMember({
-      name: submission.name || submission.phone,
-      phone: submission.phone,
-      city: submission.city
-    });
+    let member;
+    try {
+      member = createMember({
+        name: submission.name || submission.phone,
+        phone: submission.phone,
+        city: submission.city
+      });
+    } catch (error) {
+      return {
+        ok: false as const,
+        error: error instanceof Error ? error.message : "تعذّر إنشاء المنتسب."
+      };
+    }
     if (!member) {
-      return { ok: false as const, error: "ما قدرنا ننشئ العضو." };
+      return { ok: false as const, error: "تعذّر إنشاء المنتسب." };
     }
     memberId = member.id;
     created = true;
