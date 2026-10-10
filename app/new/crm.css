@@ -946,3 +946,276 @@
     padding-inline: 14px;
   }
 }
+
+/* ---- the workspace: system | conversation | rail ---- */
+
+.crm .crmWork {
+  display: flex;
+  align-items: stretch;
+  min-height: calc(100vh - 58px);
+}
+
+.crm .crmWork > .crmBody {
+  flex: 0 1 60%;
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+/* WhatsApp is 40% of the width: the open conversation and the rail beside
+   it, at the proportions Wisam set — 25 and 15 of the whole screen. */
+.crm .waPane {
+  flex: 0 0 40%;
+  display: flex;
+  min-width: 0;
+  border-inline-start: 1px solid var(--line);
+  background: var(--card);
+  position: sticky;
+  top: 58px;
+  height: calc(100vh - 58px);
+}
+
+.crm .waChat {
+  flex: 0 0 62.5%; /* 25% of the screen */
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--paper);
+}
+
+.crm .waRail {
+  flex: 0 0 37.5%; /* 15% of the screen */
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border-inline-start: 1px solid var(--line-soft);
+  order: 2;
+}
+
+.crm .waRailHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 12px 8px;
+}
+
+.crm .waTitle {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.crm .waSearch {
+  margin: 0 10px 8px;
+  width: calc(100% - 20px);
+  min-height: 34px;
+  padding: 6px 10px;
+  font-size: 13px;
+  border-radius: 8px;
+}
+
+.crm .waThreads {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding-bottom: 8px;
+}
+
+.crm .waThread {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-bottom: 1px solid var(--line-soft);
+  background: none;
+  font-family: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.crm .waThread:hover {
+  background: var(--line-soft);
+}
+
+.crm .waThread.current {
+  background: var(--tone-wash);
+  box-shadow: inset 3px 0 0 0 var(--tone-mid);
+}
+
+.crm .waThread .crmAvatar {
+  width: 32px;
+  height: 32px;
+  font-size: 12px;
+}
+
+.crm .waThreadText {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.crm .waThreadName {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crm .waDot {
+  flex: none;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--rose-ink);
+  color: #fff;
+  font-size: 10.5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.crm .waThreadLast,
+.crm .waThreadWhen {
+  display: block;
+  font-size: 11.5px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crm .waThreadWhen {
+  color: var(--faint);
+  font-size: 11px;
+}
+
+.crm .waOld {
+  padding: 9px 10px;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--faint);
+  text-decoration: none;
+  text-align: center;
+}
+
+.crm .waChatHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--line);
+  background: var(--card);
+  flex-wrap: wrap;
+}
+
+.crm .waChatName {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.crm .waMessages {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.crm .waBubble {
+  max-width: 85%;
+  padding: 8px 11px;
+  border-radius: 13px;
+  font-size: 13.5px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.crm .waBubble.incoming {
+  align-self: flex-start;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-start-start-radius: 4px;
+}
+
+.crm .waBubble.outgoing {
+  align-self: flex-end;
+  background: var(--mint-wash);
+  border: 1px solid color-mix(in srgb, var(--mint) 55%, transparent);
+  border-start-end-radius: 4px;
+}
+
+.crm .waWhen {
+  display: block;
+  margin-top: 3px;
+  font-size: 10.5px;
+  color: var(--faint);
+}
+
+.crm .waCompose {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  padding: 10px;
+  border-top: 1px solid var(--line);
+  background: var(--card);
+}
+
+.crm .waCompose textarea {
+  min-height: 42px;
+  max-height: 120px;
+  font-size: 13.5px;
+  padding: 9px 11px;
+}
+
+.crm .waCompose .crmBtn {
+  min-height: 42px;
+  flex: none;
+}
+
+.crm .waClosed {
+  padding: 12px 14px;
+  border-top: 1px solid var(--line);
+  background: var(--card);
+  font-size: 12.5px;
+}
+
+/* A fifteen-percent rail on a phone is a stripe: below a laptop the
+   widget goes under the page and lies out flat. */
+@media (max-width: 1100px) {
+  .crm .crmWork {
+    display: block;
+  }
+
+  .crm .waPane {
+    position: static;
+    height: auto;
+    border-inline-start: 0;
+    border-top: 1px solid var(--line);
+    flex-wrap: wrap;
+  }
+
+  .crm .waRail {
+    flex: 1 1 260px;
+    order: 0;
+    border-inline-start: 0;
+    border-bottom: 1px solid var(--line-soft);
+  }
+
+  .crm .waThreads {
+    max-height: 280px;
+  }
+
+  .crm .waChat {
+    flex: 999 1 320px;
+    min-height: 420px;
+  }
+}
