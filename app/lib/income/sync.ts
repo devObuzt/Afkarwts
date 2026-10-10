@@ -26,7 +26,12 @@ export async function syncIncome(from: string, to: string) {
       sources.set(doc.morningId, sourceOf(doc, store.orderIds, store.phones));
     }
 
-    const written = savePayments(docs, sources);
+    // Written in chunks: one lock held for eighteen months of invoices is
+    // a lock held while the rest of the app wants to work.
+    let written = 0;
+    for (let index = 0; index < docs.length; index += 100) {
+      written += savePayments(docs.slice(index, index + 100), sources);
+    }
     const linked = relinkPayments();
     recordSync({ from, to, count: written });
 

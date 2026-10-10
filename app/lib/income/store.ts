@@ -95,6 +95,8 @@ export function savePayments(docs: MorningDoc[], sources: Map<string, IncomeSour
   );
 
   let written = 0;
+  db.exec("BEGIN IMMEDIATE");
+  try {
   for (const doc of docs) {
     // The phone is what ties money to a person — and it is missing on about
     // a third of Morning's documents, so the link is left null rather than
@@ -119,6 +121,11 @@ export function savePayments(docs: MorningDoc[], sources: Map<string, IncomeSour
       doc.url
     );
     written += 1;
+  }
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
   }
 
   return written;

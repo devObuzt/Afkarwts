@@ -194,3 +194,35 @@ test("the series buckets by day, week and month, and keeps the quiet ones", asyn
     );
   }
 });
+
+test("the database lets a reader and a writer work at once", async () => {
+  const { getDb } = await import("@/app/lib/db");
+  const db = getDb();
+
+  // It shipped on the rollback journal with no timeout, so one page being
+  // read killed a write outright — that is what stopped the first Morning
+  // backfill at 133 rows of 296.
+  assert.equal((db.prepare("PRAGMA journal_mode").get() as { journal_mode: string }).journal_mode, "wal");
+  assert.ok(
+    Number((db.prepare("PRAGMA busy_timeout").get() as { timeout: number }).timeout) >= 5000,
+    "a writer waits its turn rather than failing instantly"
+  );
+});
+
+test("a batch that fails writes none of itself", async () => {
+  const { getDb } = await import("@/app/lib/db");
+  const { savePayments, incomeReport } = await import("@/app/lib/income/store");
+
+  getDb().exec("DELETE FROM payments");
+
+  const good = doc({ morningId: "ok1", paidOn: "2026-11-01", amount: 100 });
+  // paid_on is NOT NULL; a row missing it takes the whole batch down with it.
+  const bad = { ...(doc({ morningId: "bad1", paidOn: "2026-11-01" }) as object), paidOn: null } as never;
+
+  assert.throws(() => savePayments([good, bad], new Map()));
+  assert.equal(
+    incomeReport({ from: "2026-11-01", to: "2026-11-01" }).total.count,
+    0,
+    "the good row rolled back with the bad one, so a retry cannot double-count"
+  );
+});

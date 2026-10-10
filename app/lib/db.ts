@@ -79,6 +79,18 @@ export function getDb() {
   if (!globalForDb.__afkarDb) {
     const dataDir = getDataDir();
     const db = new DatabaseSync(path.join(dataDir, "app.sqlite"));
+
+    // The database shipped on the rollback journal with no busy timeout, so
+    // a single page being read blocked a write — instantly, with no wait.
+    // It surfaced the first time something wrote for long enough to collide:
+    // the Morning backfill stopped at «database is locked» after 133 rows.
+    //
+    // WAL lets readers and the one writer work at the same time, and the
+    // timeout makes a writer wait its turn instead of failing. Both are
+    // written into the file, so they outlive the process that set them.
+    db.exec("PRAGMA journal_mode = WAL");
+    db.exec("PRAGMA busy_timeout = 5000");
+
     db.exec(`
       CREATE TABLE IF NOT EXISTS members (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
