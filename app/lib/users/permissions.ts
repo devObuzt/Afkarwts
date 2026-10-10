@@ -24,6 +24,7 @@ export const PERMISSIONS = [
   "journeys.manage",
   "templates.manage",
   "forms.manage",
+  "income.view",
   "users.manage"
 ] as const;
 
@@ -123,6 +124,13 @@ export const PERMISSION_INFO: PermissionInfo[] = [
     group: "المكتبة"
   },
   {
+    key: "income.view",
+    label: "عرض الدخل",
+    detail: "الفواتير المقبوضة ومجاميعها حسب المصدر ووسيلة الدفع والمسار. أرقام مالية.",
+    group: "المنظومة",
+    sensitive: true
+  },
+  {
     key: "users.manage",
     label: "إدارة المستخدمين",
     detail: "إضافة مستخدم وتغيير صلاحياته وتعطيله. من يملك هذه الصلاحية يستطيع منح نفسه أي صلاحية أخرى.",
@@ -170,6 +178,7 @@ export const ROLE_PRESET: Record<Role, Permission[]> = {
     "journeys.manage",
     "templates.manage",
     "forms.manage",
+    "income.view",
     "users.manage"
   ]
 };

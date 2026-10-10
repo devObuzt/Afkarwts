@@ -5,6 +5,7 @@ import { migrateJourneyTables } from "./journeys/schema";
 import { migrateFormTables } from "./forms/schema";
 import { migrateUserTables } from "./users/schema";
 import { migrateLabelColumns } from "./labels/schema";
+import { migrateIncomeTables } from "./income/schema";
 
 export type Member = {
   id: number;
@@ -124,6 +125,7 @@ export function getDb() {
     migratePersonFileTables(db);
     migrateUserTables(db);
     migrateLabelColumns(db);
+    migrateIncomeTables(db);
     globalForDb.__afkarDb = db;
   }
 

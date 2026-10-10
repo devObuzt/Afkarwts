@@ -9,12 +9,24 @@ const AREAS = [
   { href: "/new/people", area: "people", label: "المنتسبون" },
   { href: "/new/paths", area: "paths", label: "المسارات" },
   { href: "/new/library", area: "library", label: "المكتبة" },
+  { href: "/new/income", area: "income", label: "الدخل" },
   { href: "/new/users", area: "users", label: "المستخدمون" }
 ];
 
-export function NewNav({ canManageUsers, me }: { canManageUsers: boolean; me: string }) {
+export function NewNav({
+  canManageUsers,
+  canSeeIncome,
+  me
+}: {
+  canManageUsers: boolean;
+  canSeeIncome: boolean;
+  me: string;
+}) {
   const current = areaOf(usePathname());
-  const areas = AREAS.filter((item) => item.area !== "users" || canManageUsers);
+  const areas = AREAS.filter(
+    (item) =>
+      (item.area !== "users" || canManageUsers) && (item.area !== "income" || canSeeIncome)
+  );
 
   return (
     <header className="crmNav">

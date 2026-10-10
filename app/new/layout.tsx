@@ -15,7 +15,11 @@ export default async function NewLayout({ children }: { children: ReactNode }) {
 
   return (
     <AreaShell>
-      <NewNav canManageUsers={can(user, "users.manage")} me={user.name} />
+      <NewNav
+        canManageUsers={can(user, "users.manage")}
+        canSeeIncome={can(user, "income.view")}
+        me={user.name}
+      />
       <div className="crmBody">{children}</div>
     </AreaShell>
   );

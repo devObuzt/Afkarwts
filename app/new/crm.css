@@ -83,6 +83,13 @@
   --tone-wash: var(--apricot-wash);
 }
 
+.crm[data-area="income"] {
+  --tone: var(--mint);
+  --tone-ink: var(--mint-ink);
+  --tone-mid: color-mix(in srgb, var(--tone) 55%, var(--tone-ink));
+  --tone-wash: var(--mint-wash);
+}
+
 .crm[data-area="users"] {
   --tone: var(--rose);
   --tone-ink: var(--rose-ink);
@@ -203,6 +210,10 @@
 }
 
 .crm .crmNav nav a[data-area="library"] .tick {
+  background: color-mix(in srgb, var(--mint) 55%, var(--mint-ink));
+}
+
+.crm .crmNav nav a[data-area="income"] .tick {
   background: color-mix(in srgb, var(--mint) 55%, var(--mint-ink));
 }
 

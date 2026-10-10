@@ -35,7 +35,8 @@ export const ACTION_LABEL: Record<string, string> = {
   "journey.status": "تغيير حالة مسار",
   "user.create": "إنشاء مستخدم",
   "user.update": "تعديل صلاحيات مستخدم",
-  "user.password": "تغيير كلمة المرور"
+  "user.password": "تغيير كلمة المرور",
+  "income.sync": "مزامنة الدخل"
 };
 
 export function recordAction(input: {

@@ -13,6 +13,7 @@ export function areaOf(pathname: string) {
   if (pathname.startsWith("/new/paths")) return "paths";
   if (pathname.startsWith("/new/library")) return "library";
   if (pathname.startsWith("/new/users")) return "users";
+  if (pathname.startsWith("/new/income")) return "income";
   return "today";
 }
 
