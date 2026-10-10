@@ -37,3 +37,34 @@ export async function syncIncome(from: string, to: string) {
     return { ok: false as const, error: message };
   }
 }
+
+/** How far back a routine top-up reaches. Cheap: a fortnight is a few dozen documents. */
+export const RECENT_DAYS = 14;
+
+/** The first run goes back far enough that the screen opens on a real picture. */
+export const BACKFILL_MONTHS = 18;
+
+function isoDay(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+/**
+ * Keeps the figures current without anyone pressing anything.
+ *
+ * An empty screen is not a reading — it looks like a business that took no
+ * money. So the first run reaches back eighteen months, and every run after
+ * that tops up the last fortnight, which is all that can still change.
+ */
+export async function syncIncomeAutomatically(now = new Date()) {
+  const { getDb } = await import("../db");
+  const existing = Number(
+    (getDb().prepare("SELECT COUNT(*) AS n FROM payments").get() as { n: number }).n
+  );
+
+  const to = isoDay(now);
+  const from = existing
+    ? isoDay(new Date(now.getTime() - RECENT_DAYS * 24 * 60 * 60 * 1000))
+    : isoDay(new Date(now.getFullYear(), now.getMonth() - BACKFILL_MONTHS, 1));
+
+  return syncIncome(from, to);
+}

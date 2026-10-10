@@ -1219,3 +1219,112 @@
     min-height: 420px;
   }
 }
+
+/* ---- the income chart ---- */
+
+.crm .chart {
+  padding: 4px 2px 0;
+}
+
+.crm .chartLegend {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.crm .chartLegend span,
+.crm .chartTip span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.crm .chartLegend i,
+.crm .chartTip i {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  flex: none;
+}
+
+.crm .chartPlot {
+  position: relative;
+  padding-inline-start: 42px;
+}
+
+.crm .chartPlot svg {
+  display: block;
+  width: 100%;
+  height: 190px;
+  overflow: visible;
+}
+
+.crm .chartGrid {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: 38px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  text-align: end;
+  pointer-events: none;
+}
+
+.crm .chartGrid b {
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--faint);
+  transform: translateY(-50%);
+  display: block;
+}
+
+.crm .chartGrid span:last-child b {
+  transform: none;
+}
+
+.crm .chartAxis {
+  display: flex;
+  padding-inline-start: 42px;
+  margin-top: 6px;
+}
+
+.crm .chartAxis span {
+  font-size: 10.5px;
+  color: var(--faint);
+  text-align: center;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.crm .chartTip {
+  position: absolute;
+  bottom: 100%;
+  transform: translateX(50%);
+  margin-bottom: 6px;
+  padding: 8px 11px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--card);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.09);
+  font-size: 12px;
+  line-height: 1.75;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.crm .chartTip strong {
+  display: block;
+  font-size: 12.5px;
+  color: var(--ink);
+  margin-bottom: 3px;
+}
+
+.crm .chartTip span {
+  display: flex;
+  color: var(--muted);
+}

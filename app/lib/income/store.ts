@@ -266,3 +266,73 @@ export function relinkPayments() {
     .run();
   return Number(result.changes);
 }
+
+export type Bucket = "day" | "week" | "month";
+
+export type SeriesPoint = {
+  key: string;
+  label: string;
+  website: number;
+  app: number;
+  sales: number;
+  total: number;
+};
+
+/** Sunday-start weeks, like the rest of the system. */
+function startOfWeek(iso: string) {
+  const date = new Date(`${iso}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() - date.getUTCDay());
+  return date.toISOString().slice(0, 10);
+}
+
+/**
+ * The same money, bucketed for the chart.
+ *
+ * Empty buckets are kept: a week with no income is a fact about the week,
+ * and dropping it would draw a flat line over a gap.
+ */
+export function incomeSeries(report: IncomeReport, bucket: Bucket): SeriesPoint[] {
+  const keyOf = (paidOn: string) =>
+    bucket === "day" ? paidOn : bucket === "week" ? startOfWeek(paidOn) : `${paidOn.slice(0, 7)}-01`;
+
+  const points = new Map<string, SeriesPoint>();
+
+  const blank = (key: string): SeriesPoint => ({
+    key,
+    label: bucket === "month" ? key.slice(0, 7) : key.slice(5).split("-").reverse().join("/"),
+    website: 0,
+    app: 0,
+    sales: 0,
+    total: 0
+  });
+
+  // Walk the whole window so a quiet day still gets a column.
+  const cursor = new Date(`${report.from}T00:00:00Z`);
+  const end = new Date(`${report.to}T00:00:00Z`);
+  while (cursor <= end) {
+    const key = keyOf(cursor.toISOString().slice(0, 10));
+    if (!points.has(key)) {
+      points.set(key, blank(key));
+    }
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+
+  for (const payment of report.payments) {
+    const key = keyOf(payment.paidOn);
+    const point = points.get(key) ?? blank(key);
+    point[payment.source] += payment.amount;
+    point.total += payment.amount;
+    points.set(key, point);
+  }
+
+  const round = (value: number) => Math.round(value * 100) / 100;
+  return [...points.values()]
+    .sort((a, b) => a.key.localeCompare(b.key))
+    .map((point) => ({
+      ...point,
+      website: round(point.website),
+      app: round(point.app),
+      sales: round(point.sales),
+      total: round(point.total)
+    }));
+}

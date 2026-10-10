@@ -1,6 +1,7 @@
 import { runDueCampaigns } from "./campaigns";
 import { runDueJourneys } from "./journeys/runner";
 import { isLive } from "./outbound-guard";
+import { morningConfigured } from "./income/morning";
 
 const globalForScheduler = globalThis as typeof globalThis & {
   __afkarSchedulerStarted?: boolean;
@@ -26,6 +27,26 @@ if (!globalForScheduler.__afkarSchedulerStarted) {
 
   setTimeout(journeyTick, 30 * 1000);
   setInterval(journeyTick, 5 * 60 * 1000);
+
+  // Income is pulled from Morning on a slower beat: a paid invoice does not
+  // change after the fact, and each one is its own request over there. The
+  // first run backfills, so the screen never opens on an empty total.
+  const incomeTick = () => {
+    if (!morningConfigured()) {
+      return;
+    }
+    import("./income/sync")
+      .then((module) => module.syncIncomeAutomatically())
+      .then((result) => {
+        if (!result.ok) {
+          console.error("Income sync failed:", result.error);
+        }
+      })
+      .catch((error) => console.error("Income scheduler tick failed:", error));
+  };
+
+  setTimeout(incomeTick, 90 * 1000);
+  setInterval(incomeTick, 60 * 60 * 1000);
   console.log("Afkar campaign scheduler started.");
 
   if (!isLive()) {

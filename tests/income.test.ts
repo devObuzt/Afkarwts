@@ -143,3 +143,54 @@ test("the ranges are calendar ranges in Afkar's own timezone", async () => {
     to: "2026-07-31"
   });
 });
+
+test("the series buckets by day, week and month, and keeps the quiet ones", async () => {
+  const { getDb } = await import("@/app/lib/db");
+  const { savePayments, incomeReport, incomeSeries } = await import("@/app/lib/income/store");
+
+  getDb().exec("DELETE FROM payments");
+  savePayments(
+    [
+      doc({ morningId: "s1", amount: 100, paidOn: "2026-10-01" }),
+      doc({ morningId: "s2", amount: 200, paidOn: "2026-10-01" }),
+      doc({ morningId: "s3", amount: 300, paidOn: "2026-10-05" }),
+      doc({ morningId: "s4", amount: 400, paidOn: "2026-09-28" })
+    ],
+    new Map([
+      ["s1", "website"],
+      ["s2", "sales"],
+      ["s3", "sales"],
+      ["s4", "website"]
+    ])
+  );
+
+  const report = incomeReport({ from: "2026-09-28", to: "2026-10-05" });
+
+  const days = incomeSeries(report, "day");
+  assert.equal(days.length, 8, "a day with nothing in it is still a day");
+  assert.equal(days[0].key, "2026-09-28");
+  assert.equal(days.find((d) => d.key === "2026-10-01")?.total, 300);
+  assert.equal(days.find((d) => d.key === "2026-10-01")?.website, 100);
+  assert.equal(days.find((d) => d.key === "2026-10-01")?.sales, 200);
+  assert.equal(days.find((d) => d.key === "2026-10-02")?.total, 0, "the quiet day is kept");
+
+  const weeks = incomeSeries(report, "week");
+  assert.deepEqual(weeks.map((w) => w.key), ["2026-09-27", "2026-10-04"], "weeks start on Sunday");
+  assert.equal(weeks[0].total, 700, "28.09 + 01.10 fall in the same week");
+  assert.equal(weeks[1].total, 300);
+
+  const months = incomeSeries(report, "month");
+  assert.deepEqual(months.map((m) => m.label), ["2026-09", "2026-10"]);
+  assert.equal(months[0].total, 400);
+  assert.equal(months[1].total, 600);
+
+  // Every bucket adds up to the same money, whichever way it is cut.
+  for (const series of [days, weeks, months]) {
+    assert.equal(series.reduce((sum, point) => sum + point.total, 0), 1000);
+    assert.equal(
+      series.reduce((sum, point) => sum + point.website + point.app + point.sales, 0),
+      1000,
+      "the parts are the whole — the total is not a fourth source"
+    );
+  }
+});

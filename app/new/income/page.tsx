@@ -9,8 +9,9 @@ import {
   methodName,
   type Range
 } from "@/app/lib/income/kinds";
-import { incomeReport, lastSync, rangeDates } from "@/app/lib/income/store";
+import { incomeReport, incomeSeries, lastSync, rangeDates, type Bucket } from "@/app/lib/income/store";
 import { day } from "../format";
+import { IncomeChart } from "./IncomeChart";
 import { SyncButton } from "./SyncButton";
 
 export const dynamic = "force-dynamic";
@@ -24,7 +25,7 @@ function shekels(amount: number) {
 export default async function IncomePage({
   searchParams
 }: {
-  searchParams: Promise<{ range?: string; from?: string; to?: string; method?: string }>;
+  searchParams: Promise<{ range?: string; from?: string; to?: string; method?: string; by?: string }>;
 }) {
   await requireUser("income.view");
 
@@ -32,11 +33,18 @@ export default async function IncomePage({
   const range = (RANGES as string[]).includes(params.range ?? "") ? (params.range as Range) : "month";
   const { from, to } = rangeDates(range, new Date(), { from: params.from, to: params.to });
   const method = Number(params.method) || null;
+  const by = (["day", "week", "month"] as string[]).includes(params.by ?? "")
+    ? (params.by as Bucket)
+    : range === "today" || range === "week"
+      ? "day"
+      : range === "month" || range === "last-month"
+        ? "day"
+        : "month";
 
   const report = incomeReport({ from, to, method });
   const sync = lastSync();
 
-  const link = (next: { range?: Range; method?: number | null }) => {
+  const link = (next: { range?: Range; method?: number | null; by?: Bucket }) => {
     const search = new URLSearchParams();
     search.set("range", next.range ?? range);
     if ((next.range ?? range) === "custom") {
@@ -47,6 +55,7 @@ export default async function IncomePage({
     if (chosen) {
       search.set("method", String(chosen));
     }
+    search.set("by", next.by ?? by);
     return `/new/income?${search.toString()}`;
   };
 
@@ -133,6 +142,31 @@ export default async function IncomePage({
             </div>
           </div>
         ))}
+      </section>
+
+      <section className="crmCard" data-tone="salmon">
+        <header>
+          <span className="crmDot" />
+          <h2>الدخل عبر الزمن</h2>
+          <span className="spacer" style={{ display: "flex", gap: 6 }}>
+            {(["day", "week", "month"] as Bucket[]).map((option) => (
+              <Link
+                className={option === by ? "crmBtn quiet primary" : "crmBtn quiet"}
+                href={link({ by: option })}
+                key={option}
+              >
+                {option === "day" ? "أيام" : option === "week" ? "أسابيع" : "أشهر"}
+              </Link>
+            ))}
+          </span>
+        </header>
+        <div className="crmPad">
+          {report.total.count === 0 ? (
+            <p className="crmEmpty">لا بيانات في هذه المدة.</p>
+          ) : (
+            <IncomeChart points={incomeSeries(report, by)} />
+          )}
+        </div>
       </section>
 
       <div className="crmSplit">
