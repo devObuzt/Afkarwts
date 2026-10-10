@@ -248,6 +248,23 @@ export function lastSync() {
     : null;
 }
 
+/** The earliest date a completed pull has covered, or "" if none has. */
+export function backfilledFrom() {
+  const row = getDb().prepare("SELECT backfilled_from AS f FROM payment_sync WHERE id = 1").get() as
+    | { f: string }
+    | undefined;
+  return String(row?.f ?? "");
+}
+
+export function markBackfilled(from: string) {
+  getDb()
+    .prepare(
+      `INSERT INTO payment_sync (id, backfilled_from) VALUES (1, ?)
+       ON CONFLICT (id) DO UPDATE SET backfilled_from = excluded.backfilled_from`
+    )
+    .run(from);
+}
+
 export function recordSync(input: { from: string; to: string; count: number; error?: string }) {
   getDb()
     .prepare(

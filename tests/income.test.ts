@@ -226,3 +226,20 @@ test("a batch that fails writes none of itself", async () => {
     "the good row rolled back with the bad one, so a retry cannot double-count"
   );
 });
+
+test("a half-finished backfill does not count as history", async () => {
+  const { getDb } = await import("@/app/lib/db");
+  const { savePayments, backfilledFrom, markBackfilled } = await import("@/app/lib/income/store");
+
+  getDb().exec("DELETE FROM payments");
+  getDb().exec("DELETE FROM payment_sync");
+
+  // Exactly the state the first run left behind: rows in the table, but no
+  // completed pull — so «is it empty» answered yes and the history was
+  // never fetched.
+  savePayments([doc({ morningId: "partial", paidOn: "2026-10-01" })], new Map());
+  assert.equal(backfilledFrom(), "", "rows are not a record of coverage");
+
+  markBackfilled("2025-04-01");
+  assert.equal(backfilledFrom(), "2025-04-01");
+});

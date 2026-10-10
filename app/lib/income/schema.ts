@@ -45,7 +45,16 @@ export function migrateIncomeTables(db: DatabaseSync) {
       last_from TEXT,
       last_to TEXT,
       last_count INTEGER NOT NULL DEFAULT 0,
-      last_error TEXT NOT NULL DEFAULT ''
+      last_error TEXT NOT NULL DEFAULT '',
+      backfilled_from TEXT NOT NULL DEFAULT ''
     );
   `);
+}
+
+/** Added after the first backfill died half-way and left the table looking full. */
+export function migrateBackfillColumn(db: DatabaseSync) {
+  const columns = db.prepare("PRAGMA table_info(payment_sync)").all() as Array<{ name: string }>;
+  if (!columns.some((column) => column.name === "backfilled_from")) {
+    db.exec("ALTER TABLE payment_sync ADD COLUMN backfilled_from TEXT NOT NULL DEFAULT ''");
+  }
 }

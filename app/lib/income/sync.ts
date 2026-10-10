@@ -61,15 +61,24 @@ function isoDay(date: Date) {
  * that tops up the last fortnight, which is all that can still change.
  */
 export async function syncIncomeAutomatically(now = new Date()) {
-  const { getDb } = await import("../db");
-  const existing = Number(
-    (getDb().prepare("SELECT COUNT(*) AS n FROM payments").get() as { n: number }).n
-  );
+  const { backfilledFrom, markBackfilled } = await import("./store");
 
   const to = isoDay(now);
-  const from = existing
-    ? isoDay(new Date(now.getTime() - RECENT_DAYS * 24 * 60 * 60 * 1000))
-    : isoDay(new Date(now.getFullYear(), now.getMonth() - BACKFILL_MONTHS, 1));
+  const horizon = isoDay(new Date(now.getFullYear(), now.getMonth() - BACKFILL_MONTHS, 1));
+  const covered = backfilledFrom();
 
-  return syncIncome(from, to);
+  // «Is the table empty» was the wrong question: the first backfill died
+  // half-way and left 133 rows behind, which made every run after it look
+  // like a top-up was enough. What matters is how far back a *completed*
+  // pull has reached.
+  const needsBackfill = !covered || covered > horizon;
+  const from = needsBackfill ? horizon : isoDay(new Date(now.getTime() - RECENT_DAYS * 24 * 60 * 60 * 1000));
+
+  const result = await syncIncome(from, to);
+
+  if (result.ok && needsBackfill) {
+    markBackfilled(horizon);
+  }
+
+  return result;
 }
