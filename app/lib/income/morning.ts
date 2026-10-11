@@ -28,6 +28,8 @@ export type MorningDoc = {
   description: string;
   orderRef: string;
   url: string;
+  /** The Morning account that issued it — the only thing over there that could name a seller. */
+  soldBy: string;
 };
 
 type Raw = Record<string, unknown>;
@@ -88,7 +90,8 @@ export function mapDoc(raw: Raw): MorningDoc {
     items: [...new Set(income.map((line) => String(line.catalogNum ?? "").trim()).filter(Boolean))],
     description,
     orderRef: orderRefOf(description),
-    url: String((raw.url as Record<string, unknown> | undefined)?.origin ?? "")
+    url: String((raw.url as Record<string, unknown> | undefined)?.origin ?? ""),
+    soldBy: String(raw.userName ?? "")
   };
 }
 

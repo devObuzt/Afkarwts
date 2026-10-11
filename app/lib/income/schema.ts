@@ -31,6 +31,7 @@ export function migrateIncomeTables(db: DatabaseSync) {
       order_ref TEXT NOT NULL DEFAULT '',
       member_id INTEGER,
       url TEXT NOT NULL DEFAULT '',
+      sold_by TEXT NOT NULL DEFAULT '',
       synced_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE SET NULL
     );
@@ -49,6 +50,14 @@ export function migrateIncomeTables(db: DatabaseSync) {
       backfilled_from TEXT NOT NULL DEFAULT ''
     );
   `);
+}
+
+/** Who sold it. Added once the first figures showed nobody could say. */
+export function migrateSellerColumn(db: DatabaseSync) {
+  const columns = db.prepare("PRAGMA table_info(payments)").all() as Array<{ name: string }>;
+  if (!columns.some((column) => column.name === "sold_by")) {
+    db.exec("ALTER TABLE payments ADD COLUMN sold_by TEXT NOT NULL DEFAULT ''");
+  }
 }
 
 /** Added after the first backfill died half-way and left the table looking full. */

@@ -22,6 +22,7 @@ function doc(over: Partial<Record<string, unknown>> = {}) {
     description: "تשלום עבור מסלול",
     orderRef: "",
     url: "",
+    soldBy: "",
     ...over
   } as never;
 }
@@ -242,4 +243,37 @@ test("a half-finished backfill does not count as history", async () => {
 
   markBackfilled("2025-04-01");
   assert.equal(backfilledFrom(), "2025-04-01");
+});
+
+test("a sale is named by the Morning account, or by whoever follows the member up", async () => {
+  const { createMember, getDb } = await import("@/app/lib/db");
+  const { createUser } = await import("@/app/lib/users/store");
+  const { assignCoach } = await import("@/app/lib/labels/store");
+  const { savePayments, incomeReport } = await import("@/app/lib/income/store");
+
+  getDb().exec("DELETE FROM payments");
+
+  const jwana = createUser({ name: "جوانا", username: `jw${Date.now()}`.slice(0, 20), password: "seller-pass", role: "coach" });
+  const buyer = createMember({ name: "زبونة", phone: "+972547770001" });
+  assignCoach(buyer.id, jwana.ok ? jwana.user.id : 0);
+
+  savePayments(
+    [
+      // Issued from a Morning account of its own: that name wins.
+      doc({ morningId: "v1", amount: 500, paidOn: "2026-12-01", soldBy: "مارية", clientPhone: "+972547770002" }),
+      // One shared Morning account, but the buyer has a مرافِقة.
+      doc({ morningId: "v2", amount: 300, paidOn: "2026-12-01", soldBy: "", clientPhone: "+972547770001" }),
+      // Neither.
+      doc({ morningId: "v3", amount: 100, paidOn: "2026-12-01", soldBy: "", clientPhone: "" })
+    ],
+    new Map()
+  );
+
+  const byName = Object.fromEntries(
+    incomeReport({ from: "2026-12-01", to: "2026-12-01" }).bySeller.map((row) => [row.seller, row.amount])
+  );
+
+  assert.equal(byName["جوانا"], 300, "the member's coach answers for it");
+  assert.equal(byName["مارية"], 500, "a Morning account of her own answers better");
+  assert.equal(byName["غير معروف"], 100, "and nothing is invented for the rest");
 });

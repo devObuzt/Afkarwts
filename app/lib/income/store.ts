@@ -18,6 +18,8 @@ export type Payment = {
   memberId: number | null;
   memberName: string;
   url: string;
+  soldBy: string;
+  sellerName: string;
 };
 
 type Row = Record<string, string | number | null>;
@@ -47,7 +49,9 @@ function mapPayment(row: Row): Payment {
     orderRef: String(row.order_ref ?? ""),
     memberId: row.member_id === null ? null : Number(row.member_id),
     memberName: String(row.member_name ?? ""),
-    url: String(row.url ?? "")
+    url: String(row.url ?? ""),
+    soldBy: String(row.sold_by ?? ""),
+    sellerName: String(row.seller_name ?? "")
   };
 }
 
@@ -84,14 +88,15 @@ export function savePayments(docs: MorningDoc[], sources: Map<string, IncomeSour
   const insert = db.prepare(
     `INSERT INTO payments
        (morning_id, number, doc_type, paid_on, amount, currency, methods, source,
-        client_name, client_phone, items, description, order_ref, member_id, url, synced_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        client_name, client_phone, items, description, order_ref, member_id, url, sold_by, synced_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
      ON CONFLICT (morning_id) DO UPDATE SET
        number = excluded.number, paid_on = excluded.paid_on, amount = excluded.amount,
        currency = excluded.currency, methods = excluded.methods, source = excluded.source,
        client_name = excluded.client_name, client_phone = excluded.client_phone,
        items = excluded.items, description = excluded.description, order_ref = excluded.order_ref,
-       member_id = excluded.member_id, url = excluded.url, synced_at = CURRENT_TIMESTAMP`
+       member_id = excluded.member_id, url = excluded.url, sold_by = excluded.sold_by,
+       synced_at = CURRENT_TIMESTAMP`
   );
 
   let written = 0;
@@ -118,7 +123,8 @@ export function savePayments(docs: MorningDoc[], sources: Map<string, IncomeSour
       doc.description,
       doc.orderRef,
       member?.id ?? null,
-      doc.url
+      doc.url,
+      doc.soldBy ?? ""
     );
     written += 1;
   }
@@ -167,6 +173,7 @@ export type IncomeReport = {
   bySource: Array<{ source: IncomeSource; count: number; amount: number }>;
   byMethod: Array<{ method: number; count: number; amount: number }>;
   byItem: Array<{ item: string; count: number; amount: number }>;
+  bySeller: Array<{ seller: string; count: number; amount: number }>;
   payments: Payment[];
   linked: number;
 };
@@ -186,8 +193,10 @@ export function incomeReport(filter: { from: string; to: string; method?: number
 
   const rows = db
     .prepare(
-      `SELECT payments.*, members.name AS member_name
-         FROM payments LEFT JOIN members ON members.id = payments.member_id
+      `SELECT payments.*, members.name AS member_name, users.name AS seller_name
+         FROM payments
+         LEFT JOIN members ON members.id = payments.member_id
+         LEFT JOIN users ON users.id = members.assigned_user_id
          ${clause} ORDER BY paid_on DESC, payments.id DESC`
     )
     .all(...args) as Row[];
@@ -214,6 +223,9 @@ export function incomeReport(filter: { from: string; to: string; method?: number
   const bySourceMap = group((payment) => [payment.source]);
   const byMethodMap = group((payment) => payment.methods);
   const byItemMap = group((payment) => payment.items);
+  // Two ways of knowing, in order of how much they are worth: the Morning
+  // account that issued the invoice, then whoever follows the member up.
+  const bySellerMap = group((payment) => [payment.sellerName || payment.soldBy || "غير معروف"]);
 
   return {
     from: filter.from,
@@ -229,6 +241,9 @@ export function incomeReport(filter: { from: string; to: string; method?: number
       .sort((a, b) => b.amount - a.amount),
     byItem: [...byItemMap.entries()]
       .map(([item, value]) => ({ item, count: value.count, amount: round(value.amount) }))
+      .sort((a, b) => b.amount - a.amount),
+    bySeller: [...bySellerMap.entries()]
+      .map(([seller, value]) => ({ seller, count: value.count, amount: round(value.amount) }))
       .sort((a, b) => b.amount - a.amount),
     payments,
     linked: payments.filter((payment) => payment.memberId !== null).length

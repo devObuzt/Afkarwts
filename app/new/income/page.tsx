@@ -235,6 +235,32 @@ export default async function IncomePage({
             )}
           </section>
 
+          <section className="crmCard" data-tone="rose">
+            <header>
+              <span className="crmDot" />
+              <h2>لمن البيعة</h2>
+            </header>
+            {report.bySeller.map((row) => (
+              <div className="crmRow" key={row.seller}>
+                <span className="grow">
+                  <span className="crmRowTitle" style={{ display: "block" }}>
+                    {row.seller}
+                  </span>
+                  <span className="crmRowDetail">{row.count} فاتورة</span>
+                </span>
+                <span className="crmRowTitle">{shekels(row.amount)}</span>
+              </div>
+            ))}
+            {report.bySeller.length <= 1 && (
+              <div className="crmPad" style={{ borderTop: "1px solid var(--line-soft)" }}>
+                <p className="crmNote">
+                  كل فواتير Morning تصدر من حساب واحد، فلا شيء فيها يسمّي البائعة. تُفصل بإحدى طريقتين: حساب Morning
+                  لكل واحدة من الفريق — عندها يظهر اسمها هنا من تلقائه — أو بإسناد المنتسب إلى مرافِقة في المنظومة.
+                </p>
+              </div>
+            )}
+          </section>
+
           <section className="crmCard" data-tone="mauve">
             <header>
               <span className="crmDot" />
