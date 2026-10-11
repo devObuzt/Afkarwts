@@ -160,8 +160,11 @@ export function applyPathLabels() {
   try {
     for (const [memberId, paths] of wanted) {
       for (const path of paths) {
-        const labelId = labelIds.get(path)!;
-        if (already.has(`${memberId}:${labelId}`)) {
+        // Missing when a journey or campaign already owns a group of that
+        // name: the مسار goes unlabelled, and `!` here would have handed
+        // addLabel an undefined id and rolled the whole pass back.
+        const labelId = labelIds.get(path);
+        if (labelId === undefined || already.has(`${memberId}:${labelId}`)) {
           continue;
         }
         if (addLabel(memberId, labelId, false)) {

@@ -209,3 +209,35 @@ test("a whole مسار, and the invoice contacts, cannot be messaged as a list",
   assert.equal(groupSendable(batch.id).ok, true, "a دفعة is exactly what a campaign is for");
   assert.equal(groupSendable(999_999).ok, false, "and a group that is not there is not sendable either");
 });
+
+test("one مسار blocked by a live list does not stop the others", async () => {
+  const { createGroup, createMember, getDb } = await import("@/app/lib/db");
+  const { savePayments, relinkPayments } = await import("@/app/lib/income/store");
+  const { applyPathLabels } = await import("@/app/lib/income/adopt");
+  const { labelsFor } = await import("@/app/lib/labels/store");
+
+  getDb().exec("DELETE FROM payments");
+
+  // «OCEAN CLEAN» is already a دفعة a campaign runs on, so it gets no
+  // مسار label. The other path on the same invoice still has to land —
+  // looking its id up with `!` fed addLabel an undefined group and the
+  // transaction rolled every label back.
+  const taken = createGroup("OCEAN CLEAN");
+  getDb()
+    .prepare("INSERT INTO campaigns (group_id, label, mode, text, body_params) VALUES (?, 'x', 'text', 'x', '[]')")
+    .run(taken.id);
+
+  const member = createMember({ name: "سلمى", phone: "+972521110011" })!;
+  savePayments(
+    [doc({ morningId: "t1", clientPhone: "+972521110011", items: ["OCEAN CLEAN", "EXTRA+"] })],
+    new Map()
+  );
+  relinkPayments();
+
+  const result = applyPathLabels();
+  assert.equal(result.applied, 1, "the one that could be labelled was");
+  assert.deepEqual(
+    labelsFor(member.id).map((label) => label.name),
+    ["EXTRA+"]
+  );
+});
