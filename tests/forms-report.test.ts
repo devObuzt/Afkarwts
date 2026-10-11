@@ -206,8 +206,40 @@ test("column widths follow what is in the column, not an even share", async () =
   });
 
   const asNumber = widths.map((width) => Number(width.replace("%", "")));
-  assert.ok(asNumber[1] > asNumber[0] * 2, `prose takes the room, not the phone — got ${widths.join(" / ")}`);
+  assert.ok(asNumber[1] > asNumber[0], `prose takes the room, not the phone — got ${widths.join(" / ")}`);
   assert.equal(Math.round(asNumber.reduce((sum, value) => sum + value, 0)), 100, "they divide the page");
+});
+
+test("a column of phones is wide enough to print a phone on one line", async () => {
+  const { columnWidths } = await import("@/app/lib/forms/report");
+
+  // The sheet Afkar prints: an id and a phone side by side, a town, a
+  // consent paragraph, and a dozen yes/no answers. The id came out on
+  // top of the phone, because a paragraph that folds onto four lines was
+  // weighted the same as digits that cannot fold at all.
+  const consent = "أوافق على أن كل التعليمات التي أحصل عليها ليست بديلاً عن الاستشارة الطبية ولا تلزمني بوقف علاجات";
+  const columns = ["الاسم", "البلدة", "العنوان", "رقم الهوية", "رقم الهاتف", "الإقرار",
+    ...Array.from({ length: 10 }, (_, index) => `سؤال ${index}`)];
+  const widths = columnWidths({
+    columns,
+    rows: [
+      {
+        cells: ["اكرام طه", "كابول", "الشارع الرئيسي بعد الدوار الرابع", "220135305", "0549649580", consent,
+          ...Array.from({ length: 10 }, () => "لا")]
+      }
+    ]
+  });
+
+  // A4 landscape in Chromium is about 1050px of printable width; the cell
+  // spends 8px of it on padding and draws digits at roughly 3.9px each.
+  const page = 1050;
+  const digits = (index: number) => {
+    const percent = Number(widths[index + 2].replace("%", ""));
+    return (percent / 100) * page - 8;
+  };
+
+  assert.ok(digits(3) >= 9 * 3.9, `the id needs one line — got ${widths[5]}`);
+  assert.ok(digits(4) >= 10 * 3.9, `the phone needs one line — got ${widths[6]}`);
 });
 
 test("a short column still gets enough room to be read", async () => {
@@ -236,4 +268,40 @@ test("the column widths add up to the page, counting the index and the date", as
   const total = widths.reduce((sum, width) => sum + Number(width.replace("%", "")), 0);
   // They summed to 109 once, and the id printed on top of the phone.
   assert.ok(Math.abs(total - 100) < 0.5, `they must fill the page exactly — got ${total}%`);
+});
+
+test("a paragraph-long question prints as a number, and the key says what it is", async () => {
+  const { headerKey, printHeader } = await import("@/app/lib/forms/report");
+
+  const consent =
+    "أوافق على أن كل التعليمات التي أحصل عليها من السيدة أفكار ليست بديلاً عن الاستشارة الطبية";
+  const columns = ["الاسم الكامل", "رقم الهاتف", consent];
+
+  assert.equal(printHeader(columns[0], 0), "الاسم الكامل", "a short question is its own name");
+  assert.equal(printHeader(columns[1], 1), "رقم الهاتف");
+  assert.equal(printHeader(columns[2], 2), "س3", "a paragraph prints as its number");
+
+  const key = headerKey(columns);
+  assert.deepEqual(key, [{ short: "س3", label: consent }], "only the shortened ones need a key");
+});
+
+test("no printed column name is long enough to stop the header repeating", async () => {
+  const { printHeader, SHORT_HEADER } = await import("@/app/lib/forms/report");
+
+  // Chromium repeats a table header across printed pages only while the
+  // header stays under a quarter of the page. Afkar's twenty questions
+  // made it 342px of a 718px sheet, so page two printed columns of «لا»
+  // with nothing naming them.
+  const columns = [
+    "الاسم الكامل",
+    "هل تعاني/ين أو عانيت في السابق من أحد هذه الأمراض؟",
+    "رزمة قناني العصائر تُوزَّع يوم الثلاثاء خلال أسبوع Clean عبر خدمة التوصيل، لذلك عليك أن تكون متاحاً للتواصل"
+  ];
+
+  for (const [index, column] of columns.entries()) {
+    assert.ok(
+      printHeader(column, index).length <= SHORT_HEADER,
+      `«${printHeader(column, index)}» is too long to head a column`
+    );
+  }
 });

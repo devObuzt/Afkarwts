@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getForm } from "@/app/lib/forms/store";
-import { columnWidths, isNumeric, submissionGrid } from "@/app/lib/forms/report";
+import { columnWidths, headerKey, isNumeric, printHeader, submissionGrid } from "@/app/lib/forms/report";
 import { requireUser } from "@/app/lib/users/current";
 import { PdfButton } from "./PdfButton";
 import { can } from "@/app/lib/users/permissions";
@@ -54,6 +54,7 @@ export default async function ReportPage({
   const printing = query.print === "1";
   // Weighted by content: a phone does not need a consent paragraph's room.
   const widths = columnWidths(grid);
+  const key = headerKey(grid.columns);
 
   return (
     <div className={printing ? "crmPage wide printing" : "crmPage wide"}>
@@ -118,8 +119,15 @@ export default async function ReportPage({
             <tr>
               <th>#</th>
               <th>التاريخ</th>
-              {grid.columns.map((column) => (
-                <th key={column}>{column}</th>
+              {grid.columns.map((column, index) => (
+                <th key={column}>
+                  {/* On screen the question is the column name. On paper a
+                      paragraph-long question would make the header half the
+                      sheet, and Chromium then stops repeating it — so it
+                      prints as a number and the key sits under the table. */}
+                  <span className="thFull">{column}</span>
+                  <span className="thShort">{printHeader(column, index)}</span>
+                </th>
               ))}
             </tr>
           </thead>
@@ -143,6 +151,18 @@ export default async function ReportPage({
           </tbody>
         </table>
       </div>
+
+      {key.length > 0 && (
+        <dl className="printKey">
+          <dt className="printKeyTitle">مفتاح الأسئلة</dt>
+          {key.map((entry) => (
+            <div key={entry.short}>
+              <dt>{entry.short}</dt>
+              <dd>{entry.label}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
 
       {grid.rows.length === 0 && <p className="crmEmpty">لا تسجيلات ضمن هذا الفلتر.</p>}
     </div>

@@ -21,6 +21,29 @@ export function isNumeric(value: string) {
 }
 
 /**
+ * The short name a question prints under.
+ *
+ * Chromium repeats a table header on every printed page only while the
+ * header is under a quarter of the page. Afkar's consent questions run to
+ * a full paragraph each, which made the header 342px of a 718px sheet —
+ * so it printed once and pages two and three came out as columns of «لا»
+ * with nothing saying what was asked. A long question prints as its
+ * number and is spelled out in the key under the table.
+ */
+export const SHORT_HEADER = 24;
+
+export function printHeader(column: string, index: number) {
+  return column.length <= SHORT_HEADER ? column : `س${index + 1}`;
+}
+
+/** The questions that print as a number, and what each one says. */
+export function headerKey(columns: string[]) {
+  return columns
+    .map((column, index) => ({ short: printHeader(column, index), label: column }))
+    .filter((entry) => entry.short !== entry.label);
+}
+
+/**
  * How wide each column should be on a printed page.
  *
  * Fixed layout divides the page evenly, which gives a consent paragraph
@@ -34,10 +57,20 @@ export function columnWidths(grid: { columns: string[]; rows: Array<{ cells: str
   const leading = [3, 7];
 
   const answers = grid.columns.map((column, index) => {
-    const longest = grid.rows.reduce((most, row) => Math.max(most, (row.cells[index] ?? "").length), 0);
-    const header = column.length;
-    // The header wraps onto several lines happily; a value should not have to.
-    const want = Math.max(Math.min(longest, 40), Math.min(header, 14), 6);
+    const values = grid.rows.map((row) => row.cells[index] ?? "").filter((value) => value.trim() !== "");
+    const longest = values.reduce((most, value) => Math.max(most, value.length), 0);
+    // What the header prints as, not what it says: a paragraph-long
+    // question prints as «س7». Counting the full text gave fourteen
+    // yes/no columns the sheet and left the phone spilling over the id.
+    const header = printHeader(column, index).length;
+    // A sentence folds onto three or four lines and reads the same. A
+    // phone or an id cannot fold, so its column has to hold the whole run
+    // on one line.
+    const unwrappable = values.length > 0 && values.every((value) => isNumeric(value));
+    const headroom = Math.min(Math.ceil(header / 3), 8);
+    const want = unwrappable
+      ? Math.max(longest + 2, 8)
+      : Math.max(Math.min(Math.ceil(longest / 2.5), 22), headroom, 6);
     return want;
   });
 

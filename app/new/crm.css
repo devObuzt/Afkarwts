@@ -1416,6 +1416,11 @@
   color: var(--muted);
 }
 
+.crm .gridTable thead .thShort,
+.crm .printKey {
+  display: none;
+}
+
 /* The print sheet: no chrome, no widget, the table edge to edge. */
 @page {
   /* Twenty-odd questions do not fit across a portrait page. */
@@ -1441,13 +1446,22 @@
     min-height: 0;
   }
 
+  /* overflow-x:hidden makes the body a scroll container, and Chromium
+     does not repeat a table header out of one — page two came back with
+     no column names even with display:table-header-group set. */
   .crm .crmWork > .crmBody,
   .crm .waPane {
+    display: block;
     flex: none;
     width: 100%;
     padding: 0;
+    overflow: visible;
   }
 
+  /* The page canvas, not only the app: where the table stops, the sheet
+     was showing the screen's cream behind it. */
+  html,
+  body,
   .crm,
   .crm .crmPage.wide {
     background: #fff;
@@ -1489,6 +1503,52 @@
     font-size: 8px;
   }
 
+  /* Chromium repeats a header only while it stays under a quarter of the
+     page. Afkar's consent questions are a paragraph each, which made the
+     header 342px of a 718px sheet — so it printed once and page two was
+     columns of «لا» with nothing naming them. The long ones print as a
+     number and the key under the table spells them out. */
+  .crm .gridTable thead .thFull {
+    display: none;
+  }
+
+  .crm .gridTable thead .thShort {
+    display: inline;
+  }
+
+  .crm .printKey {
+    display: block;
+    margin-top: 10px;
+    font-size: 8px;
+    line-height: 1.5;
+    color: #222;
+    /* A key split across the fold is read twice; it moves whole. */
+    break-inside: avoid;
+  }
+
+  .crm .printKey > div {
+    display: flex;
+    gap: 6px;
+    break-inside: avoid;
+    padding: 1px 0;
+  }
+
+  .crm .printKey dt {
+    flex: none;
+    font-weight: 700;
+    min-width: 26px;
+  }
+
+  .crm .printKey dd {
+    margin: 0;
+  }
+
+  .crm .printKeyTitle {
+    font-weight: 700;
+    font-size: 9px;
+    margin-bottom: 4px;
+  }
+
   /* The index and the date need no more room than they use. */
   .crm .gridTable th:first-child,
   .crm .gridTable td:first-child {
@@ -1510,7 +1570,10 @@
      mid-digit, and never out over the next column. «+972 54-523-1550»
      spilled across its neighbour when this was nowrap. */
   .crm .gridTable td.num {
-    overflow-wrap: normal;
+    /* break-word is the last resort only: it folds a number solely when
+       the column cannot hold it at all. A phone on two lines still reads;
+       a phone painted over the id beside it does not. */
+    overflow-wrap: break-word;
     word-break: normal;
     font-size: 7px;
     direction: ltr;
