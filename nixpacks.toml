@@ -1,0 +1,14 @@
+# Chromium, so the registrations report downloads as a PDF instead of
+# opening a page that explains how to make one.
+#
+# The report is a wide Arabic table: shaping and right-to-left ordering
+# that a PDF drawing library does not do. A browser already does both, and
+# the print stylesheet is written, so the server renders the page and
+# takes the PDF. Fonts come from the app — next/font self-hosts them — so
+# nothing here depends on what the image has installed.
+#
+# A missing package fails the build, and a failed build leaves the running
+# deployment serving; the route also answers 503 with a link to the print
+# sheet if it cannot find a browser, so neither way takes the system down.
+[phases.setup]
+aptPkgs = ["chromium"]

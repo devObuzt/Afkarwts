@@ -15,6 +15,11 @@ import { getForm, listFields } from "./store";
  * what somebody said months ago.
  */
 
+/** A phone, an id, a date: a value that means nothing split across lines. */
+export function isNumeric(value: string) {
+  return /^[\d+\-/.() ]{5,}$/.test(value.trim());
+}
+
 export type SubmissionGrid = {
   formId: number;
   formName: string;

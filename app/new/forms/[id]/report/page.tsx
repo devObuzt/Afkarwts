@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getForm } from "@/app/lib/forms/store";
-import { submissionGrid } from "@/app/lib/forms/report";
+import { isNumeric, submissionGrid } from "@/app/lib/forms/report";
 import { requireUser } from "@/app/lib/users/current";
+import { PdfButton } from "./PdfButton";
 import { can } from "@/app/lib/users/permissions";
 
 export const dynamic = "force-dynamic";
@@ -83,14 +84,11 @@ export default async function ReportPage({
               <a className="crmBtn" href={`/api/forms/${form.id}/export${state ? `?state=${state}` : ""}`}>
                 تنزيل Excel
               </a>
-              <a
-                className="crmBtn primary"
-                href={`/new/forms/${form.id}/report?print=1${state ? `&state=${state}` : ""}`}
-                target="_blank"
-                rel="noreferrer"
-              >
-                نسخة للطباعة / PDF
-              </a>
+              <PdfButton
+                formId={form.id}
+                printHref={`/new/forms/${form.id}/report?print=1${state ? `&state=${state}` : ""}`}
+                state={state}
+              />
             </span>
           </section>
         </>
@@ -129,7 +127,9 @@ export default async function ReportPage({
                   <span className="crmLtr">{row.submittedAt.slice(0, 10)}</span>
                 </td>
                 {row.cells.map((cell, cellIndex) => (
-                  <td key={grid.columns[cellIndex]}>{cell}</td>
+                  <td className={isNumeric(cell) ? "num" : undefined} key={grid.columns[cellIndex]}>
+                    {cell}
+                  </td>
                 ))}
               </tr>
             ))}

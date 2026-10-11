@@ -23,6 +23,7 @@
     "@capacitor/push-notifications": "^8.1.2",
     "firebase": "^12.17.1",
     "next": "^15.3.4",
+    "puppeteer-core": "^23.11.1",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },
