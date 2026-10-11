@@ -35,9 +35,19 @@ export const KIND_TONE: Record<LabelKind, string> = {
 export const MANAGED_FOLLOWING = "following";
 export const MANAGED_AWAITING = "awaiting";
 
+/**
+ * Somebody who exists here only because Morning billed them.
+ *
+ * They never filled a form and never agreed to anything, so the label is
+ * the warning that travels with them: they are a contact, not a منتسب who
+ * signed up, and nothing adds them to a مسار by itself.
+ */
+export const MANAGED_INVOICE = "invoice";
+
 export const MANAGED_NAME: Record<string, string> = {
   [MANAGED_FOLLOWING]: "متابعة مسار",
-  [MANAGED_AWAITING]: "بانتظار أفكار"
+  [MANAGED_AWAITING]: "بانتظار أفكار",
+  [MANAGED_INVOICE]: "زبون من فاتورة"
 };
 
 export function isLabelKind(value: string): value is LabelKind {

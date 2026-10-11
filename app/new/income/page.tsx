@@ -9,14 +9,18 @@ import {
   methodName,
   type Range
 } from "@/app/lib/income/kinds";
-import { incomeReport, incomeSeries, lastSync, rangeDates, type Bucket } from "@/app/lib/income/store";
+import { incomeReport, incomeSeries, lastSync, type Bucket } from "@/app/lib/income/store";
 import { day } from "../format";
+import { IncomeFilters } from "../IncomeFilters";
+import { readIncomeParams } from "../IncomeSummary";
 import { IncomeChart } from "./IncomeChart";
 import { SyncButton } from "./SyncButton";
 
 export const dynamic = "force-dynamic";
 
 const RANGES: Range[] = ["today", "week", "month", "last-month", "custom"];
+const BUCKETS: Bucket[] = ["day", "week", "month"];
+const BUCKET_LABEL: Record<Bucket, string> = { day: "أيام", week: "أسابيع", month: "أشهر" };
 
 function shekels(amount: number) {
   return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(Math.round(amount))} ش.ج`;
@@ -30,34 +34,10 @@ export default async function IncomePage({
   await requireUser("income.view");
 
   const params = await searchParams;
-  const range = (RANGES as string[]).includes(params.range ?? "") ? (params.range as Range) : "month";
-  const { from, to } = rangeDates(range, new Date(), { from: params.from, to: params.to });
-  const method = Number(params.method) || null;
-  const by = (["day", "week", "month"] as string[]).includes(params.by ?? "")
-    ? (params.by as Bucket)
-    : range === "today" || range === "week"
-      ? "day"
-      : range === "month" || range === "last-month"
-        ? "day"
-        : "month";
+  const { range, from, to, method, by } = readIncomeParams(params);
 
   const report = incomeReport({ from, to, method });
   const sync = lastSync();
-
-  const link = (next: { range?: Range; method?: number | null; by?: Bucket }) => {
-    const search = new URLSearchParams();
-    search.set("range", next.range ?? range);
-    if ((next.range ?? range) === "custom") {
-      search.set("from", from);
-      search.set("to", to);
-    }
-    const chosen = next.method === undefined ? method : next.method;
-    if (chosen) {
-      search.set("method", String(chosen));
-    }
-    search.set("by", next.by ?? by);
-    return `/new/income?${search.toString()}`;
-  };
 
   return (
     <div className="crmPage">
@@ -69,54 +49,24 @@ export default async function IncomePage({
         </p>
       </header>
 
-      {/* Filters are links, so a view can be sent to someone. */}
+      {/* The same three dropdowns the dashboard uses; the URL still carries
+          the whole view, so it can be sent to somebody. */}
       <section className="crmCard crmPad">
-        <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
-          {RANGES.map((option) => (
-            <Link
-              className={option === range ? "crmBtn quiet primary" : "crmBtn quiet"}
-              href={link({ range: option })}
-              key={option}
-            >
-              {RANGE_LABEL[option]}
-            </Link>
-          ))}
-        </div>
-
-        {range === "custom" && (
-          <form className="crmSearch" method="get" style={{ marginTop: 12 }}>
-            <input name="range" type="hidden" value="custom" />
-            <label className="crmField" style={{ flex: "1 1 160px" }}>
-              <span>من</span>
-              <input defaultValue={from} name="from" style={{ direction: "ltr", textAlign: "right" }} type="date" />
-            </label>
-            <label className="crmField" style={{ flex: "1 1 160px" }}>
-              <span>إلى</span>
-              <input defaultValue={to} name="to" style={{ direction: "ltr", textAlign: "right" }} type="date" />
-            </label>
-            {method && <input name="method" type="hidden" value={method} />}
-            <button className="crmBtn primary" style={{ alignSelf: "flex-end" }} type="submit">
-              عرض
-            </button>
-          </form>
-        )}
-
-        <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginTop: 14 }}>
-          <Link className={method ? "crmBtn quiet" : "crmBtn quiet primary"} href={link({ method: null })}>
-            كل وسائل الدفع
-          </Link>
-          {Object.keys(METHOD_LABEL)
-            .map(Number)
-            .map((code) => (
-              <Link
-                className={method === code ? "crmBtn quiet primary" : "crmBtn quiet"}
-                href={link({ method: code })}
-                key={code}
-              >
-                {METHOD_LABEL[code]}
-              </Link>
-            ))}
-        </div>
+        <IncomeFilters
+          by={by}
+          buckets={BUCKETS.map((value) => ({ value, label: BUCKET_LABEL[value] }))}
+          from={from}
+          method={method ? String(method) : ""}
+          methods={[
+            { value: "", label: "كل الوسائل" },
+            ...Object.keys(METHOD_LABEL)
+              .map(Number)
+              .map((code) => ({ value: String(code), label: METHOD_LABEL[code] }))
+          ]}
+          range={range}
+          ranges={RANGES.map((value) => ({ value, label: RANGE_LABEL[value] }))}
+          to={to}
+        />
       </section>
 
       <section className="crmGrid">
@@ -148,17 +98,6 @@ export default async function IncomePage({
         <header>
           <span className="crmDot" />
           <h2>الدخل عبر الزمن</h2>
-          <span className="spacer" style={{ display: "flex", gap: 6 }}>
-            {(["day", "week", "month"] as Bucket[]).map((option) => (
-              <Link
-                className={option === by ? "crmBtn quiet primary" : "crmBtn quiet"}
-                href={link({ by: option })}
-                key={option}
-              >
-                {option === "day" ? "أيام" : option === "week" ? "أسابيع" : "أشهر"}
-              </Link>
-            ))}
-          </span>
         </header>
         <div className="crmPad">
           {report.total.count === 0 ? (
@@ -218,14 +157,42 @@ export default async function IncomePage({
               <span className="crmDot" />
               <h2>حسب المسار</h2>
             </header>
-            {report.byItem.length === 0 ? (
-              <p className="crmEmpty">لا بنود مسمّاة.</p>
+            {report.byPath.length === 0 ? (
+              <p className="crmEmpty">لا مسار مسمّى في فواتير هذه المدة.</p>
             ) : (
-              report.byItem.slice(0, 12).map((row) => (
+              report.byPath.map((row) => (
                 <div className="crmRow" key={row.item}>
                   <span className="grow">
                     <span className="crmRowTitle" style={{ display: "block" }}>
-                      {row.item}
+                      {/* «EXTRA+» printed as «+EXTRA»: a Latin run inside an
+                          RTL line needs isolating or its sign moves. */}
+                      <bdi>{row.item}</bdi>
+                    </span>
+                    <span className="crmRowDetail">{row.count} فاتورة</span>
+                  </span>
+                  <span className="crmRowTitle">{shekels(row.amount)}</span>
+                </div>
+              ))
+            )}
+          </section>
+
+          {/* Shipping, a top-up, a photo day: sold beside a مسار, and they
+              were being added up under its heading. */}
+          <section className="crmCard" data-tone="mint">
+            <header>
+              <span className="crmDot" />
+              <h2>الإضافات</h2>
+            </header>
+            {report.byExtra.length === 0 ? (
+              <p className="crmEmpty">لا إضافات في هذه المدة.</p>
+            ) : (
+              report.byExtra.map((row) => (
+                <div className="crmRow" key={row.item}>
+                  <span className="grow">
+                    <span className="crmRowTitle" style={{ display: "block" }}>
+                      {/* «EXTRA+» printed as «+EXTRA»: a Latin run inside an
+                          RTL line needs isolating or its sign moves. */}
+                      <bdi>{row.item}</bdi>
                     </span>
                     <span className="crmRowDetail">{row.count} فاتورة</span>
                   </span>

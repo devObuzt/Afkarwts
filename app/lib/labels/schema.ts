@@ -48,5 +48,20 @@ export function migrateLabelColumns(db: DatabaseSync) {
     db.exec("CREATE INDEX IF NOT EXISTS idx_members_assigned ON members(assigned_user_id)");
   }
 
+  // A مسار label is put on from an invoice, so taking it off by hand has
+  // to be remembered — otherwise the next sync reads the same invoice and
+  // puts it straight back. A deleted membership row cannot carry a flag,
+  // so the refusal is stored on its own.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS label_refusals (
+      member_id INTEGER NOT NULL,
+      group_id INTEGER NOT NULL,
+      at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (member_id, group_id),
+      FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE,
+      FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE
+    )
+  `);
+
   db.exec("CREATE INDEX IF NOT EXISTS idx_groups_kind ON groups(kind)");
 }

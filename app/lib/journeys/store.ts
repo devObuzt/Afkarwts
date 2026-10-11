@@ -326,6 +326,20 @@ export function syncEnrollments(journeyId: number, now: Date) {
     return { added: 0, removed: 0 };
   }
 
+  // A مسار is a record of what somebody bought — it is written onto
+  // hundreds of people from their Morning invoices, including contacts who
+  // never registered and never consented. A دفعة is the list a schedule
+  // runs on. Point a journey at a مسار and the next income sync would
+  // enrol six hundred people into it and start messaging them, so it
+  // cannot be done, and the refusal lives here rather than in the screen
+  // that creates journeys.
+  const kind = db.prepare("SELECT kind FROM groups WHERE id = ?").get(journey.groupId) as
+    | { kind: string }
+    | undefined;
+  if (kind?.kind === "path") {
+    return { added: 0, removed: 0 };
+  }
+
   const steps = listSteps(journey.templateId);
   const memberIds = (
     db.prepare("SELECT member_id FROM member_groups WHERE group_id = ?").all(journey.groupId) as Array<{

@@ -38,13 +38,16 @@ export function WhatsAppWidget({ canSend }: { canSend: boolean }) {
   const [unreadTotal, setUnreadTotal] = useState(0);
   const [query, setQuery] = useState("");
   const [openId, setOpenId] = useState<number | null>(null);
+  // The rail is filtered by the search box. Without a copy of the thread,
+  // typing a name would close the conversation that is open.
+  const [openThread, setOpenThread] = useState<Thread | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const bottom = useRef<HTMLDivElement>(null);
 
-  const open = threads.find((thread) => thread.memberId === openId) ?? null;
+  const open = threads.find((thread) => thread.memberId === openId) ?? openThread;
 
   const loadThreads = useCallback(async () => {
     const response = await fetch(`/api/inbox/threads?q=${encodeURIComponent(query)}&limit=40`);
@@ -115,7 +118,9 @@ export function WhatsAppWidget({ canSend }: { canSend: boolean }) {
   }
 
   return (
-    <aside className="waPane">
+    /* The conversation is not drawn until one is chosen, and the rail
+       alone leaves the system 85% of the screen instead of 60%. */
+    <aside className="waPane" data-open={open ? "yes" : "no"}>
       {/* The rail: search, threads, and the way out to the old screen. */}
       <div className="waRail">
         <div className="waRailHead">
@@ -141,7 +146,10 @@ export function WhatsAppWidget({ canSend }: { canSend: boolean }) {
               <button
                 className={thread.memberId === openId ? "waThread current" : "waThread"}
                 key={thread.memberId}
-                onClick={() => setOpenId(thread.memberId)}
+                onClick={() => {
+                  setOpenId(thread.memberId);
+                  setOpenThread(thread);
+                }}
                 type="button"
               >
                 <span className="crmAvatar" data-hue={hueOf(thread.name)}>
@@ -168,59 +176,67 @@ export function WhatsAppWidget({ canSend }: { canSend: boolean }) {
         </a>
       </div>
 
-      {/* The conversation. */}
-      <div className="waChat">
-        {!open ? (
-          <p className="crmEmpty">اختر محادثة من القائمة.</p>
-        ) : (
-          <>
-            <header className="waChatHead">
-              <Link className="waChatName" href={`/new/people/${open.memberId}`}>
-                {open.name}
-              </Link>
-              <span className={open.windowOpen ? "crmPill live" : "crmPill open"}>
-                {open.windowOpen ? "النافذة مفتوحة" : "النافذة مغلقة"}
-              </span>
-            </header>
+      {/* The conversation, only once there is one. */}
+      {open && (
+        <div className="waChat">
+          <header className="waChatHead">
+            <Link className="waChatName" href={`/new/people/${open.memberId}`}>
+              {open.name}
+            </Link>
+            <span className={open.windowOpen ? "crmPill live" : "crmPill open"}>
+              {open.windowOpen ? "النافذة مفتوحة" : "النافذة مغلقة"}
+            </span>
+            <button
+              aria-label="إغلاق المحادثة"
+              className="waClose"
+              onClick={() => {
+                setOpenId(null);
+                setOpenThread(null);
+              }}
+              title="إغلاق المحادثة"
+              type="button"
+            >
+              ×
+            </button>
+          </header>
 
-            <div className="waMessages">
-              {messages.map((message) => (
-                <div className={`waBubble ${message.direction}`} key={message.id}>
-                  {message.body}
-                  <span className="waWhen">{ago(message.createdAt)}</span>
-                </div>
-              ))}
-              <div ref={bottom} />
-            </div>
-
-            {error && <p className="crmError" style={{ margin: "0 12px 8px" }}>{error}</p>}
-
-            {canSend && open.windowOpen ? (
-              <div className="waCompose">
-                <textarea
-                  onChange={(event) => setDraft(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-                      void send();
-                    }
-                  }}
-                  placeholder="اكتب الرد…"
-                  value={draft}
-                />
-                <button className="crmBtn primary" disabled={sending || !draft.trim()} onClick={send} type="button">
-                  {sending ? "…" : "إرسال"}
-                </button>
+          <div className="waMessages">
+            {messages.map((message) => (
+              <div className={`waBubble ${message.direction}`} key={message.id}>
+                {message.body}
+                <span className="waWhen">{ago(message.createdAt)}</span>
               </div>
-            ) : (
-              <p className="crmNote waClosed">
-                {canSend
-                  ? "مضى أكثر من 24 ساعة على آخر رسالة منه. الإرسال الآن يحتاج قالباً معتمداً."
-                  : "لا تملك صلاحية الإرسال."}
-              </p>
-            )}
-          </>
-        )}
-      </div>
+            ))}
+            <div ref={bottom} />
+          </div>
+
+          {error && <p className="crmError" style={{ margin: "0 12px 8px" }}>{error}</p>}
+
+          {canSend && open.windowOpen ? (
+            <div className="waCompose">
+              <textarea
+                onChange={(event) => setDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+                    void send();
+                  }
+                }}
+                placeholder="اكتب الرد…"
+                value={draft}
+              />
+              <button className="crmBtn primary" disabled={sending || !draft.trim()} onClick={send} type="button">
+                {sending ? "…" : "إرسال"}
+              </button>
+            </div>
+          ) : (
+            <p className="crmNote waClosed">
+              {canSend
+                ? "مضى أكثر من 24 ساعة على آخر رسالة منه. الإرسال الآن يحتاج قالباً معتمداً."
+                : "لا تملك صلاحية الإرسال."}
+            </p>
+          )}
+        </div>
+      )}
     </aside>
   );
 }

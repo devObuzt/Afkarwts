@@ -1,6 +1,7 @@
 import { getDb } from "../db";
 import type { MorningDoc } from "./morning";
 import { type IncomeSource, type Range } from "./kinds";
+import { extrasOf, pathsOf } from "./catalogue";
 
 export type Payment = {
   id: number;
@@ -173,6 +174,8 @@ export type IncomeReport = {
   bySource: Array<{ source: IncomeSource; count: number; amount: number }>;
   byMethod: Array<{ method: number; count: number; amount: number }>;
   byItem: Array<{ item: string; count: number; amount: number }>;
+  byPath: Array<{ item: string; count: number; amount: number }>;
+  byExtra: Array<{ item: string; count: number; amount: number }>;
   bySeller: Array<{ seller: string; count: number; amount: number }>;
   payments: Payment[];
   linked: number;
@@ -223,6 +226,10 @@ export function incomeReport(filter: { from: string; to: string; method?: number
   const bySourceMap = group((payment) => [payment.source]);
   const byMethodMap = group((payment) => payment.methods);
   const byItemMap = group((payment) => payment.items);
+  // «حسب المسار» was counting shipping and top-up payments as programmes.
+  // The catalogue reader separates the two — see catalogue.ts.
+  const byPathMap = group((payment) => pathsOf(payment.items));
+  const byExtraMap = group((payment) => extrasOf(payment.items));
   // Two ways of knowing, in order of how much they are worth: the Morning
   // account that issued the invoice, then whoever follows the member up.
   const bySellerMap = group((payment) => [payment.sellerName || payment.soldBy || "غير معروف"]);
@@ -240,6 +247,12 @@ export function incomeReport(filter: { from: string; to: string; method?: number
       .map(([method, value]) => ({ method, count: value.count, amount: round(value.amount) }))
       .sort((a, b) => b.amount - a.amount),
     byItem: [...byItemMap.entries()]
+      .map(([item, value]) => ({ item, count: value.count, amount: round(value.amount) }))
+      .sort((a, b) => b.amount - a.amount),
+    byPath: [...byPathMap.entries()]
+      .map(([item, value]) => ({ item, count: value.count, amount: round(value.amount) }))
+      .sort((a, b) => b.amount - a.amount),
+    byExtra: [...byExtraMap.entries()]
       .map(([item, value]) => ({ item, count: value.count, amount: round(value.amount) }))
       .sort((a, b) => b.amount - a.amount),
     bySeller: [...bySellerMap.entries()]

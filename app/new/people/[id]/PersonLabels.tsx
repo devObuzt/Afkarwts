@@ -65,7 +65,7 @@ export function PersonLabels({
               style={{ background: "var(--tone-wash)", color: "var(--tone-ink)" }}
               title={KIND_LABEL[label.kind as LabelKind] ?? ""}
             >
-              {label.name}
+              <bdi>{label.name}</bdi>
             </span>
           ))}
         </div>
@@ -119,7 +119,7 @@ export function PersonLabels({
                         }
                         type="button"
                       >
-                        {label.name}
+                        <bdi>{label.name}</bdi>
                       </button>
                     ))}
                   </div>

@@ -69,7 +69,7 @@ export default async function CohortPage({
         <div style={{ flex: "999 1 240px" }}>
         <h1>{label.group}</h1>
         <p>
-          {label.name} · بدأ {day(`${journey.anchorDate}T00:00:00.000Z`)} · {memberCount(funnel.enrolled)}
+          <bdi>{label.name}</bdi> · بدأ {day(`${journey.anchorDate}T00:00:00.000Z`)} · {memberCount(funnel.enrolled)}
         </p>
         </div>
         {form && (

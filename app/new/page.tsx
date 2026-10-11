@@ -1,5 +1,8 @@
 import Link from "next/link";
 import { getToday } from "@/app/lib/today";
+import { requireUser } from "@/app/lib/users/current";
+import { can } from "@/app/lib/users/permissions";
+import { IncomeSummary } from "./IncomeSummary";
 import { ago, clock, hueOf, initials, items, members, paths as pathCount, weekdayAndDay } from "./format";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +19,13 @@ function openingLine(counts: { decisions: number; paths: number }) {
   return `${parts.join("، ")}.`;
 }
 
-export default function TodayPage() {
+export default async function TodayPage({
+  searchParams
+}: {
+  searchParams: Promise<{ range?: string; from?: string; to?: string; method?: string; by?: string }>;
+}) {
+  const user = await requireUser();
+  const params = await searchParams;
   const now = new Date();
   const today = getToday(now);
 
@@ -28,6 +37,9 @@ export default function TodayPage() {
           {weekdayAndDay(now)} · {openingLine({ decisions: today.decisions.length, paths: today.paths.length })}
         </p>
       </header>
+
+      {/* The money first: it is the reading Afkar opens the day on. */}
+      {can(user, "income.view") && <IncomeSummary params={params} />}
 
       <section className="crmCard" data-tone={today.decisions.length ? "rose" : "mint"}>
         <header>

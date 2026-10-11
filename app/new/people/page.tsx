@@ -93,7 +93,7 @@ export default async function PeoplePage({
                     href={toggle(label.id)}
                     key={label.id}
                   >
-                    {label.name} <span style={{ opacity: 0.65 }}>{label.memberCount}</span>
+                    <bdi>{label.name}</bdi> <span style={{ opacity: 0.65 }}>{label.memberCount}</span>
                   </Link>
                 ))}
               </div>
@@ -138,7 +138,7 @@ export default async function PeoplePage({
                         key={label.id}
                         style={{ background: "var(--tone-wash)", color: "var(--tone-ink)", fontSize: 11 }}
                       >
-                        {label.name}
+                        <bdi>{label.name}</bdi>
                       </span>
                     ))}
                   </span>

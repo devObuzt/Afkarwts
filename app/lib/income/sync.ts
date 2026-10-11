@@ -1,5 +1,6 @@
 import { fetchPaidInvoices, morningConfigured } from "./morning";
 import { fetchStoreOrders } from "./store-orders";
+import { adoptInvoiceContacts, applyPathLabels } from "./adopt";
 import { recordSync, relinkPayments, savePayments, sourceOf } from "./store";
 import type { IncomeSource } from "./kinds";
 
@@ -32,10 +33,26 @@ export async function syncIncome(from: string, to: string) {
     for (let index = 0; index < docs.length; index += 100) {
       written += savePayments(docs.slice(index, index + 100), sources);
     }
-    const linked = relinkPayments();
+    let linked = relinkPayments();
+
+    // Everyone Morning billed who had no record here. They arrive carrying
+    // «زبون من فاتورة» and belong to no مسار batch — see adopt.ts.
+    const adopted = adoptInvoiceContacts();
+    if (adopted.created > 0) {
+      linked += relinkPayments();
+    }
+    const labelled = applyPathLabels();
+
     recordSync({ from, to, count: written });
 
-    return { ok: true as const, written, linked, storeReachable: store.reachable };
+    return {
+      ok: true as const,
+      written,
+      linked,
+      adopted: adopted.created,
+      labelled: labelled.applied,
+      storeReachable: store.reachable
+    };
   } catch (error) {
     const message = error instanceof Error ? error.message : "تعذّرت المزامنة.";
     recordSync({ from, to, count: 0, error: message });

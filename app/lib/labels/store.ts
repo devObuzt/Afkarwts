@@ -54,7 +54,7 @@ export function setLabelKind(id: number, kind: LabelKind, colour = "") {
 }
 
 /** A managed label is found by its role, not its name, so renaming is safe. */
-export function ensureManagedLabel(managed: string) {
+export function ensureManagedLabel(managed: string, kind: LabelKind = "state") {
   const db = getDb();
   const existing = db.prepare(`${SELECT} WHERE groups.managed = ?`).get(managed) as Row | undefined;
   if (existing) {
@@ -66,13 +66,38 @@ export function ensureManagedLabel(managed: string) {
   // adopted rather than duplicated — Afkar's own «متابعة مسار» keeps working.
   const byName = db.prepare("SELECT id FROM groups WHERE name = ?").get(name) as { id: number } | undefined;
   if (byName) {
-    db.prepare("UPDATE groups SET kind = 'state', managed = ? WHERE id = ?").run(managed, byName.id);
+    db.prepare("UPDATE groups SET kind = ?, managed = ? WHERE id = ?").run(kind, managed, byName.id);
     return getLabel(byName.id)!;
   }
 
   const row = db
-    .prepare("INSERT INTO groups (name, kind, managed) VALUES (?, 'state', ?) RETURNING id")
-    .get(name, managed) as { id: number };
+    .prepare("INSERT INTO groups (name, kind, managed) VALUES (?, ?, ?) RETURNING id")
+    .get(name, kind, managed) as { id: number };
+  return getLabel(row.id)!;
+}
+
+/**
+ * The label for a مسار, made the first time an invoice names it.
+ *
+ * It is keyed on the name rather than a managed marker because there are
+ * five of them and Afkar may rename one; what matters is that a مسار is
+ * never filed as a دفعة, which is how «CLEAN» and «كلين 232 - 30.08» ended
+ * up looking like the same kind of thing.
+ */
+export function ensurePathLabel(name: string) {
+  const db = getDb();
+  const existing = db.prepare(`${SELECT} WHERE groups.name = ?`).get(name) as Row | undefined;
+  if (existing) {
+    if (String(existing.kind) !== "path") {
+      db.prepare("UPDATE groups SET kind = 'path' WHERE id = ?").run(Number(existing.id));
+      return getLabel(Number(existing.id))!;
+    }
+    return mapLabel(existing);
+  }
+
+  const row = db.prepare("INSERT INTO groups (name, kind) VALUES (?, 'path') RETURNING id").get(name) as {
+    id: number;
+  };
   return getLabel(row.id)!;
 }
 
@@ -95,12 +120,31 @@ export function labelsFor(memberId: number): Array<Label & { pinned: boolean }> 
  * is what stops the engine from taking a managed label off again.
  */
 export function addLabel(memberId: number, labelId: number, byHand = true) {
-  getDb()
-    .prepare(
-      `INSERT INTO member_groups (member_id, group_id, pinned) VALUES (?, ?, ?)
-       ON CONFLICT (member_id, group_id) DO UPDATE SET pinned = MAX(pinned, excluded.pinned)`
-    )
-    .run(memberId, labelId, byHand ? 1 : 0);
+  const db = getDb();
+
+  if (byHand) {
+    // Putting it back by hand cancels the earlier refusal.
+    db.prepare("DELETE FROM label_refusals WHERE member_id = ? AND group_id = ?").run(memberId, labelId);
+  } else if (refused(memberId, labelId)) {
+    // She took this مسار off herself. The invoice has not changed its mind,
+    // so without this the next sync would hand it back every time.
+    return false;
+  }
+
+  db.prepare(
+    `INSERT INTO member_groups (member_id, group_id, pinned) VALUES (?, ?, ?)
+     ON CONFLICT (member_id, group_id) DO UPDATE SET pinned = MAX(pinned, excluded.pinned)`
+  ).run(memberId, labelId, byHand ? 1 : 0);
+
+  return true;
+}
+
+/** A مسار this person was given and took off again. */
+export function refused(memberId: number, labelId: number) {
+  const row = getDb()
+    .prepare("SELECT 1 AS yes FROM label_refusals WHERE member_id = ? AND group_id = ?")
+    .get(memberId, labelId) as { yes: number } | undefined;
+  return Boolean(row);
 }
 
 export function removeLabel(memberId: number, labelId: number, byHand = true) {
@@ -117,6 +161,18 @@ export function removeLabel(memberId: number, labelId: number, byHand = true) {
   }
 
   db.prepare("DELETE FROM member_groups WHERE member_id = ? AND group_id = ?").run(memberId, labelId);
+
+  // Only for a مسار: it is read off invoices that never change, so a hand
+  // removal has to outlive them. A حالة is recomputed from what is true
+  // now, and should come back when it becomes true again.
+  if (byHand) {
+    const label = getLabel(labelId);
+    if (label?.kind === "path") {
+      db.prepare(
+        "INSERT INTO label_refusals (member_id, group_id) VALUES (?, ?) ON CONFLICT DO NOTHING"
+      ).run(memberId, labelId);
+    }
+  }
   return true;
 }
 
