@@ -62,11 +62,16 @@ export default async function CohortPage({
         ← المسارات
       </Link>
 
-      <header className="crmHead">
+      <header className="crmHead" style={{ display: "flex", gap: 14, alignItems: "flex-end", flexWrap: "wrap" }}>
+        <div style={{ flex: "999 1 240px" }}>
         <h1>{label.group}</h1>
         <p>
           {label.name} · بدأ {day(`${journey.anchorDate}T00:00:00.000Z`)} · {memberCount(funnel.enrolled)}
         </p>
+        </div>
+        <Link className="crmBtn" href={`/new/paths/${journey.id}/report`}>
+          تقرير الاستمارات
+        </Link>
       </header>
 
       <section className="crmGrid">

@@ -1328,3 +1328,176 @@
   display: flex;
   color: var(--muted);
 }
+
+/* ---- the registrations table ---- */
+
+.crm .gridScroll {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+
+.crm .gridTable {
+  border-collapse: collapse;
+  width: max-content;
+  min-width: 100%;
+  font-size: 12.5px;
+}
+
+.crm .gridTable th,
+.crm .gridTable td {
+  border-inline-end: 1px solid var(--line-soft);
+  border-bottom: 1px solid var(--line-soft);
+  padding: 7px 10px;
+  text-align: start;
+  vertical-align: top;
+  /* A column that can grow without limit makes every other one unreadable. */
+  max-width: 220px;
+  overflow-wrap: anywhere;
+}
+
+.crm .gridTable thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--tone-wash);
+  color: var(--tone-ink);
+  font-weight: 700;
+  font-size: 11.5px;
+  line-height: 1.5;
+  min-width: 90px;
+  box-shadow: inset 0 -1px 0 var(--line-strong);
+}
+
+.crm .gridTable tbody tr:nth-child(even) {
+  background: #fcfbf8;
+}
+
+.crm .gridTable tbody tr:hover {
+  background: var(--tone-wash);
+}
+
+.crm .gridTable td:first-child,
+.crm .gridTable th:first-child {
+  position: sticky;
+  inset-inline-start: 0;
+  background: inherit;
+  font-weight: 600;
+  color: var(--faint);
+  min-width: 34px;
+}
+
+.crm .gridTable thead th:first-child {
+  z-index: 3;
+  background: var(--tone-wash);
+}
+
+.crm .printHead {
+  margin-bottom: 14px;
+}
+
+.crm .printHead h1 {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.crm .printHead p {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* The print sheet: no chrome, no widget, the table edge to edge. */
+@page {
+  /* Twenty-odd questions do not fit across a portrait page. */
+  size: A4 landscape;
+  margin: 10mm;
+}
+
+@media print {
+  .crm .crmNav,
+  .crm .waPane,
+  .crm .crmBack,
+  .crm .crmSearch {
+    display: none !important;
+  }
+
+  .crm .crmWork {
+    display: block;
+    min-height: 0;
+  }
+
+  .crm .crmWork > .crmBody,
+  .crm .waPane {
+    flex: none;
+    width: 100%;
+    padding: 0;
+  }
+
+  .crm,
+  .crm .crmPage.wide {
+    background: #fff;
+    max-width: none;
+  }
+
+  .crm .gridScroll {
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .crm .gridTable {
+    /* min-width:100% plus a 90px floor per header kept the table 1925px
+       wide on a 1680px page, so the last columns fell off the sheet.
+       Fixed layout divides the page instead of adding the columns up. */
+    table-layout: fixed;
+    width: 100%;
+    min-width: 0;
+    font-size: 8.5px;
+  }
+
+  .crm .gridTable th,
+  .crm .gridTable td {
+    padding: 3px 4px;
+    min-width: 0;
+    max-width: none;
+    overflow-wrap: anywhere;
+    border-inline-end: 1px solid #ccc;
+    border-bottom: 1px solid #ddd;
+  }
+
+  .crm .gridTable thead th {
+    position: static;
+    min-width: 0;
+    background: #f2f0ea !important;
+    color: #000;
+    font-size: 8px;
+  }
+
+  /* The index and the date need no more room than they use. */
+  .crm .gridTable th:first-child,
+  .crm .gridTable td:first-child {
+    width: 3%;
+  }
+
+  .crm .gridTable th:nth-child(2),
+  .crm .gridTable td:nth-child(2) {
+    width: 7%;
+  }
+
+  .crm .gridTable thead {
+    display: table-header-group;
+  }
+
+  .crm .gridTable td:first-child,
+  .crm .gridTable th:first-child {
+    position: static;
+  }
+
+  .crm .gridTable tbody tr {
+    break-inside: avoid;
+  }
+}

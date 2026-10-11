@@ -1,0 +1,159 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { getGroup } from "@/app/lib/db";
+import { listForms } from "@/app/lib/forms/store";
+import { submissionGrid } from "@/app/lib/forms/report";
+import { getJourney } from "@/app/lib/journeys/store";
+import { requireUser } from "@/app/lib/users/current";
+import { can } from "@/app/lib/users/permissions";
+
+export const dynamic = "force-dynamic";
+
+const STATES = [
+  { key: "", label: "الكل" },
+  { key: "added", label: "في المجموعة" },
+  { key: "new", label: "بانتظار المراجعة" }
+];
+
+/**
+ * The cohort's registrations as the table Afkar reads them in: one row per
+ * person, every question across the top. It is the shape the answer is
+ * wanted in — who is pregnant, who takes what — before a week of
+ * programmes is written.
+ */
+export default async function ReportPage({
+  params,
+  searchParams
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ state?: string; print?: string }>;
+}) {
+  const user = await requireUser("journeys.view");
+  const query = await searchParams;
+  const journey = getJourney(Number((await params).id));
+
+  if (!journey) {
+    notFound();
+  }
+
+  const group = getGroup(journey.groupId);
+  const form = listForms().find((candidate) => candidate.groupId === journey.groupId);
+
+  if (!form) {
+    return (
+      <div className="crmPage">
+        <Link className="crmBack" href={`/new/paths/${journey.id}`}>
+          ← المسار
+        </Link>
+        <p className="crmEmpty">لا استمارة تسجيل مرتبطة بمجموعة «{group?.name ?? ""}».</p>
+      </div>
+    );
+  }
+
+  // The answers are the medical file; the table is not a way around that.
+  if (!can(user, "people.health")) {
+    return (
+      <div className="crmPage">
+        <Link className="crmBack" href={`/new/paths/${journey.id}`}>
+          ← المسار
+        </Link>
+        <p className="crmEmpty">
+          هذا الجدول يحوي الإجابات الصحية كاملة، وصلاحية «عرض الإجابات الصحية» غير معطاة لحسابك.
+        </p>
+      </div>
+    );
+  }
+
+  const state = STATES.some((option) => option.key === query.state) ? (query.state ?? "") : "";
+  const grid = submissionGrid(form.id, { state: state || undefined })!;
+  const printing = query.print === "1";
+
+  return (
+    <div className={printing ? "crmPage wide printing" : "crmPage wide"}>
+      {!printing && (
+        <>
+          <Link className="crmBack" href={`/new/paths/${journey.id}`}>
+            ← {group?.name ?? "المسار"}
+          </Link>
+
+          <header className="crmHead">
+            <h1>تقرير الاستمارات</h1>
+            <p>
+              {group?.name} · {form.name} · {grid.rows.length} تسجيل · {grid.columns.length} سؤال
+            </p>
+          </header>
+
+          <section className="crmCard crmPad crmSearch">
+            <span style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
+              {STATES.map((option) => (
+                <Link
+                  className={option.key === state ? "crmBtn quiet primary" : "crmBtn quiet"}
+                  href={`/new/paths/${journey.id}/report${option.key ? `?state=${option.key}` : ""}`}
+                  key={option.key || "all"}
+                >
+                  {option.label}
+                </Link>
+              ))}
+            </span>
+            <span className="spacer" style={{ display: "flex", gap: 8, marginInlineStart: "auto" }}>
+              <a className="crmBtn" href={`/api/forms/${form.id}/export${state ? `?state=${state}` : ""}`}>
+                تنزيل Excel
+              </a>
+              <a
+                className="crmBtn primary"
+                href={`/new/paths/${journey.id}/report?print=1${state ? `&state=${state}` : ""}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                نسخة للطباعة / PDF
+              </a>
+            </span>
+          </section>
+        </>
+      )}
+
+      {printing && (
+        <header className="printHead">
+          <h1>
+            {group?.name} — تقرير الاستمارات
+          </h1>
+          <p>
+            {form.name} · {grid.rows.length} تسجيل · {new Date().toISOString().slice(0, 10)}
+          </p>
+        </header>
+      )}
+
+      <div className="gridScroll">
+        <table className="gridTable">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>التاريخ</th>
+              {grid.columns.map((column) => (
+                <th key={column}>{column}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {grid.rows.map((row, index) => (
+              <tr key={row.submissionId}>
+                <td>{index + 1}</td>
+                <td>
+                  {/* The class carries display:inline-block — on the cell
+                      itself it stops being a table cell, and the column
+                      collapsed to 9px with the date stacked letter by letter. */}
+                  <span className="crmLtr">{row.submittedAt.slice(0, 10)}</span>
+                </td>
+                {row.cells.map((cell, cellIndex) => (
+                  <td key={grid.columns[cellIndex]}>{cell}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {grid.rows.length === 0 && <p className="crmEmpty">لا تسجيلات ضمن هذا الفلتر.</p>}
+    </div>
+  );
+}
