@@ -107,6 +107,9 @@ export default async function CohortsPage() {
                   {form.newCount ? ` · ${form.newCount} بانتظار المراجعة` : ""}
                 </div>
               </div>
+              <Link className="crmBtn quiet" href={`/new/forms/${form.id}/report`}>
+                تقرير الاستمارات
+              </Link>
               <a className="crmBtn quiet" href={`/f/${form.token}`} rel="noreferrer" target="_blank">
                 فتح الرابط
               </a>

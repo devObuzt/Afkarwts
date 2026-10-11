@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDb } from "@/app/lib/db";
 import { journeyFunnel, journeyLabel, stepBreakdown } from "@/app/lib/journeys/report";
+import { listForms } from "@/app/lib/forms/store";
 import { getJourney } from "@/app/lib/journeys/store";
 import { clock, day, hueOf, initials, members as memberCount } from "../../format";
 
@@ -38,6 +39,8 @@ export default async function CohortPage({
   }
 
   const label = journeyLabel(journeyId);
+  // A path and its registration form meet at the group.
+  const form = listForms().find((candidate) => candidate.groupId === journey.groupId);
   const funnel = journeyFunnel(journeyId);
   const steps = stepBreakdown(journeyId);
 
@@ -69,9 +72,11 @@ export default async function CohortPage({
           {label.name} · بدأ {day(`${journey.anchorDate}T00:00:00.000Z`)} · {memberCount(funnel.enrolled)}
         </p>
         </div>
-        <Link className="crmBtn" href={`/new/paths/${journey.id}/report`}>
-          تقرير الاستمارات
-        </Link>
+        {form && (
+          <Link className="crmBtn" href={`/new/forms/${form.id}/report`}>
+            تقرير الاستمارات
+          </Link>
+        )}
       </header>
 
       <section className="crmGrid">

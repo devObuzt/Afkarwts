@@ -1,9 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getGroup } from "@/app/lib/db";
-import { listForms } from "@/app/lib/forms/store";
+import { getForm } from "@/app/lib/forms/store";
 import { submissionGrid } from "@/app/lib/forms/report";
-import { getJourney } from "@/app/lib/journeys/store";
 import { requireUser } from "@/app/lib/users/current";
 import { can } from "@/app/lib/users/permissions";
 
@@ -30,32 +28,18 @@ export default async function ReportPage({
 }) {
   const user = await requireUser("journeys.view");
   const query = await searchParams;
-  const journey = getJourney(Number((await params).id));
-
-  if (!journey) {
-    notFound();
-  }
-
-  const group = getGroup(journey.groupId);
-  const form = listForms().find((candidate) => candidate.groupId === journey.groupId);
+  const form = getForm(Number((await params).id));
 
   if (!form) {
-    return (
-      <div className="crmPage">
-        <Link className="crmBack" href={`/new/paths/${journey.id}`}>
-          ← المسار
-        </Link>
-        <p className="crmEmpty">لا استمارة تسجيل مرتبطة بمجموعة «{group?.name ?? ""}».</p>
-      </div>
-    );
+    notFound();
   }
 
   // The answers are the medical file; the table is not a way around that.
   if (!can(user, "people.health")) {
     return (
       <div className="crmPage">
-        <Link className="crmBack" href={`/new/paths/${journey.id}`}>
-          ← المسار
+        <Link className="crmBack" href="/new/paths">
+          ← المسارات
         </Link>
         <p className="crmEmpty">
           هذا الجدول يحوي الإجابات الصحية كاملة، وصلاحية «عرض الإجابات الصحية» غير معطاة لحسابك.
@@ -72,14 +56,14 @@ export default async function ReportPage({
     <div className={printing ? "crmPage wide printing" : "crmPage wide"}>
       {!printing && (
         <>
-          <Link className="crmBack" href={`/new/paths/${journey.id}`}>
-            ← {group?.name ?? "المسار"}
+          <Link className="crmBack" href="/new/paths">
+            ← المسارات
           </Link>
 
           <header className="crmHead">
             <h1>تقرير الاستمارات</h1>
             <p>
-              {group?.name} · {form.name} · {grid.rows.length} تسجيل · {grid.columns.length} سؤال
+              {form.groupName} · {form.name} · {grid.rows.length} تسجيل · {grid.columns.length} سؤال
             </p>
           </header>
 
@@ -88,7 +72,7 @@ export default async function ReportPage({
               {STATES.map((option) => (
                 <Link
                   className={option.key === state ? "crmBtn quiet primary" : "crmBtn quiet"}
-                  href={`/new/paths/${journey.id}/report${option.key ? `?state=${option.key}` : ""}`}
+                  href={`/new/forms/${form.id}/report${option.key ? `?state=${option.key}` : ""}`}
                   key={option.key || "all"}
                 >
                   {option.label}
@@ -101,7 +85,7 @@ export default async function ReportPage({
               </a>
               <a
                 className="crmBtn primary"
-                href={`/new/paths/${journey.id}/report?print=1${state ? `&state=${state}` : ""}`}
+                href={`/new/forms/${form.id}/report?print=1${state ? `&state=${state}` : ""}`}
                 target="_blank"
                 rel="noreferrer"
               >
@@ -115,7 +99,7 @@ export default async function ReportPage({
       {printing && (
         <header className="printHead">
           <h1>
-            {group?.name} — تقرير الاستمارات
+            {form.groupName} — تقرير الاستمارات
           </h1>
           <p>
             {form.name} · {grid.rows.length} تسجيل · {new Date().toISOString().slice(0, 10)}

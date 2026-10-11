@@ -64,6 +64,9 @@ export default async function LibraryPage() {
                 {form.groupName} · {form.submissionCount} تسجيل
               </div>
             </div>
+            <a className="crmBtn quiet" href={`/new/forms/${form.id}/report`}>
+              التقرير
+            </a>
             <span className={form.status === "open" ? "crmPill live" : "crmPill"}>
               {form.status === "open" ? "مفتوحة" : "مغلقة"}
             </span>
