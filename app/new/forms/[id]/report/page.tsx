@@ -110,10 +110,8 @@ export default async function ReportPage({
       <div className="gridScroll">
         <table className="gridTable">
           <colgroup>
-            <col style={{ width: "3%" }} />
-            <col style={{ width: "6%" }} />
             {widths.map((width, index) => (
-              <col key={grid.columns[index]} style={{ width }} />
+              <col key={index} style={{ width }} />
             ))}
           </colgroup>
           <thead>

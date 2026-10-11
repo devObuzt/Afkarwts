@@ -29,7 +29,11 @@ export function isNumeric(value: string) {
  * values get a little, long prose gets the rest.
  */
 export function columnWidths(grid: { columns: string[]; rows: Array<{ cells: string[] }> }) {
-  const weights = grid.columns.map((column, index) => {
+  // The index and the date are columns too. Leaving them out of the sum
+  // made the table 109% wide, and the id printed on top of the phone.
+  const leading = [3, 7];
+
+  const answers = grid.columns.map((column, index) => {
     const longest = grid.rows.reduce((most, row) => Math.max(most, (row.cells[index] ?? "").length), 0);
     const header = column.length;
     // The header wraps onto several lines happily; a value should not have to.
@@ -37,8 +41,13 @@ export function columnWidths(grid: { columns: string[]; rows: Array<{ cells: str
     return want;
   });
 
-  const total = weights.reduce((sum, weight) => sum + weight, 0) || 1;
-  return weights.map((weight) => `${Math.round((weight / total) * 10000) / 100}%`);
+  const share = 100 - leading.reduce((sum, value) => sum + value, 0);
+  const total = answers.reduce((sum, weight) => sum + weight, 0) || 1;
+
+  return [
+    ...leading.map((value) => `${value}%`),
+    ...answers.map((weight) => `${Math.round((weight / total) * share * 100) / 100}%`)
+  ];
 }
 
 export type SubmissionGrid = {

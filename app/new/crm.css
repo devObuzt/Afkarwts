@@ -1431,7 +1431,12 @@
     display: none !important;
   }
 
-  .crm .crmWork {
+  /* A table inside a flex container does not repeat its header across
+     printed pages. Every wrapper between the page and the table becomes a
+     plain block so pagination is the browser's ordinary table pagination. */
+  .crm .crmWork,
+  .crm .crmPage,
+  .crm .crmPage.wide {
     display: block;
     min-height: 0;
   }

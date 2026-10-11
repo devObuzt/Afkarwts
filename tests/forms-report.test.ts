@@ -223,3 +223,17 @@ test("a short column still gets enough room to be read", async () => {
     assert.ok(Number(width.replace("%", "")) >= 2, `a column collapsed to ${width}`);
   }
 });
+
+test("the column widths add up to the page, counting the index and the date", async () => {
+  const { columnWidths } = await import("@/app/lib/forms/report");
+
+  const widths = columnWidths({
+    columns: ["أ", "ب", "ج"],
+    rows: [{ cells: ["قصير", "متوسط الطول شوي", "نص طويل جداً ".repeat(6)] }]
+  });
+
+  assert.equal(widths.length, 5, "the index and the date are columns too");
+  const total = widths.reduce((sum, width) => sum + Number(width.replace("%", "")), 0);
+  // They summed to 109 once, and the id printed on top of the phone.
+  assert.ok(Math.abs(total - 100) < 0.5, `they must fill the page exactly — got ${total}%`);
+});
