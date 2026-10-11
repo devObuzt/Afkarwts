@@ -1517,6 +1517,9 @@
 
   .crm .gridTable thead .thShort {
     display: inline;
+    /* Three characters, and «س14» still came out as «س» over «14». A
+       question number never breaks. */
+    white-space: nowrap;
   }
 
   .crm .printKey {
