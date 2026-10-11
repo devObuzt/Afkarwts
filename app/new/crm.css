@@ -1501,6 +1501,9 @@
     background: #f2f0ea !important;
     color: #000;
     font-size: 8px;
+    /* A name breaks between words, not inside one: «التوقيع» came out as
+       «التوقي» over «ع» at the head of every page. */
+    overflow-wrap: break-word;
   }
 
   /* Chromium repeats a header only while it stays under a quarter of the
