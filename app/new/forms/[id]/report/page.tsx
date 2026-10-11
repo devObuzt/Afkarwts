@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getForm } from "@/app/lib/forms/store";
-import { isNumeric, submissionGrid } from "@/app/lib/forms/report";
+import { columnWidths, isNumeric, submissionGrid } from "@/app/lib/forms/report";
 import { requireUser } from "@/app/lib/users/current";
 import { PdfButton } from "./PdfButton";
 import { can } from "@/app/lib/users/permissions";
@@ -52,6 +52,8 @@ export default async function ReportPage({
   const state = STATES.some((option) => option.key === query.state) ? (query.state ?? "") : "";
   const grid = submissionGrid(form.id, { state: state || undefined })!;
   const printing = query.print === "1";
+  // Weighted by content: a phone does not need a consent paragraph's room.
+  const widths = columnWidths(grid);
 
   return (
     <div className={printing ? "crmPage wide printing" : "crmPage wide"}>
@@ -107,6 +109,13 @@ export default async function ReportPage({
 
       <div className="gridScroll">
         <table className="gridTable">
+          <colgroup>
+            <col style={{ width: "3%" }} />
+            <col style={{ width: "6%" }} />
+            {widths.map((width, index) => (
+              <col key={grid.columns[index]} style={{ width }} />
+            ))}
+          </colgroup>
           <thead>
             <tr>
               <th>#</th>

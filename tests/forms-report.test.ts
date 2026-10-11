@@ -189,3 +189,37 @@ test("a group's report is reachable through the form bound to it", async () => {
   assert.equal(bound?.submissionCount, 1);
   assert.equal(submissionGrid(bound!.id)!.rows.length, 1);
 });
+
+test("column widths follow what is in the column, not an even share", async () => {
+  const { columnWidths } = await import("@/app/lib/forms/report");
+
+  const widths = columnWidths({
+    columns: ["رقم الهاتف", "الإقرار"],
+    rows: [
+      {
+        cells: [
+          "0521234567",
+          "أوافق على أن كل التعليمات التي أحصل عليها من السيدة أفكار ليست بديلاً عن الاستشارة الطبية، ولا تلزمني بوقف علاجات"
+        ]
+      }
+    ]
+  });
+
+  const asNumber = widths.map((width) => Number(width.replace("%", "")));
+  assert.ok(asNumber[1] > asNumber[0] * 2, `prose takes the room, not the phone — got ${widths.join(" / ")}`);
+  assert.equal(Math.round(asNumber.reduce((sum, value) => sum + value, 0)), 100, "they divide the page");
+});
+
+test("a short column still gets enough room to be read", async () => {
+  const { columnWidths } = await import("@/app/lib/forms/report");
+
+  // Twenty questions all answered «لا» must not squeeze one to nothing.
+  const widths = columnWidths({
+    columns: Array.from({ length: 20 }, (_, index) => `سؤال ${index}`),
+    rows: [{ cells: Array.from({ length: 20 }, () => "لا") }]
+  });
+
+  for (const width of widths) {
+    assert.ok(Number(width.replace("%", "")) >= 2, `a column collapsed to ${width}`);
+  }
+});

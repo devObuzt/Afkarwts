@@ -20,6 +20,27 @@ export function isNumeric(value: string) {
   return /^[\d+\-/.() ]{5,}$/.test(value.trim());
 }
 
+/**
+ * How wide each column should be on a printed page.
+ *
+ * Fixed layout divides the page evenly, which gives a consent paragraph
+ * the same room as a phone — and a phone that does not fit spills over
+ * its neighbour. Columns are weighted by what is actually in them: short
+ * values get a little, long prose gets the rest.
+ */
+export function columnWidths(grid: { columns: string[]; rows: Array<{ cells: string[] }> }) {
+  const weights = grid.columns.map((column, index) => {
+    const longest = grid.rows.reduce((most, row) => Math.max(most, (row.cells[index] ?? "").length), 0);
+    const header = column.length;
+    // The header wraps onto several lines happily; a value should not have to.
+    const want = Math.max(Math.min(longest, 40), Math.min(header, 14), 6);
+    return want;
+  });
+
+  const total = weights.reduce((sum, weight) => sum + weight, 0) || 1;
+  return weights.map((weight) => `${Math.round((weight / total) * 10000) / 100}%`);
+}
+
 export type SubmissionGrid = {
   formId: number;
   formName: string;

@@ -1358,7 +1358,7 @@
 }
 
 .crm .gridTable td.num {
-  white-space: nowrap;
+  overflow-wrap: normal;
   direction: ltr;
   text-align: end;
 }
@@ -1449,10 +1449,11 @@
     max-width: none;
   }
 
+  /* The wrapper leaves the box tree entirely: a table inside a scroll
+     container does not repeat its header across printed pages, and page
+     two came out starting at row four with no column names. */
   .crm .gridScroll {
-    overflow: visible;
-    border: 0;
-    border-radius: 0;
+    display: contents;
   }
 
   .crm .gridTable {
@@ -1500,9 +1501,12 @@
 
   /* A phone split «0521199 / 52» across two lines is not a phone. These
      shrink to fit rather than break. */
+  /* A number breaks only where it already has a space or a dash — never
+     mid-digit, and never out over the next column. «+972 54-523-1550»
+     spilled across its neighbour when this was nowrap. */
   .crm .gridTable td.num {
-    white-space: nowrap;
     overflow-wrap: normal;
+    word-break: normal;
     font-size: 7px;
     direction: ltr;
     text-align: end;
