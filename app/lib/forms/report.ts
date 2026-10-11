@@ -62,15 +62,19 @@ export function columnWidths(grid: { columns: string[]; rows: Array<{ cells: str
     // What the header prints as, not what it says: a paragraph-long
     // question prints as «س7». Counting the full text gave fourteen
     // yes/no columns the sheet and left the phone spilling over the id.
-    const header = printHeader(column, index).length;
+    const header = printHeader(column, index);
     // A sentence folds onto three or four lines and reads the same. A
     // phone or an id cannot fold, so its column has to hold the whole run
     // on one line.
     const unwrappable = values.length > 0 && values.every((value) => isNumeric(value));
-    const headroom = Math.min(Math.ceil(header / 3), 8);
+    // The longest word in the column, header included. Nothing can be
+    // narrower than that without breaking a word in half — «التوقيع»
+    // came out as «التوقي» over «ع» at the head of every printed page.
+    const words = [header, ...values].flatMap((value) => value.split(/\s+/));
+    const atom = words.reduce((most, word) => Math.max(most, word.length), 0);
     const want = unwrappable
       ? Math.max(longest + 2, 8)
-      : Math.max(Math.min(Math.ceil(longest / 2.5), 22), headroom, 6);
+      : Math.max(Math.min(Math.ceil(longest / 2.5), 22), atom + 2, 6);
     return want;
   });
 

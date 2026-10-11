@@ -305,3 +305,19 @@ test("no printed column name is long enough to stop the header repeating", async
     );
   }
 });
+
+test("a column is never narrower than the longest word in it", async () => {
+  const { columnWidths } = await import("@/app/lib/forms/report");
+
+  // «التوقيع» printed as «التوقي» over «ع» at the head of every page: the
+  // column was weighted by its value («موقّع», five characters) and the
+  // name above it did not fit.
+  const widths = columnWidths({
+    columns: ["التوقيع", "الإقرار الطويل جداً الذي يُطبع كرقم ويُشرح في المفتاح تحت الجدول"],
+    rows: [{ cells: ["موقّع", "أنا موافق/ة"] }]
+  });
+
+  const signature = Number(widths[2].replace("%", ""));
+  const note = Number(widths[3].replace("%", ""));
+  assert.ok(signature >= note, `the name «التوقيع» has to fit — got ${widths.join(" / ")}`);
+});
