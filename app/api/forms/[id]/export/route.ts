@@ -5,7 +5,14 @@ import { gridToCsv, submissionGrid } from "@/app/lib/forms/report";
 export const runtime = "nodejs";
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  // The sheet carries every answer, the medical ones included.
+  // The same two the page asks for: the file is the page, downloaded.
+  // Guarding it by the medical permission alone let anyone holding that
+  // take a whole cohort's table without being able to open the screen.
+  const seesCohort = await requireApi("journeys.view");
+  if (!seesCohort.ok) {
+    return seesCohort.response;
+  }
+
   const auth = await requireApi("people.health");
   if (!auth.ok) {
     return auth.response;

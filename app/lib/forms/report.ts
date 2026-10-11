@@ -115,7 +115,12 @@ const STATE_LABEL: Record<string, string> = {
  * because that is what it expects to see between rows.
  */
 export function gridToCsv(grid: SubmissionGrid) {
-  const escape = (value: string) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+  // The registration form is public: anyone with the link can type
+  // «=HYPERLINK(...)» into a question, and Excel runs a cell that opens
+  // with = + - @ or a tab as a formula when Afkar opens the file. A
+  // leading apostrophe marks it as text; Excel does not display it.
+  const neutralise = (value: string) => (/^[=+\-@\t\r]/.test(value) ? `'${value}` : value);
+  const escape = (value: string) => `"${neutralise(String(value ?? "")).replace(/"/g, '""')}"`;
 
   const header = ["#", "التاريخ", "الحالة", ...grid.columns].map(escape).join(",");
   const lines = grid.rows.map((row, index) =>

