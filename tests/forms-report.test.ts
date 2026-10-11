@@ -175,3 +175,17 @@ test("the same guard for every opener Excel treats as a formula", async () => {
   assert.ok(lines[5].endsWith('"عادي"'), "ordinary text is left alone");
   assert.ok(lines[6].includes(`"'+972521234567"`), "a phone is neutralised too, and Excel still shows it whole");
 });
+
+test("a group's report is reachable through the form bound to it", async () => {
+  const { listForms } = await import("@/app/lib/forms/store");
+  const { submissionGrid } = await import("@/app/lib/forms/report");
+  const { group, form } = await cohort();
+
+  await register(form.token, form.id, "عبّأت", "0521110011");
+
+  // The library finds a group's registrations this way: group → form → grid.
+  const bound = listForms().find((candidate) => candidate.groupId === group.id);
+  assert.equal(bound?.id, form.id, "one form per group, found by the group");
+  assert.equal(bound?.submissionCount, 1);
+  assert.equal(submissionGrid(bound!.id)!.rows.length, 1);
+});

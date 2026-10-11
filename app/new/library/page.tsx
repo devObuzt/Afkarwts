@@ -3,6 +3,7 @@ import { listTemplates } from "@/app/lib/journeys/store";
 import { listForms } from "@/app/lib/forms/store";
 import { renderTitle } from "@/app/lib/forms/clean-template";
 import { listGroups } from "@/app/lib/db";
+import { members } from "../format";
 
 export const dynamic = "force-dynamic";
 
@@ -79,18 +80,30 @@ export default async function LibraryPage() {
           <span className="crmDot" />
           <h2>المجموعات</h2>
         </header>
-        {groups.map((group) => (
-          <a className="crmRow" href={`/new/people?group=${group.id}`} key={group.id}>
-            <span className="grow">
-              <span className="crmRowTitle" style={{ display: "block" }}>
-                {group.name}
-              </span>
-              <span className="crmRowDetail" style={{ display: "block" }}>
-                {group.memberCount} شخص
-              </span>
-            </span>
-          </a>
-        ))}
+        {groups.map((group) => {
+          // A group's registrations live on the form bound to it, so the
+          // report belongs on the group row too — that is where Wisam
+          // looks for «من عبّأ الاستمارة» for this group.
+          const groupForm = forms.find((candidate) => candidate.groupId === group.id);
+          return (
+            <div className="crmRow" key={group.id}>
+              <a className="grow" href={`/new/people?label=${group.id}`} style={{ textDecoration: "none" }}>
+                <span className="crmRowTitle" style={{ display: "block" }}>
+                  {group.name}
+                </span>
+                <span className="crmRowDetail" style={{ display: "block" }}>
+                  {members(group.memberCount)}
+                  {groupForm ? ` · ${groupForm.submissionCount} تسجيل` : " · بلا استمارة"}
+                </span>
+              </a>
+              {groupForm && groupForm.submissionCount > 0 && (
+                <a className="crmBtn quiet" href={`/new/forms/${groupForm.id}/report`}>
+                  تقرير الاستمارات
+                </a>
+              )}
+            </div>
+          );
+        })}
       </section>
 
       <section className="crmCard" data-tone="salmon">
