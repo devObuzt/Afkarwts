@@ -18,6 +18,7 @@ import {
   sendWhatsAppTemplate,
   sendWhatsAppText
 } from "@/app/lib/whatsapp";
+import { groupSendable } from "@/app/lib/labels/sendable";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -69,6 +70,13 @@ export async function POST(request: Request) {
       group = getGroup(groupId);
       if (!group) {
         return NextResponse.json({ error: "Group not found." }, { status: 404 });
+      }
+      // A مسار and the invoice-contacts label are not mailing lists; naming
+      // people one at a time is still allowed, because that is a decision
+      // about a person rather than a send to a list.
+      const sendable = groupSendable(groupId);
+      if (!sendable.ok) {
+        return NextResponse.json({ error: sendable.error }, { status: 400 });
       }
       members = listGroupMembers(groupId);
     } else if (body.memberIds?.length) {

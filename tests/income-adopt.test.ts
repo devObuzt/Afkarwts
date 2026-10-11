@@ -177,3 +177,35 @@ test("a مسار label is not a mailing list", async () => {
   const real = createJourney({ templateId: template.id, groupId: batch.id, anchorDate: "2026-10-11" });
   assert.equal(syncEnrollments(real.id, new Date("2026-10-11T08:00:00Z")).added, 1, "a دفعة is a cohort");
 });
+
+test("a مسار does not take over a list a campaign already runs on", async () => {
+  const { createGroup, getDb } = await import("@/app/lib/db");
+  const { ensurePathLabel, getLabel } = await import("@/app/lib/labels/store");
+
+  // Afkar names a دفعة «TOP» and runs a campaign on it. Re-kinding that
+  // group to 'path' would stop the campaign's cohort enrolling anybody,
+  // and a cohort that adds no one looks like a cohort nobody joined.
+  const group = createGroup("TOP");
+  getDb()
+    .prepare("INSERT INTO campaigns (group_id, label, mode, text, body_params) VALUES (?, 'x', 'text', 'x', '[]')")
+    .run(group.id);
+
+  assert.equal(ensurePathLabel("TOP"), null, "the مسار goes unlabelled rather than taking the list over");
+  assert.equal(getLabel(group.id)?.kind, "batch", "and the list keeps its kind");
+});
+
+test("a whole مسار, and the invoice contacts, cannot be messaged as a list", async () => {
+  const { createGroup } = await import("@/app/lib/db");
+  const { ensureManagedLabel, ensurePathLabel } = await import("@/app/lib/labels/store");
+  const { groupSendable } = await import("@/app/lib/labels/sendable");
+  const { MANAGED_INVOICE } = await import("@/app/lib/labels/kinds");
+
+  const path = ensurePathLabel("CLASSIC")!;
+  const invoiced = ensureManagedLabel(MANAGED_INVOICE, "other");
+  const batch = createGroup("كلين 25.10");
+
+  assert.equal(groupSendable(path.id).ok, false, "«CLASSIC» is two years of buyers, not a cohort");
+  assert.equal(groupSendable(invoiced.id).ok, false, "545 people who never registered are not a list");
+  assert.equal(groupSendable(batch.id).ok, true, "a دفعة is exactly what a campaign is for");
+  assert.equal(groupSendable(999_999).ok, false, "and a group that is not there is not sendable either");
+});

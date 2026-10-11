@@ -326,17 +326,17 @@ export function syncEnrollments(journeyId: number, now: Date) {
     return { added: 0, removed: 0 };
   }
 
-  // A مسار is a record of what somebody bought — it is written onto
-  // hundreds of people from their Morning invoices, including contacts who
-  // never registered and never consented. A دفعة is the list a schedule
-  // runs on. Point a journey at a مسار and the next income sync would
-  // enrol six hundred people into it and start messaging them, so it
-  // cannot be done, and the refusal lives here rather than in the screen
-  // that creates journeys.
+  // Only a دفعة is a cohort. A مسار is a record of what somebody bought,
+  // written onto hundreds of people from their Morning invoices, contacts
+  // who never registered among them; point a journey at one and the next
+  // income sync would enrol six hundred people and start messaging them.
+  // An allow-list rather than a ban on 'path', so a kind added later is
+  // silent until somebody decides it may be messaged. Every journey and
+  // campaign in production runs on a batch, checked before this landed.
   const kind = db.prepare("SELECT kind FROM groups WHERE id = ?").get(journey.groupId) as
     | { kind: string }
     | undefined;
-  if (kind?.kind === "path") {
+  if (kind?.kind !== "batch") {
     return { added: 0, removed: 0 };
   }
 

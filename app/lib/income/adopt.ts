@@ -129,9 +129,19 @@ export function applyPathLabels() {
   for (const set of wanted.values()) {
     for (const path of set) {
       if (!labelIds.has(path)) {
-        labelIds.set(path, ensurePathLabel(path).id);
+        // Null when a journey or a campaign already runs on a group of
+        // that name: it keeps its kind, and this مسار goes unlabelled
+        // rather than taking a live list over.
+        const label = ensurePathLabel(path);
+        if (label) {
+          labelIds.set(path, label.id);
+        }
       }
     }
+  }
+
+  if (labelIds.size === 0) {
+    return { applied: 0, paths: 0 };
   }
 
   const already = new Set(

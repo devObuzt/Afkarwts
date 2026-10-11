@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { createCampaign, getGroup, listCampaigns, listGroupMembers } from "@/app/lib/db";
 import { campaignProgress, runCampaignBatch } from "@/app/lib/campaigns";
 import { getMessagingLimit } from "@/app/lib/whatsapp";
+import { groupSendable } from "@/app/lib/labels/sendable";
 
 export const runtime = "nodejs";
 
@@ -56,6 +57,12 @@ export async function POST(request: Request) {
 
     if (!listGroupMembers(groupId).length) {
       return NextResponse.json({ error: "This group has no members." }, { status: 400 });
+    }
+
+    // A مسار and the invoice-contacts label are not mailing lists.
+    const sendable = groupSendable(groupId);
+    if (!sendable.ok) {
+      return NextResponse.json({ error: sendable.error }, { status: 400 });
     }
 
     const limit = await getMessagingLimit();

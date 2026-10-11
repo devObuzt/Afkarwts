@@ -87,12 +87,31 @@ export function ensureManagedLabel(managed: string, kind: LabelKind = "state") {
 export function ensurePathLabel(name: string) {
   const db = getDb();
   const existing = db.prepare(`${SELECT} WHERE groups.name = ?`).get(name) as Row | undefined;
+
   if (existing) {
-    if (String(existing.kind) !== "path") {
-      db.prepare("UPDATE groups SET kind = 'path' WHERE id = ?").run(Number(existing.id));
-      return getLabel(Number(existing.id))!;
+    if (String(existing.kind) === "path") {
+      return mapLabel(existing);
     }
-    return mapLabel(existing);
+
+    // A group a journey or a campaign runs on keeps the kind it has.
+    // Re-kinding it to 'path' would stop its schedule enrolling anybody —
+    // silently, because a cohort that adds no one looks like a cohort
+    // nobody joined. A مسار that collides with a live list gets no label
+    // rather than taking one over.
+    const inUse = db
+      .prepare(
+        `SELECT 1 AS yes FROM journeys WHERE group_id = ?
+          UNION ALL
+         SELECT 1 AS yes FROM campaigns WHERE group_id = ?`
+      )
+      .get(Number(existing.id), Number(existing.id)) as { yes: number } | undefined;
+
+    if (inUse) {
+      return null;
+    }
+
+    db.prepare("UPDATE groups SET kind = 'path' WHERE id = ?").run(Number(existing.id));
+    return getLabel(Number(existing.id))!;
   }
 
   const row = db.prepare("INSERT INTO groups (name, kind) VALUES (?, 'path') RETURNING id").get(name) as {
