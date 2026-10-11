@@ -1517,8 +1517,11 @@
 
   .crm .gridTable thead .thShort {
     display: inline;
-    /* Three characters, and «س14» still came out as «س» over «14». A
-       question number never breaks. */
+  }
+
+  /* Only the question numbers. «س14» came out as «س» over «14», and
+     nowrap on every header instead pushed «الاسم الكامل» over «البلد». */
+  .crm .gridTable thead .thRef {
     white-space: nowrap;
   }
 

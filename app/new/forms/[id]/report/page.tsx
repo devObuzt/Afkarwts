@@ -126,7 +126,13 @@ export default async function ReportPage({
                       sheet, and Chromium then stops repeating it — so it
                       prints as a number and the key sits under the table. */}
                   <span className="thFull">{column}</span>
-                  <span className="thShort">{printHeader(column, index)}</span>
+                  <span
+                    className={
+                      printHeader(column, index) === column ? "thShort" : "thShort thRef"
+                    }
+                  >
+                    {printHeader(column, index)}
+                  </span>
                 </th>
               ))}
             </tr>
