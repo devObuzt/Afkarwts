@@ -35,7 +35,7 @@ export default async function CohortsPage() {
       </header>
 
       {waiting.length > 0 && (
-        <section className="crmCard" data-tone="rose">
+        <section className="crmCard" data-tone="clay">
           <header>
             <span className="crmDot" />
             <h2>تسجيلات بانتظار المراجعة</h2>
@@ -64,7 +64,7 @@ export default async function CohortsPage() {
         </section>
       )}
 
-      <section className="crmCard" data-tone="apricot">
+      <section className="crmCard" data-tone="sage">
         <header>
           <span className="crmDot" />
           <h2>المسارات قيد التشغيل</h2>
@@ -90,7 +90,7 @@ export default async function CohortsPage() {
         )}
       </section>
 
-      <section className="crmCard" data-tone="mauve">
+      <section className="crmCard" data-tone="clay">
         <header>
           <span className="crmDot" />
           <h2>استمارات التسجيل</h2>

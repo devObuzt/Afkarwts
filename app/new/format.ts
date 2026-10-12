@@ -137,5 +137,7 @@ export function hueOf(name: string) {
   for (const character of name) {
     sum = (sum + character.codePointAt(0)!) % 1000;
   }
-  return sum % 5;
+  // Four, not five: only four of the six brand colours can hold a
+  // 15px initial at 4.5:1 — see the avatar block in crm.css.
+  return sum % 4;
 }

@@ -13,16 +13,23 @@ import { SOURCE_LABEL, type IncomeSource } from "@/app/lib/income/kinds";
  * fourth source. A stacked column gives all four readings honestly: the
  * column's height is the total, and the segments are where it came from.
  *
- * The series colours are not the brand's. Afkar's palette is warm pastels,
- * and the three of them measure ΔE 2.6 apart under deuteranopia — the
- * validator refused them. These three pass every check in light mode,
- * which is the only mode this screen has.
+ * The three series are Afkar's own colours. Of the twenty triplets the
+ * six-colour palette allows, forest/sage/peach is the one that survives
+ * colour blindness: ΔE 42 at worst across deuteranopia, protanopia and
+ * tritanopia, against ΔE 8.5 for sage/clay, which a protanope reads as
+ * one colour. Measured, not chosen by eye.
+ *
+ * The peach is 1.37:1 against the white card — a fill that pale is not a
+ * «graphical object» anyone can see — so every segment carries a hairline
+ * of the forest. The outline does the separating; the fill stays exact.
  */
 const SERIES: Array<{ key: IncomeSource; colour: string }> = [
-  { key: "website", colour: "#2a78d6" },
-  { key: "app", colour: "#eb6834" },
-  { key: "sales", colour: "#1baf7a" }
+  { key: "website", colour: "#6c926e" },
+  { key: "app", colour: "#fdd4bd" },
+  { key: "sales", colour: "#002a0c" }
 ];
+
+const EDGE = "#002a0c";
 
 const SURFACE = "#ffffff";
 
@@ -118,6 +125,9 @@ export function IncomeChart({ points }: { points: SeriesPoint[] }) {
                       height={Math.max(tall - gap, 0.5)}
                       key={series.key}
                       opacity={hover === null || hover === index ? 1 : 0.35}
+                      stroke={EDGE}
+                      strokeWidth="0.12"
+                      vectorEffect="non-scaling-stroke"
                       width={width}
                       x={centre - width / 2}
                       y={cursor}

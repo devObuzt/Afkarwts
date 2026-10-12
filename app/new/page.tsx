@@ -41,7 +41,7 @@ export default async function TodayPage({
       {/* The money first: it is the reading Afkar opens the day on. */}
       {can(user, "income.view") && <IncomeSummary params={params} />}
 
-      <section className="crmCard" data-tone={today.decisions.length ? "rose" : "mint"}>
+      <section className="crmCard" data-tone={today.decisions.length ? "clay" : "olive"}>
         <header>
           <span className="crmDot" />
           <h2>بانتظار قرار</h2>
@@ -51,7 +51,7 @@ export default async function TodayPage({
           <p className="crmEmpty">لا شيء معلّق. المسارات ترسل من تلقائها.</p>
         ) : (
           today.decisions.map((item) => (
-            <div className="crmRow" data-tone={item.weight === "now" ? "rose" : "apricot"} key={item.key}>
+            <div className="crmRow" data-tone={item.weight === "now" ? "clay" : "sage"} key={item.key}>
               <div className="grow">
                 <div className="crmRowTitle">{item.title}</div>
                 <div className="crmRowDetail">{item.detail}</div>
@@ -67,7 +67,7 @@ export default async function TodayPage({
       {today.paths.length > 0 && (
         <section className="crmGrid">
           {today.paths.map((item) => (
-            <article className="crmCard crmTile" data-tone={item.status === "active" ? "mint" : "apricot"} key={item.journeyId}>
+            <article className="crmCard crmTile" data-tone={item.status === "active" ? "olive" : "sage"} key={item.journeyId}>
               <div className="crmPad">
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
                   <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>
@@ -99,7 +99,7 @@ export default async function TodayPage({
         </section>
       )}
 
-      <section className="crmCard" data-tone="mauve">
+      <section className="crmCard" data-tone="clay">
         <header>
           <span className="crmDot" />
           <h2>ردود بلا جواب</h2>

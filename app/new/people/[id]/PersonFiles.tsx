@@ -70,7 +70,7 @@ export function PersonFiles({ memberId, files }: { memberId: number; files: Pers
   }
 
   return (
-    <section className="crmCard" data-tone="apricot">
+    <section className="crmCard" data-tone="sage">
       <header>
         <span className="crmDot" />
         <h2>الملفات</h2>

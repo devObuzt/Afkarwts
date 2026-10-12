@@ -43,7 +43,7 @@ export function PersonLabels({
   const worn = new Set(labels.map((label) => label.id));
 
   return (
-    <section className="crmCard" data-tone="mint">
+    <section className="crmCard" data-tone="olive">
       <header>
         <span className="crmDot" />
         <h2>الملصقات</h2>
@@ -60,7 +60,7 @@ export function PersonLabels({
           {labels.map((label) => (
             <span
               className="crmPill"
-              data-tone={KIND_TONE[label.kind as LabelKind] ?? "salmon"}
+              data-tone={KIND_TONE[label.kind as LabelKind] ?? "forest"}
               key={label.id}
               style={{ background: "var(--tone-wash)", color: "var(--tone-ink)" }}
               title={KIND_LABEL[label.kind as LabelKind] ?? ""}

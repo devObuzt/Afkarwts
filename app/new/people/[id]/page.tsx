@@ -45,7 +45,7 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
 
       <header
         className="crmCard crmTile crmPad"
-        data-tone="mauve"
+        data-tone="clay"
         style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}
       >
         <span className="crmAvatar big" data-hue={hueOf(member.name)}>
@@ -73,7 +73,7 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
       </header>
 
       {openTasks.length > 0 && (
-        <section className="crmCard" data-tone="rose">
+        <section className="crmCard" data-tone="clay">
           <header>
             <span className="crmDot" />
             <h2>مهام مفتوحة</h2>
@@ -116,7 +116,7 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
 
           <PersonFiles files={record.files} memberId={member.id} />
 
-          <section className="crmCard" data-tone="salmon">
+          <section className="crmCard" data-tone="forest">
             <header>
               <span className="crmDot" />
               <h2>كل ما جرى</h2>
@@ -143,7 +143,7 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
           </section>
 
           {registration && (
-            <section className="crmCard" data-tone="mauve">
+            <section className="crmCard" data-tone="clay">
               <header>
                 <span className="crmDot" />
                 <h2>استمارة التسجيل</h2>
@@ -186,7 +186,7 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
             windowOpen={record.windowOpen}
           />
 
-          <section className="crmCard" data-tone="apricot">
+          <section className="crmCard" data-tone="sage">
             <header>
               <span className="crmDot" />
               <h2>مساراته</h2>

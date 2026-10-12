@@ -33,9 +33,9 @@ export const SOURCE_DETAIL: Record<IncomeSource, string> = {
 };
 
 export const SOURCE_TONE: Record<IncomeSource, string> = {
-  website: "mint",
-  app: "mauve",
-  sales: "apricot"
+  website: "olive",
+  app: "clay",
+  sales: "sage"
 };
 
 export type Range = "today" | "week" | "month" | "last-month" | "custom";

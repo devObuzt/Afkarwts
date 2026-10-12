@@ -130,7 +130,7 @@ export function UsersClient({ users, meId }: { users: User[]; meId: number }) {
 
   return (
     <>
-      <section className="crmCard" data-tone="mauve">
+      <section className="crmCard" data-tone="clay">
         <header>
           <span className="crmDot" />
           <h2>المستخدمون</h2>

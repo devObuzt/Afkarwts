@@ -134,7 +134,7 @@ export default async function PeoplePage({
                     {person.labels.slice(0, 4).map((label) => (
                       <span
                         className="crmPill"
-                        data-tone={KIND_TONE[label.kind as LabelKind] ?? "salmon"}
+                        data-tone={KIND_TONE[label.kind as LabelKind] ?? "forest"}
                         key={label.id}
                         style={{ background: "var(--tone-wash)", color: "var(--tone-ink)", fontSize: 11 }}
                       >

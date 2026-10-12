@@ -18,7 +18,7 @@ export function PersonNotes({ memberId, notes }: { memberId: number; notes: stri
   }
 
   return (
-    <section className="crmCard" data-tone="mint">
+    <section className="crmCard" data-tone="olive">
       <header>
         <span className="crmDot" />
         <h2>ملاحظات</h2>

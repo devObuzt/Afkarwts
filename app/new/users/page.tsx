@@ -22,7 +22,7 @@ export default async function UsersPage() {
 
       <UsersClient meId={me.id} users={users} />
 
-      <section className="crmCard" data-tone="salmon">
+      <section className="crmCard" data-tone="forest">
         <header>
           <span className="crmDot" />
           <h2>سجل العمليات</h2>

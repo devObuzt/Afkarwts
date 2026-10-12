@@ -49,7 +49,7 @@ export function IncomeSummary({
   const report = incomeReport({ from, to, method });
 
   return (
-    <section className="crmCard" data-tone="salmon">
+    <section className="crmCard" data-tone="forest">
       <header>
         <span className="crmDot" />
         <h2>الدخل</h2>
@@ -77,7 +77,7 @@ export function IncomeSummary({
 
         {/* Four readings, small: the figure is what is read, not the box. */}
         <div className="crmStats">
-          <div className="crmStat" data-tone="salmon">
+          <div className="crmStat" data-tone="forest">
             <span className="statFigure">{shekels(report.total.amount)}</span>
             <span className="statName">المجموع · {report.total.count} فاتورة</span>
           </div>

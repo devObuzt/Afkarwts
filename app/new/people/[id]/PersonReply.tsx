@@ -55,7 +55,7 @@ export function PersonReply({
     : "";
 
   return (
-    <section className="crmCard" data-tone={windowOpen ? "mint" : "apricot"}>
+    <section className="crmCard" data-tone={windowOpen ? "olive" : "sage"}>
       <header>
         <span className="crmDot" />
         <h2>الرد</h2>

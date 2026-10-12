@@ -27,7 +27,7 @@ export default async function LibraryPage() {
         <p>ما يُبنى مرة واحدة ويُستعمل في كل مسار: جداول الرسائل والاستمارات والمجموعات.</p>
       </header>
 
-      <section className="crmCard" data-tone="apricot">
+      <section className="crmCard" data-tone="sage">
         <header>
           <span className="crmDot" />
           <h2>المسارات</h2>
@@ -49,7 +49,7 @@ export default async function LibraryPage() {
         )}
       </section>
 
-      <section className="crmCard" data-tone="mauve">
+      <section className="crmCard" data-tone="clay">
         <header>
           <span className="crmDot" />
           <h2>الاستمارات</h2>
@@ -75,7 +75,7 @@ export default async function LibraryPage() {
         ))}
       </section>
 
-      <section className="crmCard" data-tone="mint">
+      <section className="crmCard" data-tone="olive">
         <header>
           <span className="crmDot" />
           <h2>المجموعات</h2>
@@ -106,7 +106,7 @@ export default async function LibraryPage() {
         })}
       </section>
 
-      <section className="crmCard" data-tone="salmon">
+      <section className="crmCard" data-tone="forest">
         <header>
           <span className="crmDot" />
           <h2>قوالب واتساب</h2>

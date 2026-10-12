@@ -17,44 +17,64 @@
  */
 
 .crm {
-  /* Afkar's palette, from the site's own Elementor globals. */
-  --salmon: #e9967a;
-  --rose: #dd518f;
-  --apricot: #f5aa62;
-  --mint: #b9dcd2;
-  --mauve: #c48fa6;
-  --peach: #fcbfaa;
+  /* ────────────────────────────────────────────────────────────────
+     Afkar's colours, exactly as the brand defines them. Nothing here
+     is derived, mixed or nudged.
 
-  /* The same hues, dark enough to read. */
-  --salmon-ink: #a8482a;
-  --rose-ink: #b02a66;
-  --apricot-ink: #8a5713;
-  --mint-ink: #2c6b5b;
-  --mauve-ink: #8a4e68;
+     Three from the Shaper brandbook (artik branding, 2022 — the «צבעים»
+     page), sampled from the PDF itself rather than converted from its
+     CMYK, because a CMYK→RGB conversion depends on the profile and would
+     be our number, not theirs. The same three values appear again on the
+     graphic-elements page, which is the cross-check.
 
-  /* And light enough to sit behind a line of text. */
-  --salmon-wash: #fdede7;
-  --rose-wash: #fceaf2;
-  --apricot-wash: #fdf1e1;
-  --mint-wash: #e8f4f0;
-  --mauve-wash: #f8ecf1;
+       #002A0C  C61 M6  Y74 K91   أخضر غامق
+       #FDD4BD  C0  M19 Y23 K0    خوخي
+       #6C926E  C65 M32 Y69 K0    أخضر مريمية
 
-  --paper: #faf9f3;
+     Three more from the Afkar logo artwork Wisam supplied, taken as the
+     median of 87,480 background pixels each (they are JPEGs, so a single
+     pixel would carry compression noise):
+
+       #9F7A81  وردي مغبّر
+       #D1D3BE  أخضر فاتح
+       #95A189  أخضر مريمية فاتح
+
+     🔒 These six are the whole palette. No tints, no shades, no
+     color-mix on a brand colour — Wisam, 2026-10-12: «بدي التصميم
+     والالوان يكون نفس… ودرجة اللون بدون لعب من عنا».
+     ──────────────────────────────────────────────────────────────── */
+  --forest: #002a0c;
+  --sage: #6c926e;
+  --olive: #95a189;
+  --clay: #9f7a81;
+  --peach: #fdd4bd;
+  --pale: #d1d3be;
+
+  /* The neutral scale is not a brand colour: paper, card, rules and
+     secondary text. The brandbook sets flat colour on white and says
+     nothing about greys, so these stay neutral and quiet rather than
+     inventing a seventh brand hue. */
+  --paper: #f7f7f4;
   --card: #ffffff;
-  --line: #e7e2d6;
-  --line-soft: #f1ede3;
-  --line-strong: #cfc9bb;
-  --ink: #3a3836;
-  --body: #4f4d4d;
-  --muted: #65625c;
-  --faint: #75726b;
+  --line: #e4e4dd;
+  --line-soft: #efefe9;
+  --line-strong: #c9c9c0;
+  --ink: var(--forest);
+  --body: #33382f;
+  --muted: #5d6357;
+  --faint: #6f7569;
   --radius: 16px;
 
-  /* Repainted per area by the rules below. */
-  --tone: var(--salmon);
-  --tone-ink: var(--salmon-ink);
-  --tone-wash: var(--salmon-wash);
-  --tone-mid: color-mix(in srgb, var(--tone) 55%, var(--tone-ink));
+  /* Every tone is a pair of brand colours: a wash to sit behind text and
+     a mid for the bar, the dot and the meter. The ink on both is always
+     the dark green — at 15.71:1 on white and 10.3:1 on the pale it is
+     the only one of the six that can carry small text. The mids are
+     bars, dots and edges, never text: sage reads 3.52:1 on white and
+     olive 2.71:1, so a word in either would fail. */
+  --tone: var(--forest);
+  --tone-ink: var(--forest);
+  --tone-mid: var(--forest);
+  --tone-wash: var(--pale);
 
   min-height: 100vh;
   background: var(--paper);
@@ -62,82 +82,79 @@
   font-family: var(--font-sans), system-ui, sans-serif;
 }
 
+.crm[data-tone="forest"],
+.crm [data-tone="forest"] {
+  --tone: var(--forest);
+  --tone-mid: var(--forest);
+  --tone-wash: var(--pale);
+}
+
+.crm[data-tone="sage"],
+.crm [data-tone="sage"] {
+  --tone: var(--sage);
+  --tone-mid: var(--sage);
+  --tone-wash: var(--pale);
+}
+
+.crm[data-tone="olive"],
+.crm [data-tone="olive"] {
+  --tone: var(--olive);
+  --tone-mid: var(--olive);
+  --tone-wash: var(--pale);
+}
+
+.crm[data-tone="clay"],
+.crm [data-tone="clay"] {
+  --tone: var(--clay);
+  --tone-mid: var(--clay);
+  --tone-wash: var(--peach);
+}
+
+/* Peach cannot be a bar — 1.11:1 against the pale, 1.37:1 against white,
+   so it would simply not be there. It is a wash, and the dark green
+   carries the edge. */
+.crm[data-tone="peach"],
+.crm [data-tone="peach"] {
+  --tone: var(--peach);
+  --tone-mid: var(--forest);
+  --tone-wash: var(--peach);
+}
+
+/* Which tone each area wears. */
 .crm[data-area="today"] {
-  --tone: var(--salmon);
-  --tone-ink: var(--salmon-ink);
-  --tone-mid: color-mix(in srgb, var(--tone) 55%, var(--tone-ink));
-  --tone-wash: var(--salmon-wash);
+  --tone: var(--forest);
+  --tone-mid: var(--forest);
+  --tone-wash: var(--pale);
 }
 
 .crm[data-area="people"] {
-  --tone: var(--mauve);
-  --tone-ink: var(--mauve-ink);
-  --tone-mid: color-mix(in srgb, var(--tone) 55%, var(--tone-ink));
-  --tone-wash: var(--mauve-wash);
+  --tone: var(--clay);
+  --tone-mid: var(--clay);
+  --tone-wash: var(--peach);
 }
 
 .crm[data-area="paths"] {
-  --tone: var(--apricot);
-  --tone-ink: var(--apricot-ink);
-  --tone-mid: color-mix(in srgb, var(--tone) 55%, var(--tone-ink));
-  --tone-wash: var(--apricot-wash);
+  --tone: var(--sage);
+  --tone-mid: var(--sage);
+  --tone-wash: var(--pale);
 }
 
 .crm[data-area="income"] {
-  --tone: var(--mint);
-  --tone-ink: var(--mint-ink);
-  --tone-mid: color-mix(in srgb, var(--tone) 55%, var(--tone-ink));
-  --tone-wash: var(--mint-wash);
+  --tone: var(--olive);
+  --tone-mid: var(--olive);
+  --tone-wash: var(--pale);
 }
 
 .crm[data-area="users"] {
-  --tone: var(--rose);
-  --tone-ink: var(--rose-ink);
-  --tone-mid: color-mix(in srgb, var(--tone) 55%, var(--tone-ink));
-  --tone-wash: var(--rose-wash);
+  --tone: var(--forest);
+  --tone-mid: var(--forest);
+  --tone-wash: var(--pale);
 }
 
 .crm[data-area="library"] {
-  --tone: var(--mint);
-  --tone-ink: var(--mint-ink);
-  --tone-mid: color-mix(in srgb, var(--tone) 55%, var(--tone-ink));
-  --tone-wash: var(--mint-wash);
-}
-
-/* A card can carry a tone of its own, whatever area it sits in. */
-.crm [data-tone="rose"] {
-  --tone: var(--rose);
-  --tone-ink: var(--rose-ink);
-  --tone-mid: color-mix(in srgb, var(--tone) 55%, var(--tone-ink));
-  --tone-wash: var(--rose-wash);
-}
-
-.crm [data-tone="salmon"] {
-  --tone: var(--salmon);
-  --tone-ink: var(--salmon-ink);
-  --tone-mid: color-mix(in srgb, var(--tone) 55%, var(--tone-ink));
-  --tone-wash: var(--salmon-wash);
-}
-
-.crm [data-tone="apricot"] {
-  --tone: var(--apricot);
-  --tone-ink: var(--apricot-ink);
-  --tone-mid: color-mix(in srgb, var(--tone) 55%, var(--tone-ink));
-  --tone-wash: var(--apricot-wash);
-}
-
-.crm [data-tone="mint"] {
-  --tone: var(--mint);
-  --tone-ink: var(--mint-ink);
-  --tone-mid: color-mix(in srgb, var(--tone) 55%, var(--tone-ink));
-  --tone-wash: var(--mint-wash);
-}
-
-.crm [data-tone="mauve"] {
-  --tone: var(--mauve);
-  --tone-ink: var(--mauve-ink);
-  --tone-mid: color-mix(in srgb, var(--tone) 55%, var(--tone-ink));
-  --tone-wash: var(--mauve-wash);
+  --tone: var(--sage);
+  --tone-mid: var(--sage);
+  --tone-wash: var(--pale);
 }
 
 .crm *,
@@ -170,7 +187,7 @@
   font-family: var(--font-brand), var(--font-sans), sans-serif;
   font-weight: 700;
   font-size: 19px;
-  color: var(--salmon-ink);
+  color: var(--forest);
   margin-inline-end: 18px;
 }
 
@@ -197,28 +214,28 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: color-mix(in srgb, var(--salmon) 55%, var(--salmon-ink));
+  background: var(--forest);
   flex: none;
 }
 
 .crm .crmNav nav a[data-area="people"] .tick {
-  background: color-mix(in srgb, var(--mauve) 55%, var(--mauve-ink));
+  background: var(--clay);
 }
 
 .crm .crmNav nav a[data-area="paths"] .tick {
-  background: color-mix(in srgb, var(--apricot) 55%, var(--apricot-ink));
+  background: var(--sage);
 }
 
 .crm .crmNav nav a[data-area="library"] .tick {
-  background: color-mix(in srgb, var(--mint) 55%, var(--mint-ink));
+  background: var(--sage);
 }
 
 .crm .crmNav nav a[data-area="income"] .tick {
-  background: color-mix(in srgb, var(--mint) 55%, var(--mint-ink));
+  background: var(--olive);
 }
 
 .crm .crmNav nav a[data-area="users"] .tick {
-  background: color-mix(in srgb, var(--rose) 55%, var(--rose-ink));
+  background: var(--forest);
 }
 
 .crm .crmNav nav a:hover {
@@ -232,7 +249,7 @@
 }
 
 .crm .crmNav nav a.current .tick {
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--tone) 35%, transparent);
+  box-shadow: 0 0 0 3px var(--tone-wash);
 }
 
 /* Whoever is signed in, and the way out. With one shared login there was
@@ -272,7 +289,7 @@
 }
 
 .crm .crmWho button:hover {
-  color: var(--rose-ink);
+  color: var(--forest);
 }
 
 .crm .crmOld {
@@ -353,7 +370,7 @@
   gap: 10px;
   padding: 15px 20px;
   background: var(--tone-wash);
-  border-bottom: 1px solid color-mix(in srgb, var(--tone) 45%, transparent);
+  border-bottom: 1px solid var(--tone-mid);
   box-shadow: inset 4px 0 0 0 var(--tone-mid);
   flex-wrap: wrap;
 }
@@ -378,7 +395,7 @@
   height: 10px;
   border-radius: 50%;
   background: var(--tone-mid);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--tone) 35%, transparent);
+  box-shadow: 0 0 0 3px var(--tone-wash);
   flex: none;
 }
 
@@ -445,29 +462,34 @@
   justify-content: center;
   font-size: 15px;
   font-weight: 700;
-  color: #fff;
-  background: var(--mauve-ink);
+  /* Dark green on a light brand colour, not white on a dark one: of the
+     six, only the forest can carry white text (15.71:1). Sage reads
+     3.52:1 under white and clay 3.77:1, and two bold letters at 15px are
+     not «large text», so either would fail. Turned round, the forest
+     clears every light member of the palette. */
+  color: var(--forest);
+  background: var(--pale);
 }
 
-/* Faces are a wall of initials; a colour per name makes them tell apart. */
+/* Faces are a wall of initials; a colour per name makes them tell apart.
+   Four rather than five: of the six, the clay reads 4.17:1 under the
+   forest and the sage 4.47:1 — both just under the 4.5 a 15px letter
+   needs, and neither may be nudged into passing. */
 .crm .crmAvatar[data-hue="0"] {
-  background: var(--salmon-ink);
+  background: var(--pale);
 }
 
 .crm .crmAvatar[data-hue="1"] {
-  background: var(--mauve-ink);
+  background: var(--peach);
 }
 
 .crm .crmAvatar[data-hue="2"] {
-  background: var(--mint-ink);
+  background: var(--olive);
 }
 
 .crm .crmAvatar[data-hue="3"] {
-  background: var(--apricot-ink);
-}
-
-.crm .crmAvatar[data-hue="4"] {
-  background: var(--rose-ink);
+  background: var(--forest);
+  color: #fff;
 }
 
 .crm .crmAvatar.big {
@@ -523,14 +545,14 @@
 
 .crm .crmBtn.danger {
   background: var(--card);
-  color: var(--rose-ink);
-  border-color: color-mix(in srgb, var(--rose) 45%, #fff);
+  color: var(--forest);
+  border-color: var(--clay);
 }
 
 .crm .crmBtn.danger:hover {
-  background: var(--rose-wash);
-  border-color: var(--rose);
-  color: var(--rose-ink);
+  background: var(--peach);
+  border-color: var(--clay);
+  color: var(--forest);
 }
 
 .crm .crmBtn:disabled {
@@ -557,18 +579,18 @@
 }
 
 .crm .crmPill.live {
-  background: var(--mint-wash);
-  color: var(--mint-ink);
+  background: var(--pale);
+  color: var(--forest);
 }
 
 .crm .crmPill.open {
-  background: var(--apricot-wash);
-  color: var(--apricot-ink);
+  background: var(--peach);
+  color: var(--forest);
 }
 
 .crm .crmPill.alert {
-  background: var(--rose-wash);
-  color: var(--rose-ink);
+  background: var(--peach);
+  color: var(--forest);
 }
 
 .crm .crmPill.tone {
@@ -747,17 +769,17 @@
 
 .crm .crmHighlight {
   padding: 16px 18px;
-  border: 1px solid var(--rose);
-  border-inline-start: 5px solid var(--rose-ink);
+  border: 1px solid var(--clay);
+  border-inline-start: 5px solid var(--forest);
   border-radius: 14px;
-  background: var(--rose-wash);
+  background: var(--peach);
 }
 
 .crm .crmHighlight h3 {
   margin: 0 0 10px;
   font-size: 13.5px;
   font-weight: 700;
-  color: var(--rose-ink);
+  color: var(--forest);
 }
 
 .crm .crmHighlight dl {
@@ -809,23 +831,23 @@
 
 /* What happened is readable by colour down the left edge of the stream. */
 .crm .crmEvent[data-kind="reply"] .mark {
-  background: var(--rose-ink);
+  background: var(--forest);
 }
 
 .crm .crmEvent[data-kind="message"] .mark {
-  background: var(--mint-ink);
+  background: var(--forest);
 }
 
 .crm .crmEvent[data-kind="submission"] .mark {
-  background: var(--mauve-ink);
+  background: var(--forest);
 }
 
 .crm .crmEvent[data-kind="file"] .mark {
-  background: var(--apricot-ink);
+  background: var(--forest);
 }
 
 .crm .crmEvent[data-kind="joined"] .mark {
-  background: var(--salmon-ink);
+  background: var(--forest);
 }
 
 .crm .crmEvent .what {
@@ -924,8 +946,8 @@
   height: 40px;
   padding: 0 8px;
   border-radius: 11px;
-  background: var(--apricot-wash);
-  color: var(--apricot-ink);
+  background: var(--peach);
+  color: var(--forest);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -934,13 +956,13 @@
 }
 
 .crm .crmFileKind[data-kind="test"] {
-  background: var(--mint-wash);
-  color: var(--mint-ink);
+  background: var(--pale);
+  color: var(--forest);
 }
 
 .crm .crmFileKind[data-kind="photo"] {
-  background: var(--mauve-wash);
-  color: var(--mauve-ink);
+  background: var(--peach);
+  color: var(--forest);
 }
 
 .crm .crmFileKind[data-kind="doc"],
@@ -969,10 +991,10 @@
 .crm .crmError {
   margin: 0;
   padding: 11px 14px;
-  border: 1px solid var(--rose);
+  border: 1px solid var(--clay);
   border-radius: 10px;
-  background: var(--rose-wash);
-  color: var(--rose-ink);
+  background: var(--peach);
+  color: var(--forest);
   font-size: 13.5px;
   font-weight: 600;
   line-height: 1.7;
@@ -1182,7 +1204,7 @@
   height: 17px;
   padding: 0 4px;
   border-radius: 999px;
-  background: var(--rose-ink);
+  background: var(--forest);
   color: #fff;
   font-size: 10.5px;
   display: inline-flex;
@@ -1259,8 +1281,8 @@
 
 .crm .waBubble.outgoing {
   align-self: flex-end;
-  background: var(--mint-wash);
-  border: 1px solid color-mix(in srgb, var(--mint) 55%, transparent);
+  background: var(--pale);
+  border: 1px solid var(--olive);
   border-start-end-radius: 4px;
 }
 
@@ -1358,6 +1380,9 @@
   width: 9px;
   height: 9px;
   border-radius: 2px;
+  /* Same reason as the bars: the peach swatch is 1.37:1 on white and
+     would read as an empty square without an edge. */
+  border: 1px solid var(--forest);
   flex: none;
 }
 

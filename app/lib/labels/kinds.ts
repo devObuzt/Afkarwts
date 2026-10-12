@@ -22,13 +22,13 @@ export const KIND_DETAIL: Record<LabelKind, string> = {
   other: "تصنيف لا يندرج تحت ما سبق."
 };
 
-/** The tone each kind is drawn in, from the palette the screens already use. */
+/** The tone each kind is drawn in — five kinds, five of Afkar's colours. */
 export const KIND_TONE: Record<LabelKind, string> = {
-  path: "apricot",
-  batch: "mint",
-  state: "rose",
-  coach: "mauve",
-  other: "salmon"
+  path: "sage",
+  batch: "olive",
+  state: "clay",
+  coach: "forest",
+  other: "peach"
 };
 
 /** The two states the system keeps up to date by itself. */

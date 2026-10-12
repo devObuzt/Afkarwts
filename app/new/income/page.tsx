@@ -70,7 +70,7 @@ export default async function IncomePage({
       </section>
 
       <section className="crmGrid">
-        <div className="crmCard crmTile crmPad" data-tone="salmon" style={{ flex: "1 1 200px" }}>
+        <div className="crmCard crmTile crmPad" data-tone="forest" style={{ flex: "1 1 200px" }}>
           <div className="figure">{shekels(report.total.amount)}</div>
           <div className="crmRowDetail">
             المجموع · {report.total.count} فاتورة
@@ -94,7 +94,7 @@ export default async function IncomePage({
         ))}
       </section>
 
-      <section className="crmCard" data-tone="salmon">
+      <section className="crmCard" data-tone="forest">
         <header>
           <span className="crmDot" />
           <h2>الدخل عبر الزمن</h2>
@@ -110,7 +110,7 @@ export default async function IncomePage({
 
       <div className="crmSplit">
         <div className="main">
-          <section className="crmCard" data-tone="mint">
+          <section className="crmCard" data-tone="olive">
             <header>
               <span className="crmDot" />
               <h2>الفواتير</h2>
@@ -152,7 +152,7 @@ export default async function IncomePage({
         </div>
 
         <div className="side">
-          <section className="crmCard" data-tone="apricot">
+          <section className="crmCard" data-tone="sage">
             <header>
               <span className="crmDot" />
               <h2>حسب المسار</h2>
@@ -178,7 +178,7 @@ export default async function IncomePage({
 
           {/* Shipping, a top-up, a photo day: sold beside a مسار, and they
               were being added up under its heading. */}
-          <section className="crmCard" data-tone="mint">
+          <section className="crmCard" data-tone="olive">
             <header>
               <span className="crmDot" />
               <h2>الإضافات</h2>
@@ -202,7 +202,7 @@ export default async function IncomePage({
             )}
           </section>
 
-          <section className="crmCard" data-tone="rose">
+          <section className="crmCard" data-tone="clay">
             <header>
               <span className="crmDot" />
               <h2>لمن البيعة</h2>
@@ -228,7 +228,7 @@ export default async function IncomePage({
             )}
           </section>
 
-          <section className="crmCard" data-tone="mauve">
+          <section className="crmCard" data-tone="clay">
             <header>
               <span className="crmDot" />
               <h2>حسب وسيلة الدفع</h2>

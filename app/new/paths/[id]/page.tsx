@@ -81,10 +81,10 @@ export default async function CohortPage({
 
       <section className="crmGrid">
         {[
-          { label: "أُرسلت", value: funnel.sent, tone: "salmon" },
-          { label: "وصلت", value: funnel.reached, tone: "apricot" },
-          { label: "قُرئت", value: funnel.read, tone: "mauve" },
-          { label: "ردّوا", value: funnel.replied, tone: "mint" }
+          { label: "أُرسلت", value: funnel.sent, tone: "forest" },
+          { label: "وصلت", value: funnel.reached, tone: "sage" },
+          { label: "قُرئت", value: funnel.read, tone: "clay" },
+          { label: "ردّوا", value: funnel.replied, tone: "olive" }
         ].map((stat) => (
           <div className="crmCard crmTile crmPad" data-tone={stat.tone} key={stat.label} style={{ flex: "1 1 160px" }}>
             <div className="figure">{stat.value}</div>
@@ -95,7 +95,7 @@ export default async function CohortPage({
 
       <div className="crmSplit">
         <div className="main">
-          <section className="crmCard" data-tone="mauve">
+          <section className="crmCard" data-tone="clay">
             <header>
               <span className="crmDot" />
               <h2>المنتسبين</h2>
@@ -126,7 +126,7 @@ export default async function CohortPage({
         </div>
 
         <div className="side">
-          <section className="crmCard" data-tone="apricot">
+          <section className="crmCard" data-tone="sage">
             <header>
               <span className="crmDot" />
               <h2>خطوات المسار</h2>
