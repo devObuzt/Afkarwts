@@ -19,8 +19,13 @@ import { SyncButton } from "./SyncButton";
 export const dynamic = "force-dynamic";
 
 const RANGES: Range[] = ["today", "week", "month", "last-month", "custom"];
-const BUCKETS: Bucket[] = ["day", "week", "month"];
-const BUCKET_LABEL: Record<Bucket, string> = { day: "أيام", week: "أسابيع", month: "أشهر" };
+const BUCKETS: Bucket[] = ["hour", "day", "week", "month"];
+const BUCKET_LABEL: Record<Bucket, string> = {
+  hour: "ساعات",
+  day: "أيام",
+  week: "أسابيع",
+  month: "أشهر"
+};
 
 function shekels(amount: number) {
   return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(Math.round(amount))} ش.ج`;
@@ -34,9 +39,28 @@ export default async function IncomePage({
   await requireUser("income.view");
 
   const params = await searchParams;
-  const { range, from, to, method, by } = readIncomeParams(params);
+  const { range, from, to, method, by, hours, page } = readIncomeParams(params);
 
-  const report = incomeReport({ from, to, method });
+  const report = incomeReport({ from, to, method, page });
+
+  // The pager keeps the filters: a link to page three of «this month, by
+  // card» has to stay that view.
+  const pageHref = (next: number) => {
+    const search = new URLSearchParams();
+    search.set("range", range);
+    if (range === "custom") {
+      search.set("from", from);
+      search.set("to", to);
+    }
+    if (method) {
+      search.set("method", String(method));
+    }
+    search.set("by", by);
+    if (next > 1) {
+      search.set("page", String(next));
+    }
+    return `/new/income?${search.toString()}`;
+  };
   const sync = lastSync();
 
   return (
@@ -54,7 +78,10 @@ export default async function IncomePage({
       <section className="crmCard crmPad">
         <IncomeFilters
           by={by}
-          buckets={BUCKETS.map((value) => ({ value, label: BUCKET_LABEL[value] }))}
+          buckets={BUCKETS.filter((value) => value !== "hour" || hours).map((value) => ({
+            value,
+            label: BUCKET_LABEL[value]
+          }))}
           from={from}
           method={method ? String(method) : ""}
           methods={[
@@ -103,7 +130,15 @@ export default async function IncomePage({
           {report.total.count === 0 ? (
             <p className="crmEmpty">لا بيانات في هذه المدة.</p>
           ) : (
-            <IncomeChart points={incomeSeries(report, by)} />
+            <>
+              <IncomeChart points={incomeSeries(report, by)} />
+              {by === "hour" && report.timed < report.total.count && (
+                <p className="crmNote">
+                  الساعة من وقت إصدار الفاتورة في Morning — مسجّلة على {report.timed} من{" "}
+                  {report.total.count} فاتورة هنا. الأقدم منها لا تحمل ساعة فلا تظهر في الرسم.
+                </p>
+              )}
+            </>
           )}
         </div>
       </section>
@@ -114,6 +149,7 @@ export default async function IncomePage({
             <header>
               <span className="crmDot" />
               <h2>الفواتير</h2>
+              <span className="crmRowDetail">{report.paymentCount}</span>
               <SyncButton from={from} to={to} />
             </header>
 
@@ -122,7 +158,7 @@ export default async function IncomePage({
                 لا فواتير في هذه المدة. إن كانت المدة صحيحة، اسحب من Morning أولاً.
               </p>
             ) : (
-              report.payments.slice(0, 120).map((payment) => (
+              report.payments.map((payment) => (
                 <div className="crmRow" key={payment.id}>
                   <span className="grow">
                     <span className="crmRowTitle" style={{ display: "block" }}>
@@ -147,6 +183,28 @@ export default async function IncomePage({
                   </span>
                 </div>
               ))
+            )}
+
+            {report.pages > 1 && (
+              <div className="crmPager">
+                <Link
+                  aria-disabled={report.page <= 1}
+                  className={report.page <= 1 ? "crmBtn quiet disabled" : "crmBtn quiet"}
+                  href={pageHref(report.page - 1)}
+                >
+                  السابق
+                </Link>
+                <span className="crmRowDetail">
+                  صفحة {report.page} من {report.pages} · {report.paymentCount} فاتورة
+                </span>
+                <Link
+                  aria-disabled={report.page >= report.pages}
+                  className={report.page >= report.pages ? "crmBtn quiet disabled" : "crmBtn quiet"}
+                  href={pageHref(report.page + 1)}
+                >
+                  التالي
+                </Link>
+              </div>
             )}
           </section>
         </div>

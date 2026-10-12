@@ -5,7 +5,12 @@ import { migrateJourneyTables } from "./journeys/schema";
 import { migrateFormTables } from "./forms/schema";
 import { migrateUserTables } from "./users/schema";
 import { migrateLabelColumns } from "./labels/schema";
-import { migrateBackfillColumn, migrateIncomeTables, migrateSellerColumn } from "./income/schema";
+import {
+  migrateBackfillColumn,
+  migrateIncomeTables,
+  migrateIssuedAtColumn,
+  migrateSellerColumn
+} from "./income/schema";
 
 export type Member = {
   id: number;
@@ -140,6 +145,7 @@ export function getDb() {
     migrateIncomeTables(db);
     migrateBackfillColumn(db);
     migrateSellerColumn(db);
+    migrateIssuedAtColumn(db);
     globalForDb.__afkarDb = db;
   }
 

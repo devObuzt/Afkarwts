@@ -19,6 +19,8 @@ export type MorningDoc = {
   number: string;
   docType: number;
   paidOn: string;
+  /** Unix seconds, UTC: when the document was issued. 0 when Morning gives none. */
+  issuedAt: number;
   amount: number;
   currency: string;
   methods: number[];
@@ -82,6 +84,8 @@ export function mapDoc(raw: Raw): MorningDoc {
     // documentDate is the day the money is booked to; creationDate is when
     // somebody got round to typing it in.
     paidOn: String(raw.documentDate ?? raw.creationDate ?? "").slice(0, 10),
+    // documentDate has no time in it; creationDate does, as Unix seconds.
+    issuedAt: Number.isFinite(Number(raw.creationDate)) ? Number(raw.creationDate) : 0,
     amount: Number(raw.amount ?? 0),
     currency: String(raw.currency ?? "ILS"),
     methods: [...new Set(payments.map((payment) => Number(payment.type)).filter(Number.isFinite))],

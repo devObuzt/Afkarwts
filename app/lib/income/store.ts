@@ -21,6 +21,8 @@ export type Payment = {
   url: string;
   soldBy: string;
   sellerName: string;
+  /** Unix seconds UTC, or 0 for a row synced before the column existed. */
+  issuedAt: number;
 };
 
 type Row = Record<string, string | number | null>;
@@ -52,7 +54,8 @@ function mapPayment(row: Row): Payment {
     memberName: String(row.member_name ?? ""),
     url: String(row.url ?? ""),
     soldBy: String(row.sold_by ?? ""),
-    sellerName: String(row.seller_name ?? "")
+    sellerName: String(row.seller_name ?? ""),
+    issuedAt: Number(row.issued_at ?? 0)
   };
 }
 
@@ -89,15 +92,16 @@ export function savePayments(docs: MorningDoc[], sources: Map<string, IncomeSour
   const insert = db.prepare(
     `INSERT INTO payments
        (morning_id, number, doc_type, paid_on, amount, currency, methods, source,
-        client_name, client_phone, items, description, order_ref, member_id, url, sold_by, synced_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        client_name, client_phone, items, description, order_ref, member_id, url, sold_by,
+        issued_at, synced_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
      ON CONFLICT (morning_id) DO UPDATE SET
        number = excluded.number, paid_on = excluded.paid_on, amount = excluded.amount,
        currency = excluded.currency, methods = excluded.methods, source = excluded.source,
        client_name = excluded.client_name, client_phone = excluded.client_phone,
        items = excluded.items, description = excluded.description, order_ref = excluded.order_ref,
        member_id = excluded.member_id, url = excluded.url, sold_by = excluded.sold_by,
-       synced_at = CURRENT_TIMESTAMP`
+       issued_at = excluded.issued_at, synced_at = CURRENT_TIMESTAMP`
   );
 
   let written = 0;
@@ -125,7 +129,8 @@ export function savePayments(docs: MorningDoc[], sources: Map<string, IncomeSour
       doc.orderRef,
       member?.id ?? null,
       doc.url,
-      doc.soldBy ?? ""
+      doc.soldBy ?? "",
+      doc.issuedAt || null
     );
     written += 1;
   }
@@ -177,11 +182,31 @@ export type IncomeReport = {
   byPath: Array<{ item: string; count: number; amount: number }>;
   byExtra: Array<{ item: string; count: number; amount: number }>;
   bySeller: Array<{ seller: string; count: number; amount: number }>;
+  /** One page of the list — ten rows, not a thousand. */
   payments: Payment[];
+  paymentCount: number;
+  page: number;
+  pages: number;
+  perPage: number;
   linked: number;
+  /** How many rows in the range carry an issue time, for the hour view. */
+  timed: number;
+  /**
+   * Just enough of every row in the range to draw the chart: the list is
+   * one page now, so the series cannot be built from it.
+   */
+  ticks: Array<{ paidOn: string; issuedAt: number; source: IncomeSource; amount: number }>;
 };
 
-export function incomeReport(filter: { from: string; to: string; method?: number | null }): IncomeReport {
+/** The invoice list is paged: a year of invoices is not a page. */
+export const PER_PAGE = 10;
+
+export function incomeReport(filter: {
+  from: string;
+  to: string;
+  method?: number | null;
+  page?: number;
+}): IncomeReport {
   const db = getDb();
   const where = ["paid_on >= ?", "paid_on <= ?"];
   const args: Array<string | number> = [filter.from, filter.to];
@@ -194,6 +219,9 @@ export function incomeReport(filter: { from: string; to: string; method?: number
 
   const clause = `WHERE ${where.join(" AND ")}`;
 
+  // Two reads, on purpose. The totals need every row in the range; the
+  // list needs ten. Loading a thousand invoices to show ten of them is
+  // what this avoids — Wisam, 2026-10-12.
   const rows = db
     .prepare(
       `SELECT payments.*, members.name AS member_name, users.name AS seller_name
@@ -205,6 +233,20 @@ export function incomeReport(filter: { from: string; to: string; method?: number
     .all(...args) as Row[];
 
   const payments = rows.map(mapPayment);
+
+  const paymentCount = payments.length;
+  const pages = Math.max(1, Math.ceil(paymentCount / PER_PAGE));
+  const page = Math.min(Math.max(1, Math.trunc(filter.page ?? 1)), pages);
+  const pageRows = db
+    .prepare(
+      `SELECT payments.*, members.name AS member_name, users.name AS seller_name
+         FROM payments
+         LEFT JOIN members ON members.id = payments.member_id
+         LEFT JOIN users ON users.id = members.assigned_user_id
+         ${clause} ORDER BY paid_on DESC, payments.id DESC
+        LIMIT ? OFFSET ?`
+    )
+    .all(...args, PER_PAGE, (page - 1) * PER_PAGE) as Row[];
   const round = (value: number) => Math.round(value * 100) / 100;
 
   const group = <T>(key: (payment: Payment) => T[]) => {
@@ -258,8 +300,19 @@ export function incomeReport(filter: { from: string; to: string; method?: number
     bySeller: [...bySellerMap.entries()]
       .map(([seller, value]) => ({ seller, count: value.count, amount: round(value.amount) }))
       .sort((a, b) => b.amount - a.amount),
-    payments,
-    linked: payments.filter((payment) => payment.memberId !== null).length
+    payments: pageRows.map(mapPayment),
+    paymentCount,
+    page,
+    pages,
+    perPage: PER_PAGE,
+    linked: payments.filter((payment) => payment.memberId !== null).length,
+    timed: payments.filter((payment) => payment.issuedAt > 0).length,
+    ticks: payments.map((payment) => ({
+      paidOn: payment.paidOn,
+      issuedAt: payment.issuedAt,
+      source: payment.source,
+      amount: payment.amount
+    }))
   };
 }
 
@@ -319,7 +372,37 @@ export function relinkPayments() {
   return Number(result.changes);
 }
 
-export type Bucket = "day" | "week" | "month";
+export type Bucket = "hour" | "day" | "week" | "month";
+
+/**
+ * The hour an invoice was issued, in Afkar's own time.
+ *
+ * The container runs UTC — `TZ` is unset on the service — so reading the
+ * hour off a Date would put a 17:04 sale at 14:00. Asia/Jerusalem is
+ * asked for by name, which also gets the summer-time change right.
+ */
+const JERUSALEM = new Intl.DateTimeFormat("en-GB", {
+  timeZone: "Asia/Jerusalem",
+  hourCycle: "h23",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit"
+});
+
+export function jerusalemHour(epochSeconds: number) {
+  const parts = JERUSALEM.formatToParts(new Date(epochSeconds * 1000));
+  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? "00";
+  return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}`;
+}
+
+/** A day of hours is 24 columns; eighteen months of them is 13,000. */
+export const HOUR_SPAN_DAYS = 2;
+
+export function hourBucketAllowed(from: string, to: string) {
+  const days = (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 864e5 + 1;
+  return days <= HOUR_SPAN_DAYS;
+}
 
 export type SeriesPoint = {
   key: string;
@@ -344,37 +427,70 @@ function startOfWeek(iso: string) {
  * and dropping it would draw a flat line over a gap.
  */
 export function incomeSeries(report: IncomeReport, bucket: Bucket): SeriesPoint[] {
-  const keyOf = (paidOn: string) =>
-    bucket === "day" ? paidOn : bucket === "week" ? startOfWeek(paidOn) : `${paidOn.slice(0, 7)}-01`;
-
   const points = new Map<string, SeriesPoint>();
 
   const blank = (key: string): SeriesPoint => ({
     key,
-    label: bucket === "month" ? key.slice(0, 7) : key.slice(5).split("-").reverse().join("/"),
+    label:
+      bucket === "hour"
+        ? `${key.slice(11, 13)}:00`
+        : bucket === "month"
+          ? key.slice(0, 7)
+          : key.slice(5).split("-").reverse().join("/"),
     website: 0,
     app: 0,
     sales: 0,
     total: 0
   });
 
-  // Walk the whole window so a quiet day still gets a column.
-  const cursor = new Date(`${report.from}T00:00:00Z`);
-  const end = new Date(`${report.to}T00:00:00Z`);
-  while (cursor <= end) {
-    const key = keyOf(cursor.toISOString().slice(0, 10));
-    if (!points.has(key)) {
-      points.set(key, blank(key));
+  if (bucket === "hour") {
+    // Every hour of every day in the range, so a quiet morning is still a
+    // gap in the day rather than a missing column.
+    const cursor = new Date(`${report.from}T00:00:00Z`);
+    const end = new Date(`${report.to}T00:00:00Z`);
+    while (cursor <= end) {
+      const day = cursor.toISOString().slice(0, 10);
+      for (let hour = 0; hour < 24; hour += 1) {
+        const key = `${day}T${String(hour).padStart(2, "0")}`;
+        points.set(key, blank(key));
+      }
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
     }
-    cursor.setUTCDate(cursor.getUTCDate() + 1);
-  }
 
-  for (const payment of report.payments) {
-    const key = keyOf(payment.paidOn);
-    const point = points.get(key) ?? blank(key);
-    point[payment.source] += payment.amount;
-    point.total += payment.amount;
-    points.set(key, point);
+    for (const tick of report.ticks) {
+      // An invoice synced before the column existed has no hour, and
+      // guessing midnight for it would invent a spike at 00:00.
+      if (!tick.issuedAt) {
+        continue;
+      }
+      const key = jerusalemHour(tick.issuedAt);
+      const point = points.get(key) ?? blank(key);
+      point[tick.source] += tick.amount;
+      point.total += tick.amount;
+      points.set(key, point);
+    }
+  } else {
+    const keyOf = (paidOn: string) =>
+      bucket === "day" ? paidOn : bucket === "week" ? startOfWeek(paidOn) : `${paidOn.slice(0, 7)}-01`;
+
+    // Walk the whole window so a quiet day still gets a column.
+    const cursor = new Date(`${report.from}T00:00:00Z`);
+    const end = new Date(`${report.to}T00:00:00Z`);
+    while (cursor <= end) {
+      const key = keyOf(cursor.toISOString().slice(0, 10));
+      if (!points.has(key)) {
+        points.set(key, blank(key));
+      }
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
+    }
+
+    for (const tick of report.ticks) {
+      const key = keyOf(tick.paidOn);
+      const point = points.get(key) ?? blank(key);
+      point[tick.source] += tick.amount;
+      point.total += tick.amount;
+      points.set(key, point);
+    }
   }
 
   const round = (value: number) => Math.round(value * 100) / 100;

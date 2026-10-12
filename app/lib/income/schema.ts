@@ -67,3 +67,20 @@ export function migrateBackfillColumn(db: DatabaseSync) {
     db.exec("ALTER TABLE payment_sync ADD COLUMN backfilled_from TEXT NOT NULL DEFAULT ''");
   }
 }
+
+/**
+ * The hour, not only the day.
+ *
+ * Morning's `documentDate` is the day the money is booked to and carries
+ * no time at all; `creationDate` is a Unix timestamp of when the document
+ * was issued, which for a 320 — invoice and receipt in one — is the
+ * moment of the sale. Stored as seconds UTC and turned into an
+ * Asia/Jerusalem hour when it is read, because the container runs UTC
+ * and a local-time reading would be three hours out.
+ */
+export function migrateIssuedAtColumn(db: DatabaseSync) {
+  const columns = db.prepare("PRAGMA table_info(payments)").all() as Array<{ name: string }>;
+  if (!columns.some((column) => column.name === "issued_at")) {
+    db.exec("ALTER TABLE payments ADD COLUMN issued_at INTEGER");
+  }
+}

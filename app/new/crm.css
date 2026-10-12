@@ -633,6 +633,22 @@
   gap: 18px;
 }
 
+/* ---- the pager ---- */
+
+.crm .crmPager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 11px 16px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.crm .crmBtn.disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
 /* ---- the filter row, and the small figures ---- */
 
 /* Three dropdowns on one line instead of eighteen buttons on two. */

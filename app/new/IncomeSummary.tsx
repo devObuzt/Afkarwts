@@ -7,29 +7,46 @@ import {
   SOURCE_TONE,
   type Range
 } from "@/app/lib/income/kinds";
-import { incomeReport, incomeSeries, rangeDates, type Bucket } from "@/app/lib/income/store";
+import { hourBucketAllowed, incomeReport, incomeSeries, rangeDates, type Bucket } from "@/app/lib/income/store";
 import { IncomeChart } from "./income/IncomeChart";
 import { IncomeFilters } from "./IncomeFilters";
 
 const RANGES: Range[] = ["today", "week", "month", "last-month", "custom"];
-const BUCKETS: Bucket[] = ["day", "week", "month"];
-const BUCKET_LABEL: Record<Bucket, string> = { day: "أيام", week: "أسابيع", month: "أشهر" };
+const BUCKETS: Bucket[] = ["hour", "day", "week", "month"];
+const BUCKET_LABEL: Record<Bucket, string> = {
+  hour: "ساعات",
+  day: "أيام",
+  week: "أسابيع",
+  month: "أشهر"
+};
 
 function shekels(amount: number) {
   return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(Math.round(amount))} ش.ج`;
 }
 
 /** The filters the dashboard and the income screen both read. */
-export function readIncomeParams(params: { range?: string; from?: string; to?: string; method?: string; by?: string }) {
+export function readIncomeParams(params: {
+  range?: string;
+  from?: string;
+  to?: string;
+  method?: string;
+  by?: string;
+  page?: string;
+}) {
   const range = (RANGES as string[]).includes(params.range ?? "") ? (params.range as Range) : "month";
   const { from, to } = rangeDates(range, new Date(), { from: params.from, to: params.to });
   const method = Number(params.method) || null;
-  const by = (BUCKETS as string[]).includes(params.by ?? "")
-    ? (params.by as Bucket)
-    : range === "custom"
-      ? "month"
-      : "day";
-  return { range, from, to, method, by };
+
+  // Hours are offered only for a day or two. Eighteen months of them is
+  // thirteen thousand columns, which is not a chart.
+  const hours = hourBucketAllowed(from, to);
+  const asked = (BUCKETS as string[]).includes(params.by ?? "") ? (params.by as Bucket) : null;
+  const fallback: Bucket = range === "today" ? "hour" : range === "custom" ? "month" : "day";
+  const wanted = asked ?? fallback;
+  const by: Bucket = wanted === "hour" && !hours ? "day" : wanted;
+
+  const page = Math.max(1, Math.trunc(Number(params.page) || 1));
+  return { range, from, to, method, by, hours, page };
 }
 
 /**
@@ -45,7 +62,7 @@ export function IncomeSummary({
 }: {
   params: { range?: string; from?: string; to?: string; method?: string; by?: string };
 }) {
-  const { range, from, to, method, by } = readIncomeParams(params);
+  const { range, from, to, method, by, hours } = readIncomeParams(params);
   const report = incomeReport({ from, to, method });
 
   return (
@@ -61,7 +78,10 @@ export function IncomeSummary({
       <div className="crmPad">
         <IncomeFilters
           by={by}
-          buckets={BUCKETS.map((value) => ({ value, label: BUCKET_LABEL[value] }))}
+          buckets={BUCKETS.filter((value) => value !== "hour" || hours).map((value) => ({
+            value,
+            label: BUCKET_LABEL[value]
+          }))}
           from={from}
           method={method ? String(method) : ""}
           methods={[
@@ -94,7 +114,16 @@ export function IncomeSummary({
         {report.total.count === 0 ? (
           <p className="crmEmpty">لا مدفوعات في هذه المدة.</p>
         ) : (
-          <IncomeChart points={incomeSeries(report, by)} />
+          <>
+            <IncomeChart points={incomeSeries(report, by)} />
+            {by === "hour" && report.timed < report.total.count && (
+              <p className="crmNote">
+                الساعة تُقرأ من وقت إصدار الفاتورة في Morning، وهي مسجّلة على {report.timed} من{" "}
+                {report.total.count} فاتورة في هذه المدة. الفواتير الأقدم من تشغيل هذه الميزة لا
+                تحمل ساعة، فلا تظهر في الرسم.
+              </p>
+            )}
+          </>
         )}
       </div>
     </section>
