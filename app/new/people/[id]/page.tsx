@@ -148,6 +148,16 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
                 <span className="crmDot" />
                 <h2>استمارة التسجيل</h2>
                 <span className="crmPill tone spacer">{registration.formName}</span>
+                {/* The correction starts where the mistake is noticed, and
+                    that is here — on her file, not in a report. */}
+                {can(user, "forms.manage") && record.seesHealth && (
+                  <Link
+                    className="crmBtn quiet"
+                    href={`/new/forms/${registration.formId}/submissions/${registration.id}`}
+                  >
+                    تعديل
+                  </Link>
+                )}
               </header>
               <div className="crmPad crmAnswers">
                 {registration.answers

@@ -28,6 +28,8 @@ export type PersonJourney = {
 
 export type PersonSubmission = {
   id: number;
+  /** Needed to link to the editor, which is scoped by form. */
+  formId: number;
   formName: string;
   submittedAt: string;
   state: string;
@@ -182,7 +184,7 @@ export function getPersonRecord(
 
   const submissionRows = db
     .prepare(
-      `SELECT s.id, s.submitted_at, s.state, f.name AS form_name
+      `SELECT s.id, s.form_id, s.submitted_at, s.state, f.name AS form_name
          FROM form_submissions s
          LEFT JOIN forms f ON f.id = s.form_id
         WHERE s.member_id = ? OR (s.phone <> '' AND s.phone = ?)
@@ -193,6 +195,7 @@ export function getPersonRecord(
   const answersFor = db.prepare("SELECT label, value FROM form_answers WHERE submission_id = ? ORDER BY id");
   const submissions: PersonSubmission[] = submissionRows.map((row) => ({
     id: Number(row.id),
+    formId: Number(row.form_id),
     formName: String(row.form_name ?? ""),
     submittedAt: toIso(String(row.submitted_at)),
     state: String(row.state ?? ""),
