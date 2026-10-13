@@ -32,6 +32,7 @@ export const ACTION_LABEL: Record<string, string> = {
   "file.rename": "تغيير اسم ملف",
   "lead.approve": "الموافقة على تسجيل",
   "lead.reject": "رفض تسجيل",
+  "lead.edit": "تعديل تسجيل",
   "journey.status": "تغيير حالة مسار",
   "user.create": "إنشاء مستخدم",
   "user.update": "تعديل صلاحيات مستخدم",

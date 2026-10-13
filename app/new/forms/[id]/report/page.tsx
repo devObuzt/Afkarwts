@@ -140,7 +140,17 @@ export default async function ReportPage({
           <tbody>
             {grid.rows.map((row, index) => (
               <tr key={row.submissionId}>
-                <td>{index + 1}</td>
+                <td>
+                  {/* The number is the way in: a typo is noticed while
+                      reading the table, so the correction starts there. */}
+                  {printing ? (
+                    index + 1
+                  ) : (
+                    <Link href={`/new/forms/${form.id}/submissions/${row.submissionId}`} title="تعديل التسجيل">
+                      {index + 1}
+                    </Link>
+                  )}
+                </td>
                 <td>
                   {/* The class carries display:inline-block — on the cell
                       itself it stops being a table cell, and the column

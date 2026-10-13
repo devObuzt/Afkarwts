@@ -435,10 +435,129 @@ export function getSubmission(id: number) {
   }
 
   const answers = getDb()
-    .prepare("SELECT label, value FROM form_answers WHERE submission_id = ? ORDER BY id")
-    .all(id) as Array<{ label: string; value: string }>;
+    .prepare(
+      `SELECT form_answers.id, form_answers.label, form_answers.value,
+              form_fields.kind, form_fields.options, form_fields.map_to
+         FROM form_answers
+         LEFT JOIN form_fields ON form_fields.id = form_answers.field_id
+        WHERE form_answers.submission_id = ? ORDER BY form_answers.id`
+    )
+    .all(id) as Array<{
+    id: number;
+    label: string;
+    value: string;
+    kind: string | null;
+    options: string | null;
+    map_to: string | null;
+  }>;
 
-  return { submission: mapSubmission(row), answers };
+  return {
+    submission: mapSubmission(row),
+    answers: answers.map((answer) => ({
+      id: answer.id,
+      label: answer.label,
+      value: answer.value,
+      // A question the form no longer asks has no kind: it is still
+      // editable, as plain text, because the answer is still somebody's.
+      kind: answer.kind ?? "text",
+      options: (() => {
+        try {
+          const parsed = JSON.parse(answer.options ?? "[]");
+          return Array.isArray(parsed) ? parsed.map(String) : [];
+        } catch {
+          return [];
+        }
+      })(),
+      mapsTo: answer.map_to ?? ""
+    }))
+  };
+}
+
+/**
+ * A registration, after it arrived, with somebody's typo in it.
+ *
+ * Until now nothing could touch one: a phone keyed in wrong meant the
+ * approval made a member nobody could reach, and a town or a health answer
+ * entered in the wrong box stayed wrong for good.
+ *
+ * The part that is easy to get wrong: the submission's own `name`, `phone`
+ * and `city` are not stored twice over — they are **derived** from the
+ * answers at submit time through each field's `mapsTo`. Correcting the
+ * phone answer without re-deriving them would leave the column holding the
+ * old number, and approval would go on making a member from it. So every
+ * edit re-reads the mapped answers and writes the three columns again,
+ * through the same normaliser the public form uses.
+ */
+export function updateSubmissionAnswers(
+  submissionId: number,
+  edits: Array<{ answerId: number; value: string }>
+) {
+  const db = getDb();
+
+  const submission = db.prepare("SELECT id, form_id FROM form_submissions WHERE id = ?").get(submissionId) as
+    | { id: number; form_id: number }
+    | undefined;
+  if (!submission) {
+    throw new Error("هذا التسجيل غير موجود.");
+  }
+
+  const rows = db
+    .prepare("SELECT id, field_id, label, value FROM form_answers WHERE submission_id = ?")
+    .all(submissionId) as Array<{ id: number; field_id: number | null; label: string; value: string }>;
+  const byId = new Map(rows.map((row) => [row.id, row]));
+
+  // Which questions changed, for the log. Never the answers themselves —
+  // see the note in the API route.
+  const changed: string[] = [];
+
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    const write = db.prepare("UPDATE form_answers SET value = ? WHERE id = ? AND submission_id = ?");
+    for (const edit of edits) {
+      const row = byId.get(edit.answerId);
+      // An answer id that belongs to another registration is not an edit.
+      if (!row || row.value === edit.value) {
+        continue;
+      }
+      write.run(edit.value, edit.answerId, submissionId);
+      row.value = edit.value;
+      changed.push(row.label);
+    }
+
+    if (changed.length > 0) {
+      const fields = new Map(listFields(submission.form_id).map((field) => [field.id, field]));
+      let name = "";
+      let phone = "";
+      let city = "";
+      for (const row of rows) {
+        const field = row.field_id === null ? undefined : fields.get(row.field_id);
+        if (!field) {
+          continue;
+        }
+        if (field.mapsTo === "name") {
+          name = row.value.trim();
+        } else if (field.mapsTo === "phone") {
+          phone = formPhone(row.value);
+        } else if (field.mapsTo === "city") {
+          city = row.value.trim();
+        }
+      }
+
+      db.prepare("UPDATE form_submissions SET name = ?, phone = ?, city = ? WHERE id = ?").run(
+        name,
+        phone,
+        city,
+        submissionId
+      );
+    }
+
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+
+  return { changed };
 }
 
 export function setSubmissionState(id: number, state: SubmissionRow["state"], memberId: number | null) {

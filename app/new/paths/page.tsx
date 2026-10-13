@@ -51,6 +51,14 @@ export default async function CohortsPage() {
                   {submission.knownMemberName ? ` · مسجّل مسبقاً باسم ${submission.knownMemberName}` : ""}
                 </div>
               </div>
+              {/* Before approval is the moment a typo is worth catching:
+                  after it, the member exists with the wrong number. */}
+              <Link
+                className="crmBtn quiet"
+                href={`/new/forms/${submission.formId}/submissions/${submission.id}`}
+              >
+                تعديل
+              </Link>
             </div>
           ))}
           <div className="crmPad" style={{ borderTop: "1px solid var(--line-soft)" }}>
