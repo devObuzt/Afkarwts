@@ -98,6 +98,13 @@ export type SubmissionGrid = {
     state: string;
     submittedAt: string;
     cells: string[];
+    /**
+     * The answer row behind each cell, so the table can edit in place.
+     * Null where this registration never answered that question — there is
+     * no row to patch, and inventing one would make a field the form did
+     * not ask look answered.
+     */
+    answerIds: Array<number | null>;
   }>;
 };
 
@@ -133,7 +140,7 @@ export function submissionGrid(formId: number, filter: { state?: string } = {}):
     )
     .all(...args) as Array<Record<string, string | number | null>>;
 
-  const answers = db.prepare("SELECT label, value FROM form_answers WHERE submission_id = ? ORDER BY id");
+  const answers = db.prepare("SELECT id, label, value FROM form_answers WHERE submission_id = ? ORDER BY id");
 
   const asked = listFields(formId).map((field) => field.label);
   const columns = [...asked];
@@ -141,27 +148,34 @@ export function submissionGrid(formId: number, filter: { state?: string } = {}):
 
   const collected = submissions.map((submission) => {
     const given = new Map<string, string>();
-    for (const answer of answers.all(Number(submission.id)) as Array<{ label: string; value: string }>) {
+    const ids = new Map<string, number>();
+    for (const answer of answers.all(Number(submission.id)) as Array<{
+      id: number;
+      label: string;
+      value: string;
+    }>) {
       // A repeated label keeps the first answer: a duplicate question is a
       // form mistake, and dropping the earlier one loses what was said.
       if (!given.has(answer.label)) {
         given.set(answer.label, cellValue(answer.value));
+        ids.set(answer.label, answer.id);
       }
       if (!columns.includes(answer.label)) {
         // A question the form no longer asks, still answered in the past.
         columns.push(answer.label);
       }
     }
-    return { submission, given };
+    return { submission, given, ids };
   });
 
-  for (const { submission, given } of collected) {
+  for (const { submission, given, ids } of collected) {
     rows.push({
       submissionId: Number(submission.id),
       memberId: submission.member_id === null ? null : Number(submission.member_id),
       state: String(submission.state),
       submittedAt: String(submission.submitted_at),
-      cells: columns.map((column) => given.get(column) ?? "")
+      cells: columns.map((column) => given.get(column) ?? ""),
+      answerIds: columns.map((column) => ids.get(column) ?? null)
     });
   }
 

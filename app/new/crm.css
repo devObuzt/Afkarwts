@@ -633,6 +633,25 @@
   gap: 18px;
 }
 
+/* ---- editing a cell where it is read ---- */
+
+.crm .gridTable td .cellEdit {
+  width: 100%;
+  min-height: 0;
+  padding: 2px 6px;
+  font: inherit;
+  font-size: 13px;
+  border: 1px solid var(--forest);
+  border-radius: 6px;
+  background: var(--card);
+  color: var(--ink);
+}
+
+.crm .cellFailed {
+  color: var(--clay);
+  font-weight: 700;
+}
+
 /* ---- the pager ---- */
 
 .crm .crmPager {

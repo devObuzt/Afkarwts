@@ -133,3 +133,66 @@ test("a correction that leaves the phone too short still saves, and says so", as
   const after = getSubmission(id)!.submission.phone;
   assert.equal(phoneIsUsable(after), false, "and «أضف للمجموعة» would still refuse it");
 });
+
+test("the report grid carries the answer row behind each cell", async () => {
+  const { submissionGrid, updateSubmissionAnswers } = await import("@/app/lib/forms/report").then(
+    async (report) => ({ ...report, ...(await import("@/app/lib/forms/store")) })
+  );
+  const { createGroup } = await import("@/app/lib/db");
+  const { createForm, listFields, submitForm } = await import("@/app/lib/forms/store");
+
+  const group = createGroup("كلين للجدول");
+  const form = createForm({ name: "تسجيل الجدول", groupId: group.id, fromTemplate: true });
+  const answers: Record<string, string> = {};
+  for (const field of listFields(form.id)) {
+    answers[String(field.id)] =
+      field.mapsTo === "name"
+        ? "ريم"
+        : field.mapsTo === "phone"
+          ? "0545227690"
+          : field.mapsTo === "city"
+            ? "عرابة"
+            : field.kind === "date"
+              ? "2026-10-02"
+              : field.options.length
+                ? field.options[0]
+                : "نعم";
+  }
+  const sent = submitForm(form.token, answers) as { ok: true; id: number };
+
+  const grid = submissionGrid(form.id)!;
+  const row = grid.rows[0];
+
+  assert.equal(row.cells.length, row.answerIds.length, "one id per cell, or the table edits the wrong one");
+
+  // Editing through the id the table would send changes that same cell.
+  const index = grid.columns.findIndex((column) => column.includes("الاسم"));
+  const id = row.answerIds[index];
+  assert.ok(id, "the name cell has a row behind it");
+  updateSubmissionAnswers(sent.id, [{ answerId: id!, value: "ريم زيدات" }]);
+
+  assert.equal(submissionGrid(form.id)!.rows[0].cells[index], "ريم زيدات");
+});
+
+test("a question this registration never answered has no cell to patch", async () => {
+  const { submissionGrid } = await import("@/app/lib/forms/report");
+  const { addField, createForm, listFields, submitForm } = await import("@/app/lib/forms/store");
+  const { createGroup } = await import("@/app/lib/db");
+
+  const group = createGroup("كلين بسؤال جديد");
+  const form = createForm({ name: "تسجيل", groupId: group.id, fromTemplate: true });
+  const answers: Record<string, string> = {};
+  for (const field of listFields(form.id)) {
+    answers[String(field.id)] =
+      field.mapsTo === "phone" ? "0545227691" : field.kind === "date" ? "2026-10-02" : field.options.length ? field.options[0] : "نعم";
+  }
+  submitForm(form.token, answers);
+
+  // Asked after she replied: her row has nothing behind that column, and
+  // the table must not offer to edit a row that does not exist.
+  addField(form.id, { label: "سؤال أُضيف لاحقاً", kind: "text" });
+  const grid = submissionGrid(form.id)!;
+  const index = grid.columns.indexOf("سؤال أُضيف لاحقاً");
+  assert.ok(index >= 0);
+  assert.equal(grid.rows[0].answerIds[index], null);
+});

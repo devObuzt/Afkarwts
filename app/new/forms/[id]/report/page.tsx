@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getForm } from "@/app/lib/forms/store";
 import { columnWidths, headerKey, isNumeric, printHeader, submissionGrid } from "@/app/lib/forms/report";
 import { requireUser } from "@/app/lib/users/current";
+import { EditableCell } from "./EditableCell";
 import { PdfButton } from "./PdfButton";
 import { can } from "@/app/lib/users/permissions";
 
@@ -52,6 +53,11 @@ export default async function ReportPage({
   const state = STATES.some((option) => option.key === query.state) ? (query.state ?? "") : "";
   const grid = submissionGrid(form.id, { state: state || undefined })!;
   const printing = query.print === "1";
+  // Correcting in place needs both: the form permission and the right to
+  // see the answers — the same pair the save route enforces, so a cell is
+  // never offered to somebody the server would refuse. Never while
+  // printing: the PDF is a reading of the table, not a way into it.
+  const editable = !printing && can(user, "forms.manage");
   // Weighted by content: a phone does not need a consent paragraph's room.
   const widths = columnWidths(grid);
   const key = headerKey(grid.columns);
@@ -70,6 +76,13 @@ export default async function ReportPage({
               {form.groupName} · {form.name} · {grid.rows.length} تسجيل · {grid.columns.length} سؤال
             </p>
           </header>
+
+          {editable && (
+            <p className="crmNote" style={{ marginBottom: -6 }}>
+              نقرتان على أي خانة لتعديلها · Enter للحفظ · Esc للتراجع. تصحيح الهاتف أو الاسم
+              يغيّره في ملف المنتسبة أيضاً.
+            </p>
+          )}
 
           <section className="crmCard crmPad crmSearch">
             <span style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
@@ -157,11 +170,21 @@ export default async function ReportPage({
                       collapsed to 9px with the date stacked letter by letter. */}
                   <span className="crmLtr">{row.submittedAt.slice(0, 10)}</span>
                 </td>
-                {row.cells.map((cell, cellIndex) => (
-                  <td className={isNumeric(cell) ? "num" : undefined} key={grid.columns[cellIndex]}>
-                    {cell}
-                  </td>
-                ))}
+                {row.cells.map((cell, cellIndex) =>
+                  editable ? (
+                    <EditableCell
+                      answerId={row.answerIds[cellIndex]}
+                      className={isNumeric(cell) ? "num" : undefined}
+                      key={grid.columns[cellIndex]}
+                      submissionId={row.submissionId}
+                      value={cell}
+                    />
+                  ) : (
+                    <td className={isNumeric(cell) ? "num" : undefined} key={grid.columns[cellIndex]}>
+                      {cell}
+                    </td>
+                  )
+                )}
               </tr>
             ))}
           </tbody>
