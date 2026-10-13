@@ -78,11 +78,9 @@ export default async function IncomePage({
       <section className="crmCard crmPad">
         <IncomeFilters
           by={by}
-          buckets={BUCKETS.filter((value) => value !== "hour" || hours).map((value) => ({
-            value,
-            label: BUCKET_LABEL[value]
-          }))}
+          buckets={BUCKETS.map((value) => ({ value, label: BUCKET_LABEL[value] }))}
           from={from}
+          hourly={hours}
           method={method ? String(method) : ""}
           methods={[
             { value: "", label: "كل الوسائل" },

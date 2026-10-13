@@ -21,7 +21,8 @@ export function IncomeFilters({
   method,
   by,
   from,
-  to
+  to,
+  hourly
 }: {
   ranges: Option[];
   methods: Option[];
@@ -31,6 +32,8 @@ export function IncomeFilters({
   by: string;
   from: string;
   to: string;
+  /** Whether the range on screen is short enough for hours already. */
+  hourly: boolean;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -51,6 +54,17 @@ export function IncomeFilters({
       next.delete("from");
       next.delete("to");
     }
+
+    // Hours only mean something over a day or two. Rather than hiding the
+    // option until «اليوم» is picked — which made it look as though the
+    // income screen had no hour view at all — choosing it moves the range
+    // to today, which is the only range it could have meant.
+    if (key === "by" && value === "hour" && !hourly) {
+      next.set("range", "today");
+      next.delete("from");
+      next.delete("to");
+    }
+
     if (next.get("range") === "custom") {
       next.set("from", from);
       next.set("to", to);
