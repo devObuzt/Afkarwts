@@ -91,3 +91,19 @@ test("a closed form still shows the registrations it already took", async () => 
 
   assert.equal(listSubmissions({ formId: form.id }).length, 1);
 });
+
+test("Arabic counts agree with their number", async () => {
+  const { choices, questions, registrations } = await import("@/app/new/format");
+
+  // «2 خيار» and «3 تسجيل» are what a template literal gives you, and both
+  // are wrong Arabic. The dual and the plural are different words.
+  assert.equal(choices(0), "بلا خيارات");
+  assert.equal(choices(1), "خيار واحد");
+  assert.equal(choices(2), "خياران");
+  assert.ok(choices(3).includes("خيارات"), `three is a plural — got ${choices(3)}`);
+  assert.ok(choices(11).includes("خياراً"), `eleven takes the singular accusative — got ${choices(11)}`);
+
+  assert.equal(questions(2), "سؤالان");
+  assert.equal(registrations(2), "تسجيلان");
+  assert.equal(registrations(1), "تسجيل واحد");
+});

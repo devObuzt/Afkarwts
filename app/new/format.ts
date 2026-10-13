@@ -141,3 +141,33 @@ export function hueOf(name: string) {
   // 15px initial at 4.5:1 — see the avatar block in crm.css.
   return sum % 4;
 }
+
+export function questions(total: number) {
+  return count(total, {
+    none: "لا أسئلة",
+    one: "سؤال واحد",
+    two: "سؤالان",
+    few: "أسئلة",
+    many: "سؤالاً"
+  });
+}
+
+export function registrations(total: number) {
+  return count(total, {
+    none: "لا تسجيلات",
+    one: "تسجيل واحد",
+    two: "تسجيلان",
+    few: "تسجيلات",
+    many: "تسجيلاً"
+  });
+}
+
+export function choices(total: number) {
+  return count(total, {
+    none: "بلا خيارات",
+    one: "خيار واحد",
+    two: "خياران",
+    few: "خيارات",
+    many: "خياراً"
+  });
+}

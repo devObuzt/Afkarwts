@@ -53,9 +53,6 @@ export default async function LibraryPage() {
         <header>
           <span className="crmDot" />
           <h2>الاستمارات</h2>
-          <a className="crmBtn quiet spacer" href="/leads">
-            تعديل
-          </a>
         </header>
         {forms.map((form) => (
           <div className="crmRow" key={form.id}>
@@ -65,6 +62,12 @@ export default async function LibraryPage() {
                 {form.groupName} · {form.submissionCount} تسجيل
               </div>
             </div>
+            {/* «تعديل» sat at the top of the card and went to the old
+                English screen, so it read as one button for all the forms
+                rather than as a way into this one. */}
+            <a className="crmBtn quiet" href={`/new/forms/${form.id}/edit`}>
+              تعديل الأسئلة
+            </a>
             <a className="crmBtn quiet" href={`/new/forms/${form.id}/report`}>
               التقرير
             </a>
