@@ -94,3 +94,26 @@ test("names from the app arrive per language and are shown in Arabic", async () 
   assert.equal(localName("نص"), "نص");
   assert.equal(localName(null), "");
 });
+
+test("without people.all the app list shows only the people assigned to you — same rule as /new/people", async () => {
+  const { useTempDataDir } = await import("./helpers/data-dir.ts");
+  useTempDataDir();
+  const { createMember, getDb } = await import("@/app/lib/db");
+  const { createUser } = await import("@/app/lib/users/store");
+  const { visibleAppMembers } = await import("@/app/lib/afkar-app/person");
+
+  const coach = createUser({ name: "مدرّبة", username: `c${Date.now()}`, password: "p".repeat(12), role: "coach", mustChangePassword: false });
+  assert.ok(coach.ok);
+  const mine = createMember({ name: "لي", phone: "+972500000011" })!;
+  const other = createMember({ name: "لغيري", phone: "+972500000012" })!;
+  getDb().prepare("UPDATE members SET assigned_user_id = ? WHERE id = ?").run(coach.user.id, mine.id);
+
+  const app = [
+    { id: "a", display_name: "لي", phone_e164: null, first_login_at: null, afkarwts_person_id: String(mine.id) },
+    { id: "b", display_name: "لغيري", phone_e164: null, first_login_at: null, afkarwts_person_id: String(other.id) },
+    { id: "c", display_name: "بلا ربط", phone_e164: null, first_login_at: null, afkarwts_person_id: null }
+  ];
+
+  assert.deepEqual(visibleAppMembers(app, { id: coach.user.id, seesAll: false }).map((m) => m.id), ["a"]);
+  assert.deepEqual(visibleAppMembers(app, { id: coach.user.id, seesAll: true }).map((m) => m.id), ["a", "b", "c"]);
+});

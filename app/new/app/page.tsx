@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { requireUser } from "@/app/lib/users/current";
+import { can } from "@/app/lib/users/permissions";
 import { appAdmin, appConfig } from "@/app/lib/afkar-app/client";
-import { appPrograms, type AppMember } from "@/app/lib/afkar-app/person";
+import { appPrograms, visibleAppMembers, type AppMember } from "@/app/lib/afkar-app/person";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +27,8 @@ export default async function AppPage() {
     appPrograms(user)
   ]);
 
+  const list = members.ok ? visibleAppMembers(members.data.members, { id: user.id, seesAll: can(user, "people.all") }) : [];
+
   return (
     <div className="crmPage">
       <header className="crmHead">
@@ -42,12 +45,12 @@ export default async function AppPage() {
           <header>
             <span className="crmDot" />
             <h2>المنتسبون بالتطبيق</h2>
-            <span className="crmPill tone spacer">{members.data.members.length}</span>
+            <span className="crmPill tone spacer">{list.length}</span>
           </header>
-          {members.data.members.length === 0 ? (
+          {list.length === 0 ? (
             <p className="crmEmpty">لا أحد بعد.</p>
           ) : (
-            members.data.members.map((member) => {
+            list.map((member) => {
               const inner = (
                 <>
                   <span className="grow">

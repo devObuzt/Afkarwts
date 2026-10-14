@@ -1,3 +1,4 @@
+import { getDb } from "@/app/lib/db";
 import { appAdmin, type AppResult } from "./client";
 
 type Staff = { id: number; name: string; role: string };
@@ -36,4 +37,18 @@ export async function appPrograms(user: Staff): Promise<AppResult<AppProgram[]>>
   return result.ok
     ? { ok: true, data: result.data.programs.map((program) => ({ ...program, name: localName(program.name) })) }
     : result;
+}
+
+/**
+ * The same rule /new/people applies: without people.all you see only the people
+ * assigned to you. An app account not tied to a HeartBeat person is hidden too.
+ */
+export function visibleAppMembers<M extends { afkarwts_person_id: string | null }>(
+  members: M[],
+  viewer: { id: number; seesAll: boolean }
+): M[] {
+  if (viewer.seesAll) return members;
+  const rows = getDb().prepare("SELECT id FROM members WHERE assigned_user_id = ?").all(viewer.id) as Array<{ id: number }>;
+  const mine = new Set(rows.map((row) => String(row.id)));
+  return members.filter((member) => member.afkarwts_person_id !== null && mine.has(member.afkarwts_person_id));
 }
