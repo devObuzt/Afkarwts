@@ -1,0 +1,104 @@
+import Link from "next/link";
+import { requireUser } from "@/app/lib/users/current";
+import { appAdmin, appConfig } from "@/app/lib/afkar-app/client";
+import { appPrograms, type AppMember } from "@/app/lib/afkar-app/person";
+
+export const dynamic = "force-dynamic";
+
+type Row = AppMember & { afkarwts_person_id: string | null };
+
+export default async function AppPage() {
+  const user = await requireUser("people.view");
+
+  if (!appConfig()) {
+    return (
+      <div className="crmPage">
+        <header className="crmHead">
+        <h1>التطبيق</h1>
+          <p>تطبيق المنتسبين غير مربوط بهذه النسخة بعد.</p>
+        </header>
+      </div>
+    );
+  }
+
+  const [members, programs] = await Promise.all([
+    appAdmin<{ members: Row[] }>(user, "/admin/v1/members"),
+    appPrograms(user)
+  ]);
+
+  return (
+    <div className="crmPage">
+      <header className="crmHead">
+        <h1>التطبيق</h1>
+        <p>من سُجّل بتطبيق أفكار، ومن دخل إليه. التسجيل بمسار يتم من صفحة الشخص.</p>
+      </header>
+
+      {!members.ok ? (
+        <section className="crmCard" data-tone="clay">
+          <p className="crmEmpty">التطبيق لا يرد الآن. حاولي بعد قليل.</p>
+        </section>
+      ) : (
+        <section className="crmCard" data-tone="forest">
+          <header>
+            <span className="crmDot" />
+            <h2>المنتسبون بالتطبيق</h2>
+            <span className="crmPill tone spacer">{members.data.members.length}</span>
+          </header>
+          {members.data.members.length === 0 ? (
+            <p className="crmEmpty">لا أحد بعد.</p>
+          ) : (
+            members.data.members.map((member) => {
+              const inner = (
+                <>
+                  <span className="grow">
+                    <span className="crmRowTitle" style={{ display: "block" }}>
+                      {member.display_name}
+                    </span>
+                    <span className="crmRowDetail" dir="ltr" style={{ display: "block", textAlign: "right" }}>
+                      {member.phone_e164 ?? "—"}
+                    </span>
+                  </span>
+                  <span className={member.first_login_at ? "crmPill live" : "crmPill"}>
+                    {member.first_login_at ? "دخلت" : "لم تدخل بعد"}
+                  </span>
+                </>
+              );
+              return member.afkarwts_person_id ? (
+                <Link className="crmRow" href={`/new/people/${member.afkarwts_person_id}`} key={member.id}>
+                  {inner}
+                </Link>
+              ) : (
+                <div className="crmRow" key={member.id}>
+                  {inner}
+                </div>
+              );
+            })
+          )}
+        </section>
+      )}
+
+      <section className="crmCard" data-tone="sage">
+        <header>
+          <span className="crmDot" />
+          <h2>المسارات بالتطبيق</h2>
+        </header>
+        {!programs.ok || programs.data.length === 0 ? (
+          <p className="crmEmpty">لا توجد مسارات بعد.</p>
+        ) : (
+          programs.data.map((program) => (
+            <div className="crmRow" key={program.id}>
+              <span className="grow">
+                <span className="crmRowTitle" style={{ display: "block" }}>
+                  {program.name}
+                </span>
+                <span className="crmRowDetail" style={{ display: "block" }}>
+                  {program.length_days} يوم · {program.key}
+                </span>
+              </span>
+            </div>
+          ))
+        )}
+      </section>
+    </div>
+  );
+}

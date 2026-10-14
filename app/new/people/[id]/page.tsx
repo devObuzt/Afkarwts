@@ -10,6 +10,7 @@ import { PersonFiles } from "./PersonFiles";
 import { PersonLabels } from "./PersonLabels";
 import { PersonNotes } from "./PersonNotes";
 import { PersonReply } from "./PersonReply";
+import { PersonApp } from "./PersonApp";
 
 export const dynamic = "force-dynamic";
 
@@ -194,6 +195,13 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
             memberId={member.id}
             windowClosesAt={record.windowClosesAt}
             windowOpen={record.windowOpen}
+          />
+
+          <PersonApp
+            canEdit={can(user, "people.edit")}
+            memberId={member.id}
+            name={member.name}
+            phone={member.phone}
           />
 
           <section className="crmCard" data-tone="sage">

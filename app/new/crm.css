@@ -145,6 +145,12 @@
   --tone-wash: var(--pale);
 }
 
+.crm[data-area="app"] {
+  --tone: var(--forest);
+  --tone-mid: var(--sage);
+  --tone-wash: var(--pale);
+}
+
 .crm[data-area="users"] {
   --tone: var(--forest);
   --tone-mid: var(--forest);
@@ -232,6 +238,10 @@
 
 .crm .crmNav nav a[data-area="income"] .tick {
   background: var(--olive);
+}
+
+.crm .crmNav nav a[data-area="app"] .tick {
+  background: var(--sage);
 }
 
 .crm .crmNav nav a[data-area="users"] .tick {
@@ -922,6 +932,7 @@
 .crm input[type="text"],
 .crm input[type="search"],
 .crm input[type="file"],
+.crm input[type="date"],
 .crm select,
 .crm textarea {
   width: 100%;
