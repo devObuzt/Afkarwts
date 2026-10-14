@@ -1,4 +1,5 @@
 import { getDb } from "@/app/lib/db";
+import { can } from "@/app/lib/users/permissions";
 import { appAdmin, type AppResult } from "./client";
 
 type Staff = { id: number; name: string; role: string };
@@ -51,4 +52,16 @@ export function visibleAppMembers<M extends { afkarwts_person_id: string | null 
   const rows = getDb().prepare("SELECT id FROM members WHERE assigned_user_id = ?").all(viewer.id) as Array<{ id: number }>;
   const mine = new Set(rows.map((row) => String(row.id)));
   return members.filter((member) => member.afkarwts_person_id !== null && mine.has(member.afkarwts_person_id));
+}
+
+/**
+ * Whether this user may act on one person's app account. A login link opens her
+ * account, so it follows the people.all rule rather than the looser person page.
+ */
+export function canActOnPerson(user: { id: number; role: string; permissions: string[] }, personId: number): boolean {
+  if (can(user, "people.all")) return true;
+  const row = getDb().prepare("SELECT assigned_user_id AS owner FROM members WHERE id = ?").get(personId) as
+    | { owner: number | null }
+    | undefined;
+  return row?.owner === user.id;
 }

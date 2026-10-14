@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireApi } from "@/app/lib/users/current";
 import { getPersonRecord } from "@/app/lib/people";
 import { appConfig, enrollmentEvent, sendAppEvent } from "@/app/lib/afkar-app/client";
-import { appPersonView, appPrograms } from "@/app/lib/afkar-app/person";
+import { appPersonView, appPrograms, canActOnPerson } from "@/app/lib/afkar-app/person";
 
 export const runtime = "nodejs";
 
@@ -15,6 +15,7 @@ export async function GET(_request: Request, { params }: P) {
   if (!appConfig()) return NextResponse.json({ configured: false });
 
   const personId = Number((await params).id);
+  if (!canActOnPerson(auth.user, personId)) return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
   const [view, programs] = await Promise.all([appPersonView(auth.user, personId), appPrograms(auth.user)]);
   if (!view.ok) return NextResponse.json({ configured: true, error: view.error }, { status: 502 });
   return NextResponse.json({
@@ -40,7 +41,9 @@ export async function POST(request: Request, { params }: P) {
     return NextResponse.json({ error: "BAD_REQUEST" }, { status: 400 });
   }
 
-  const record = getPersonRecord(Number((await params).id), { health: false });
+  const personId = Number((await params).id);
+  if (!canActOnPerson(auth.user, personId)) return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
+  const record = getPersonRecord(personId, { health: false });
   if (!record) return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
   if (!record.member.phone) return NextResponse.json({ error: "NO_PHONE" }, { status: 422 });
 

@@ -117,3 +117,21 @@ test("without people.all the app list shows only the people assigned to you — 
   assert.deepEqual(visibleAppMembers(app, { id: coach.user.id, seesAll: false }).map((m) => m.id), ["a"]);
   assert.deepEqual(visibleAppMembers(app, { id: coach.user.id, seesAll: true }).map((m) => m.id), ["a", "b", "c"]);
 });
+
+test("acting on someone's app account needs people.all or her being assigned to you", async () => {
+  const { createMember, getDb } = await import("@/app/lib/db");
+  const { createUser } = await import("@/app/lib/users/store");
+  const { canActOnPerson } = await import("@/app/lib/afkar-app/person");
+
+  const helper = createUser({ name: "مساعدة", username: `h${Date.now()}`, password: "p".repeat(12), role: "coach", mustChangePassword: false });
+  assert.ok(helper.ok);
+  const mine = createMember({ name: "لي", phone: "+972500000021" })!;
+  const other = createMember({ name: "لغيري", phone: "+972500000022" })!;
+  getDb().prepare("UPDATE members SET assigned_user_id = ? WHERE id = ?").run(helper.user.id, mine.id);
+
+  const limited = { ...helper.user, permissions: ["people.view", "people.edit"] };
+  assert.equal(canActOnPerson(limited, mine.id), true);
+  assert.equal(canActOnPerson(limited, other.id), false, "a login link for someone else's member is her account, not a profile view");
+  assert.equal(canActOnPerson({ ...limited, permissions: [...limited.permissions, "people.all"] }, other.id), true);
+  assert.equal(canActOnPerson({ ...limited, role: "owner", permissions: [] }, other.id), true, "the owner is never short");
+});

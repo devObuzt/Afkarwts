@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireApi } from "@/app/lib/users/current";
 import { appAdmin, appConfig } from "@/app/lib/afkar-app/client";
-import { appPersonView } from "@/app/lib/afkar-app/person";
+import { appPersonView, canActOnPerson } from "@/app/lib/afkar-app/person";
 
 export const runtime = "nodejs";
 
@@ -11,7 +11,9 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   if (!auth.ok) return auth.response;
   if (!appConfig()) return NextResponse.json({ error: "NOT_CONFIGURED" }, { status: 409 });
 
-  const view = await appPersonView(auth.user, Number((await params).id));
+  const personId = Number((await params).id);
+  if (!canActOnPerson(auth.user, personId)) return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
+  const view = await appPersonView(auth.user, personId);
   if (!view.ok) return NextResponse.json({ error: view.error }, { status: 502 });
   if (!view.data.member) return NextResponse.json({ error: "NO_APP_ACCOUNT" }, { status: 404 });
 

@@ -44,7 +44,8 @@ export function PersonApp({ memberId, name, phone, canEdit }: { memberId: number
     const response = await fetch(`/api/people/${memberId}/app`, { cache: "no-store" }).catch(() => null);
     const body = response ? await response.json().catch(() => null) : null;
     if (!response || !body) return setView({ state: "error" });
-    if (body.configured === false) return setView({ state: "off" });
+    // Not configured, or not one of your people: no card at all rather than a misleading error.
+    if (body.configured === false || response.status === 403) return setView({ state: "off" });
     if (!response.ok) return setView({ state: "error" });
     setView({ state: "ready", member: body.member, plans: body.plans, programs: body.programs });
     setProgramKey((current) => current || body.programs[0]?.key || "");
