@@ -1652,8 +1652,10 @@
 
 .crm .gridTable {
   border-collapse: collapse;
-  width: max-content;
-  min-width: 100%;
+  /* Fixed, so the colgroup is obeyed. On «auto» a percentage is a hint the
+     browser drops as soon as a cell wants more room — which is why asking
+     for a narrower date column changed nothing at all. */
+  table-layout: fixed;
   font-size: 12.5px;
 }
 
@@ -1664,8 +1666,8 @@
   padding: 7px 10px;
   text-align: start;
   vertical-align: top;
-  /* A column that can grow without limit makes every other one unreadable. */
-  max-width: 220px;
+  /* The colgroup decides the width now, so the cell only has to agree not
+     to push past it. */
   overflow-wrap: anywhere;
 }
 
@@ -1684,8 +1686,8 @@
   font-weight: 700;
   font-size: 11.5px;
   line-height: 1.5;
-  min-width: 90px;
   box-shadow: inset 0 -1px 0 var(--line-strong);
+  position: sticky;
 }
 
 .crm .gridTable tbody tr:nth-child(even) {
@@ -1760,6 +1762,36 @@
 .crm .gridTable thead .colName {
   z-index: 3;
   background: var(--tone-wash);
+}
+
+/* ---- dragging a column wider ----
+   A grip on the heading's inline-end edge. Wide enough to hit, invisible
+   until the pointer is near it. */
+.crm .colGrip {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: -4px;
+  width: 9px;
+  cursor: col-resize;
+  touch-action: none;
+  z-index: 4;
+}
+
+.crm .colGrip:hover::after,
+.crm body.resizingCol .colGrip::after {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 4px;
+  width: 2px;
+  background: var(--tone-ink);
+}
+
+/* While a drag is on, nothing else on the page reacts to the pointer —
+   the cursor stays the resize cursor even once it leaves the grip. */
+body.resizingCol {
+  cursor: col-resize;
+  user-select: none;
 }
 
 /* ---- the columns Afkar fill in themselves ----
@@ -1888,6 +1920,10 @@
     overflow-wrap: anywhere;
     border-inline-end: 1px solid #ccc;
     border-bottom: 1px solid #ddd;
+  }
+
+  .crm .colGrip {
+    display: none;
   }
 
   /* Nothing is pinned on paper: the sheet does not scroll, and a sticky

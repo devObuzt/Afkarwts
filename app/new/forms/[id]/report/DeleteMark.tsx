@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 /**
  * Erasing a registration, in two steps on purpose.
@@ -11,6 +12,13 @@ import { useEffect, useState } from "react";
  * question, and the question names the woman and says what will happen to
  * her place in the cohort — because «حذف» on a crowded row tells you
  * nothing about what you are about to lose.
+ *
+ * The question is drawn through a portal, on the body. Rendered where it
+ * sits in the table it is inside a pinned cell, and a pinned cell is its
+ * own stacking context: `position: fixed` still filled the screen, but its
+ * z-index was resolved inside that one cell, so the other pinned cells
+ * painted straight over the dialog. It came out as a white block of rows
+ * across the overlay.
  */
 export function DeleteMark({
   city,
@@ -27,6 +35,10 @@ export function DeleteMark({
 }) {
   const router = useRouter();
   const [asking, setAsking] = useState(false);
+  // The body exists only in the browser; without this the first client
+  // render disagrees with the server's and React throws the tree away.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -63,7 +75,7 @@ export function DeleteMark({
         حذف
       </button>
 
-      {asking && (
+      {asking && mounted && createPortal(
         <div className="crmModalWrap" onClick={() => !busy && setAsking(false)} role="presentation">
           <div
             aria-modal="true"
@@ -100,7 +112,8 @@ export function DeleteMark({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

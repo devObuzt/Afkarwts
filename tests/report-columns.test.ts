@@ -13,6 +13,7 @@ import { readFileSync } from "node:fs";
  * without a browser.
  */
 const SOURCE = readFileSync(new URL("../app/new/forms/[id]/report/page.tsx", import.meta.url), "utf8");
+const CSS = readFileSync(new URL("../app/new/crm.css", import.meta.url), "utf8");
 
 test("every column drawn in the header is drawn in the body too", () => {
   // The mark column is conditional, so the heading, the cell and the
@@ -114,14 +115,17 @@ test("the pinned columns are pinned in the header and the body alike", () => {
   // Their offsets are told to them, because the controls column comes and
   // goes and the two after it cannot work out where they start.
   assert.ok(/--offDate/.test(SOURCE) && /--offName/.test(SOURCE), "the offsets are passed to the table");
-  assert.ok(/style=\{pinned as React\.CSSProperties\}/.test(SOURCE), "and the table carries them");
+  assert.ok(/\{ \.\.\.pinned, width: tableWidth \}/.test(SOURCE), "and the table carries them, with its own width");
 });
 
 test("Afkar's own columns follow the phone, in the header and the body", () => {
   // One list of slots drives both, so a note column cannot appear in the
   // headings without its cell — the failure that shipped twice.
-  assert.equal((SOURCE.match(/rest\.map\(\(slot\)/g) ?? []).length, 3, "widths, headings and cells walk the same list");
-  assert.equal((SOURCE.match(/"note" in slot/g) ?? []).length, 3, "and each of the three knows a note from an answer");
+  // Four: the printed widths, the screen widths, the headings, the cells.
+  // Print is a share of the sheet and the screen is pixels, so they are
+  // two expressions of one order — and they still have to agree on it.
+  assert.equal((SOURCE.match(/rest\.map\(\(slot\)/g) ?? []).length, 4, "widths, headings and cells walk the same list");
+  assert.equal((SOURCE.match(/"note" in slot/g) ?? []).length, 4, "and each of them knows a note from an answer");
   assert.ok(/if \(index === afterPhone\)/.test(SOURCE), "they are placed after the phone");
   assert.ok(/noteKey=\{slot\.note\.key\}/.test(SOURCE), "and each cell saves to its own column");
 });
@@ -175,9 +179,30 @@ test("the headings, the cells and the widths all follow one list", () => {
   // They used to be three independent maps over grid.columns, and the
   // Arabic town column could be dropped from one and not the others.
   const uses = (SOURCE.match(/rest\.map\(/g) ?? []).length;
-  assert.equal(uses, 3, `headings, cells and widths — found ${uses} maps over «rest»`);
+  assert.equal(uses, 4, `headings, cells and both sets of widths — found ${uses} maps over «rest»`);
   assert.ok(
     /index !== grid\.cityColumn && index !== grid\.nameColumn/.test(SOURCE),
     "and the town and the name are taken out of the answers deliberately"
   );
+});
+
+test("the screen is told pixels and the sheet is told shares", () => {
+  // Percentages on screen were a hint the browser dropped: asking for a
+  // narrower date column changed nothing, because `table-layout` was auto
+  // and every column came out as wide as its widest cell. Pixels are
+  // obeyed — and they are what a drag handle can change.
+  assert.ok(/const laidOut = printing/.test(SOURCE), "the two are decided on the server, not guessed in CSS");
+  assert.ok(/table-layout: fixed/.test(CSS), "and the table is told to obey its colgroup");
+  // A fixed layout with no width of its own goes back to measuring cells.
+  assert.ok(/const tableWidth = printing \? undefined/.test(SOURCE), "the screen table carries its own total");
+});
+
+test("the delete dialog is drawn outside the table", () => {
+  // Inside a pinned cell it is inside that cell's stacking context: the
+  // overlay covered the screen but the other pinned cells painted over
+  // the dialog, as a white block of rows.
+  const DIALOG = readFileSync(new URL("../app/new/forms/[id]/report/DeleteMark.tsx", import.meta.url), "utf8");
+  assert.ok(/createPortal\(/.test(DIALOG), "it goes through a portal");
+  assert.ok(/document\.body\s*\)/.test(DIALOG), "onto the body");
+  assert.ok(/mounted &&/.test(DIALOG), "and only once the browser has one");
 });

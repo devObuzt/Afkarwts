@@ -15,6 +15,7 @@ import {
   viewQuery
 } from "@/app/lib/forms/report";
 import { requireUser } from "@/app/lib/users/current";
+import { ColumnSizing } from "./ColumnSizing";
 import { DeleteMark } from "./DeleteMark";
 import { DuplicateMark } from "./DuplicateMark";
 import { RestoreMark } from "./RestoreMark";
@@ -188,16 +189,42 @@ export default async function ReportPage({
   const ordered = [...(grid.nameColumn === null ? [] : [grid.nameColumn]), ...shown, ...tail];
   const keptTotal = num(widths[0]) + num(widths[1]) + ordered.reduce((sum, index) => sum + answer(index), 0);
   const scale = (100 - extra) / (keptTotal || 1);
-  const pct = (value: number) => `${Math.round(value * scale * 100) / 100}%`;
-  const laidOut = [
-    pct(num(widths[0])),
-    ...(markColumn ? [`${markWidth}%`] : []),
-    pct(num(widths[1])),
-    ...(grid.nameColumn === null ? [] : [pct(answer(grid.nameColumn))]),
-    "9%",
-    "9%",
-    ...rest.map((slot) => ("note" in slot ? `${noteWidth}%` : pct(answer(slot.answer))))
-  ];
+  const pct = (value: number) => Math.round(value * scale * 100) / 100;
+
+  // On paper the colgroup is a share of the sheet. On screen it is pixels.
+  //
+  // It was a share there too, and that is why «صغّر التاريخ» did nothing:
+  // the screen table is `table-layout: auto`, where a percentage is a hint
+  // the browser drops the moment the content wants more — so the columns
+  // came out as wide as their widest cell whatever the colgroup said. Fixed
+  // pixels are obeyed, and they are also what a drag handle can change.
+  const PX = { index: 30, actions: 58, date: 56, name: 150, hebrewName: 120, hebrewCity: 110, note: 110 };
+  // The weights stay the ruler: a consent paragraph still gets more room
+  // than a phone. 14px per point, floored and capped so nothing vanishes
+  // and nothing eats the screen.
+  const toPx = (weight: number) => Math.max(84, Math.min(260, Math.round(pct(weight) * 14)));
+  const laidOut = printing
+    ? [
+        `${pct(num(widths[0]))}%`,
+        ...(markColumn ? [`${markWidth}%`] : []),
+        `${pct(num(widths[1]))}%`,
+        ...(grid.nameColumn === null ? [] : [`${pct(answer(grid.nameColumn))}%`]),
+        "9%",
+        "9%",
+        ...rest.map((slot) => ("note" in slot ? `${noteWidth}%` : `${pct(answer(slot.answer))}%`))
+      ]
+    : [
+        `${PX.index}px`,
+        ...(markColumn ? [`${PX.actions}px`] : []),
+        `${PX.date}px`,
+        ...(grid.nameColumn === null ? [] : [`${PX.name}px`]),
+        `${PX.hebrewName}px`,
+        `${PX.hebrewCity}px`,
+        ...rest.map((slot) => (`${"note" in slot ? PX.note : toPx(answer(slot.answer))}px`))
+      ];
+  // A fixed layout needs to be told how wide it is, or «max-content» goes
+  // back to measuring the cells.
+  const tableWidth = printing ? undefined : `${laidOut.reduce((sum, w) => sum + Number(w.replace("px", "")), 0)}px`;
   // The row stays identifiable while the table scrolls: the leading columns
   // are pinned, and each one's offset is the sum of the ones before it. The
   // mark column comes and goes, so the two that follow it are told where
@@ -302,11 +329,12 @@ export default async function ReportPage({
         </header>
       )}
 
+      {!printing && <ColumnSizing formId={form.id} />}
       <div className="gridScroll">
-        <table className="gridTable" style={pinned as React.CSSProperties}>
+        <table className="gridTable" style={{ ...pinned, width: tableWidth } as React.CSSProperties}>
           <colgroup>
             {laidOut.map((width, index) => (
-              <col key={index} style={{ width }} />
+              <col data-col={index} key={index} style={{ width }} />
             ))}
           </colgroup>
           <thead>
