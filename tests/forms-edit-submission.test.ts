@@ -34,7 +34,7 @@ async function register(
                 ? field.options[0]
                 : "نعم";
   }
-  const result = submitForm(form.token, answers);
+  const result = submitForm(form.token, answers, { requirePhoneCode: false });
   assert.equal(result.ok, true);
   return (result as { id: number }).id;
 }
@@ -158,7 +158,7 @@ test("the report grid carries the answer row behind each cell", async () => {
                 ? field.options[0]
                 : "نعم";
   }
-  const sent = submitForm(form.token, answers) as { ok: true; id: number };
+  const sent = submitForm(form.token, answers, { requirePhoneCode: false }) as { ok: true; id: number };
 
   const grid = submissionGrid(form.id)!;
   const row = grid.rows[0];
@@ -186,7 +186,7 @@ test("a question this registration never answered has no cell to patch", async (
     answers[String(field.id)] =
       field.mapsTo === "phone" ? "0545227691" : field.kind === "date" ? "2026-10-02" : field.options.length ? field.options[0] : "نعم";
   }
-  submitForm(form.token, answers);
+  submitForm(form.token, answers, { requirePhoneCode: false });
 
   // Asked after she replied: her row has nothing behind that column, and
   // the table must not offer to edit a row that does not exist.

@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { getDb, normalizeImportPhone } from "../db";
 import { CLEAN_INTRO, CLEAN_TEMPLATE, CLEAN_TITLE, type FieldKind, type NewField } from "./clean-template";
+import { phoneIsVerified } from "./verify";
 
 export type Form = {
   id: number;
@@ -682,7 +683,11 @@ function isShown(field: Field, answers: Record<string, string>) {
   return given === field.showWhenValue || given.split("، ").includes(field.showWhenValue);
 }
 
-export function submitForm(token: string, answers: Record<string, string>) {
+export function submitForm(
+  token: string,
+  answers: Record<string, string>,
+  { requirePhoneCode = true }: { requirePhoneCode?: boolean } = {}
+) {
   const form = getFormByToken(token);
   if (!form) {
     return { ok: false as const, error: "هذا الرابط غير موجود." };
@@ -693,6 +698,7 @@ export function submitForm(token: string, answers: Record<string, string>) {
 
   const fields = listFields(form.id);
   const collected: Array<{ fieldId: number; value: string }> = [];
+  let typedPhone = "";
 
   for (const field of fields) {
     if (!isShown(field, answers)) {
@@ -710,7 +716,18 @@ export function submitForm(token: string, answers: Record<string, string>) {
       return { ok: false as const, error: `رقم الهاتف غير صالح: ${field.label}` };
     }
 
+    if (field.mapsTo === "phone") {
+      typedPhone = value;
+    }
+
     collected.push({ fieldId: field.id, value });
+  }
+
+  // The gate, on the server. The browser asks for a code and checks it,
+  // but the form posts to a public endpoint — a check that lives only in
+  // the page is a check anybody can walk around.
+  if (requirePhoneCode && typedPhone && !phoneIsVerified(form.id, typedPhone)) {
+    return { ok: false as const, error: "أكّدي رقم هاتفك بالكود قبل الإرسال." };
   }
 
   return { ok: true as const, id: recordSubmission(form.id, collected) };

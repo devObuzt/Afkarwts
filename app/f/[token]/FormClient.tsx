@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { PhoneCode } from "./PhoneCode";
 import { LocationPicker, type LocationValue } from "@/app/components/LocationPicker";
 import { SignaturePad } from "@/app/components/SignaturePad";
 import type { Field } from "@/app/lib/forms/store";
@@ -39,6 +40,13 @@ export function FormClient({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
+  const [verified, setVerified] = useState(false);
+
+  // The field the phone lives in, so the code step can sit under it and
+  // the submit button can wait for it.
+  const phoneField = fields.find((field) => field.mapsTo === "phone" || field.kind === "phone");
+  const typedPhone = phoneField ? (answers[String(phoneField.id)] ?? "") : "";
+  const needsCode = Boolean(phoneField);
 
   function set(id: number, value: string) {
     setAnswers((current) => ({ ...current, [String(id)]: value }));
@@ -131,6 +139,10 @@ export function FormClient({
               />
             ) : null}
 
+            {phoneField && field.id === phoneField.id && (
+              <PhoneCode onVerified={setVerified} phone={typedPhone} token={token} verified={verified} />
+            )}
+
             {field.kind === "date" ? (
               <input
                 id={`f${field.id}`}
@@ -208,7 +220,7 @@ export function FormClient({
 
         {error ? <p className="formError">{error}</p> : null}
 
-        <button className="formSubmit" disabled={busy} type="submit">
+        <button className="formSubmit" disabled={busy || (needsCode && !verified)} type="submit">
           {busy ? "عم نبعت…" : "إرسال التسجيل"}
         </button>
       </form>

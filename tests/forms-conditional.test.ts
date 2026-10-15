@@ -86,7 +86,7 @@ test("an unanswered gate hides its follow-up rather than demanding it", async ()
   const followUp = addField(form.id, { label: "شو بالضبط؟", kind: "textarea", required: true });
   updateField(followUp.id, { showWhenFieldId: gate.id, showWhenValue: "نعم" });
 
-  assert.equal(submitForm(form.token, {}).ok, true);
+  assert.equal(submitForm(form.token, {}, { requirePhoneCode: false }).ok, true);
 });
 
 test("the Clean template's follow-ups point at the right questions", async () => {

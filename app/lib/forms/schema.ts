@@ -125,6 +125,23 @@ export function migrateFormTables(db: DatabaseSync) {
       FOREIGN KEY (submission_id) REFERENCES form_submissions(id) ON DELETE CASCADE
     );
 
+    -- One row per phone being verified on a form. The code is kept as a
+    -- hash: this table is read by anyone who can read the database, and a
+    -- live login code in plain text is a live login code.
+    CREATE TABLE IF NOT EXISTS form_phone_codes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      form_id INTEGER NOT NULL,
+      phone TEXT NOT NULL,
+      code_hash TEXT NOT NULL,
+      channel TEXT NOT NULL DEFAULT 'whatsapp',
+      sent_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      expires_at TEXT NOT NULL,
+      tries INTEGER NOT NULL DEFAULT 0,
+      verified_at TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_form_phone_codes ON form_phone_codes(form_id, phone, sent_at);
+
     CREATE INDEX IF NOT EXISTS idx_form_answers_submission ON form_answers(submission_id);
     CREATE INDEX IF NOT EXISTS idx_submission_notes ON submission_notes(submission_id);
   `);

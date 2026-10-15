@@ -27,7 +27,7 @@ async function registered() {
               : "نعم";
   }
 
-  const submitted = submitForm(form.token, answers) as { ok: true; id: number };
+  const submitted = submitForm(form.token, answers, { requirePhoneCode: false }) as { ok: true; id: number };
   const approved = approveSubmission(submitted.id) as { ok: true; memberId: number };
   return approved.memberId;
 }

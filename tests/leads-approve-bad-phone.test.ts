@@ -21,7 +21,7 @@ async function submission(phone: string) {
       field.mapsTo === "name" ? "اسم تجربة" : field.mapsTo === "phone" ? phone : field.options[0] ?? "نعم";
   }
 
-  return { group, form, result: submitForm(form.token, answers) };
+  return { group, form, result: submitForm(form.token, answers, { requirePhoneCode: false }) };
 }
 
 test("a registration with too short a number is refused while the person can still fix it", async () => {

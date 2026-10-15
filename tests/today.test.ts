@@ -20,7 +20,7 @@ test("the day opens on what needs a decision, not on a list of chats", async () 
     answers[String(field.id)] =
       field.mapsTo === "name" ? "ليلى عوض" : field.mapsTo === "phone" ? "0521234567" : field.options[0] ?? "نعم";
   }
-  submitForm(form.token, answers);
+  submitForm(form.token, answers, { requirePhoneCode: false });
 
   const member = createMember({ name: "مريم حسارمة", phone: "+972521111111" });
   addMembersToGroup(group.id, [member.id]);
