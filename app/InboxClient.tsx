@@ -2019,6 +2019,8 @@ function BulkModal({ groups, onClose, onDone }: { groups: Group[]; onClose: () =
   const todayIso = new Date().toISOString().slice(0, 10);
   // Recurrence only matters when the group cannot fit in a single allowed batch.
   const needsRepeat = (selectedGroup?.memberCount ?? 0) > maxRecipients;
+  /** Roughly how long a send of this size takes, at the rate Meta accepts them. */
+  const willTakeMinutes = Math.ceil(Math.min(maxRecipients, selectedGroup?.memberCount ?? 0) / 70);
 
   // A group that fits in one batch is always a one-off; a bigger one defaults to daily.
   useEffect(() => {
@@ -2085,6 +2087,10 @@ function BulkModal({ groups, onClose, onDone }: { groups: Group[]; onClose: () =
     // trip would take the same 250 and send to them again — sixty times.
     // One trip then, exactly as before.
     const mayLoop = skipAlreadySent;
+    // Something on screen from the first second. The first batch takes
+    // minutes, and a button that says «Sending…» with nothing behind it
+    // is indistinguishable from a button that has hung.
+    setResults({ sent: 0, failed: 0, skipped: 0, remaining: 0, inFlight: true, results: [] });
     try {
       for (let trip = 0; trip < (mayLoop ? 60 : 1); trip++) {
         const response = await fetch("/api/messages/bulk", {
@@ -2183,8 +2189,12 @@ function BulkModal({ groups, onClose, onDone }: { groups: Group[]; onClose: () =
             </div>
 
             {results.inFlight ? (
-              <p className="hint">
-                Still sending — {results.remaining} to go. Leave this open until it finishes.
+              <p className="hint warning">
+                <strong>Still sending.</strong>{" "}
+                {results.remaining
+                  ? `${results.remaining} to go — about ${Math.max(1, Math.ceil(results.remaining / 70))} more minutes.`
+                  : "Working through the first batch — this takes a few minutes."}{" "}
+                Keep this window open: closing it stops the send where it is.
               </p>
             ) : null}
 
@@ -2339,6 +2349,13 @@ function BulkModal({ groups, onClose, onDone }: { groups: Group[]; onClose: () =
                   WhatsApp allows <strong>{metaLimit.dailyLimit}</strong> business-initiated conversations per day
                   {metaLimit.quality ? ` (quality: ${metaLimit.quality.toLowerCase()})` : ""} — suggested batch is 70% ={" "}
                   <strong>{metaLimit.suggested}</strong>. You can lower it, but not exceed the limit.
+                </p>
+              ) : null}
+
+              {!autoCampaign && willTakeMinutes > 3 ? (
+                <p className="hint warning">
+                  This goes out in batches of 250 and will take about <strong>{willTakeMinutes} minutes</strong>.
+                  Keep this window open the whole time — closing it stops the send where it is.
                 </p>
               ) : null}
               {autoCampaign && selectedGroup ? (
