@@ -509,6 +509,10 @@ export function updateSubmissionAnswers(
   // Which questions changed, for the log. Never the answers themselves —
   // see the note in the API route.
   const changed: string[] = [];
+  /** Which of her own details the correction carried through to. */
+  const reached: string[] = [];
+  let memberId: number | null = null;
+  let phoneTaken = false;
 
   db.exec("BEGIN IMMEDIATE");
   try {
@@ -549,6 +553,49 @@ export function updateSubmissionAnswers(
         city,
         submissionId
       );
+
+      // And the منتسب herself. Rewriting only the registration left the
+      // correction invisible everywhere that matters: the people list,
+      // the search, the conversation header — all of which read `members`.
+      // The registration is where her details came from, so a correction
+      // to it is a correction to her.
+      const member = db
+        .prepare(
+          `SELECT id, name, phone, city FROM members
+            WHERE id = (SELECT member_id FROM form_submissions WHERE id = ?)
+               OR (? <> '' AND phone = (SELECT phone FROM form_submissions WHERE id = ?))
+            LIMIT 1`
+        )
+        .get(submissionId, phone, submissionId) as
+        | { id: number; name: string; phone: string; city: string }
+        | undefined;
+
+      if (member) {
+        if (name && name !== member.name) {
+          db.prepare("UPDATE members SET name = ? WHERE id = ?").run(name, member.id);
+          reached.push("الاسم");
+        }
+        if (city && city !== member.city) {
+          db.prepare("UPDATE members SET city = ? WHERE id = ?").run(city, member.id);
+          reached.push("البلدة");
+        }
+        if (phone && phone !== member.phone) {
+          // The phone is unique and is her WhatsApp identity. If the
+          // corrected number already belongs to somebody else, hers is
+          // left alone and the caller is told — overwriting would merge
+          // two people by accident.
+          const taken = db
+            .prepare("SELECT id FROM members WHERE phone = ? AND id <> ?")
+            .get(phone, member.id) as { id: number } | undefined;
+          if (taken) {
+            phoneTaken = true;
+          } else {
+            db.prepare("UPDATE members SET phone = ? WHERE id = ?").run(phone, member.id);
+            reached.push("الهاتف");
+          }
+        }
+        memberId = member.id;
+      }
     }
 
     db.exec("COMMIT");
@@ -557,7 +604,7 @@ export function updateSubmissionAnswers(
     throw error;
   }
 
-  return { changed };
+  return { changed, reached, memberId, phoneTaken };
 }
 
 export function setSubmissionState(id: number, state: SubmissionRow["state"], memberId: number | null) {

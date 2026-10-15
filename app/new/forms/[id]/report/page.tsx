@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getForm } from "@/app/lib/forms/store";
 import { columnWidths, headerKey, isNumeric, printHeader, submissionGrid } from "@/app/lib/forms/report";
 import { requireUser } from "@/app/lib/users/current";
+import { DuplicateMark } from "./DuplicateMark";
 import { EditableCell } from "./EditableCell";
 import { PdfButton } from "./PdfButton";
 import { can } from "@/app/lib/users/permissions";
@@ -58,8 +59,19 @@ export default async function ReportPage({
   // never offered to somebody the server would refuse. Never while
   // printing: the PDF is a reading of the table, not a way into it.
   const editable = !printing && can(user, "forms.manage");
+  const canReject = can(user, "leads.review");
+  const duplicates = grid.rows.filter((row) => row.duplicateOf.length > 0).length;
   // Weighted by content: a phone does not need a consent paragraph's room.
   const widths = columnWidths(grid);
+  // The duplicate mark is a column too. Without its own width the colgroup
+  // is one short and every width lands on the cell to its left — the
+  // answers shift and the id prints under the date. The 6% comes off the
+  // rest proportionally rather than out of the total, which has to stay 100.
+  const shrink = (width: string) => `${Math.round(Number(width.replace("%", "")) * 0.94 * 100) / 100}%`;
+  const laidOut =
+    !printing && duplicates > 0
+      ? [shrink(widths[0]), "6%", ...widths.slice(1).map(shrink)]
+      : widths;
   const key = headerKey(grid.columns);
 
   return (
@@ -76,6 +88,13 @@ export default async function ReportPage({
               {form.groupName} · {form.name} · {grid.rows.length} تسجيل · {grid.columns.length} سؤال
             </p>
           </header>
+
+          {duplicates > 0 && (
+            <p className="crmNote" style={{ marginBottom: -6 }}>
+              {duplicates} تسجيل يحمل رقم هاتف مكرر على هذه الاستمارة — نفس المرأة سجّلت أكثر من
+              مرة. «ارفض» يرفض التسجيل وحده؛ المنتسبة تبقى، لأن تسجيلها الآخر ما زال لها.
+            </p>
+          )}
 
           {editable && (
             <p className="crmNote" style={{ marginBottom: -6 }}>
@@ -124,13 +143,14 @@ export default async function ReportPage({
       <div className="gridScroll">
         <table className="gridTable">
           <colgroup>
-            {widths.map((width, index) => (
+            {laidOut.map((width, index) => (
               <col key={index} style={{ width }} />
             ))}
           </colgroup>
           <thead>
             <tr>
               <th>#</th>
+              {!printing && duplicates > 0 && <th>تكرار</th>}
               <th>التاريخ</th>
               {grid.columns.map((column, index) => (
                 <th key={column}>

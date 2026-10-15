@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 /**
@@ -27,6 +28,14 @@ export function EditableCell({
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState("");
   const input = useRef<HTMLInputElement>(null);
+  const router = useRouter();
+  /**
+   * The value the server last rendered. Without it the effect below could
+   * not tell «the page re-rendered» from «somebody else changed this», and
+   * it reset the cell to the stale prop the instant the input closed — the
+   * edit looked undone until a reload.
+   */
+  const fromServer = useRef(value);
 
   useEffect(() => {
     if (open) {
@@ -35,8 +44,12 @@ export function EditableCell({
     }
   }, [open]);
 
-  // A re-render from router.refresh() must not overwrite what is being typed.
+  // Follow the server only when the server actually says something new.
   useEffect(() => {
+    if (value === fromServer.current) {
+      return;
+    }
+    fromServer.current = value;
     if (!open) {
       setCurrent(value);
       setDraft(value);
@@ -65,7 +78,12 @@ export function EditableCell({
     }
 
     setCurrent(draft);
+    fromServer.current = draft;
     setOpen(false);
+    // The rest of the page reads the same registration — her name in the
+    // header, the duplicate marks, the other screens' idea of her. Saving
+    // one cell changes those too.
+    router.refresh();
   }
 
   // Nothing to patch: the question was never answered on this registration.

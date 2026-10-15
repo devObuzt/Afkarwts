@@ -196,3 +196,97 @@ test("a question this registration never answered has no cell to patch", async (
   assert.ok(index >= 0);
   assert.equal(grid.rows[0].answerIds[index], null);
 });
+
+test("a correction reaches the منتسبة herself, not only her registration", async () => {
+  const { findMemberByPhone, getMember } = await import("@/app/lib/db");
+  const { approveSubmission } = await import("@/app/lib/forms/approve");
+  const { getSubmission, updateSubmissionAnswers } = await import("@/app/lib/forms/store");
+
+  const { form } = await cohort("كلين");
+  const id = await register(form, { name: "سناء", phone: "0545227700", city: "عرابه" });
+  const approved = approveSubmission(id) as { ok: true; memberId: number };
+  assert.equal(approved.ok, true);
+
+  const name = await answerFor(id, "name");
+  const city = await answerFor(id, "city");
+  const phone = await answerFor(id, "phone");
+  const result = updateSubmissionAnswers(id, [
+    { answerId: name.id, value: "سناء حاج" },
+    { answerId: city.id, value: "عرابة" },
+    { answerId: phone.id, value: "0545227701" }
+  ]);
+
+  // The whole point: the people list reads `members`, so a correction that
+  // stops at the registration is a correction nobody sees.
+  const member = getMember(approved.memberId)!;
+  assert.equal(member.name, "سناء حاج");
+  assert.equal(member.city, "عرابة");
+  assert.equal(member.phone, "+972545227701");
+  assert.deepEqual(result.reached.sort(), ["الاسم", "البلدة", "الهاتف"]);
+  assert.ok(findMemberByPhone("+972545227701"));
+  assert.equal(getSubmission(id)!.submission.phone, "+972545227701");
+});
+
+test("a corrected phone that belongs to somebody else is refused, not merged", async () => {
+  const { createMember, getMember } = await import("@/app/lib/db");
+  const { approveSubmission } = await import("@/app/lib/forms/approve");
+  const { updateSubmissionAnswers } = await import("@/app/lib/forms/store");
+
+  const { form } = await cohort("كلين");
+  const id = await register(form, { name: "ليلى", phone: "0545227702" });
+  const approved = approveSubmission(id) as { ok: true; memberId: number };
+
+  // Somebody else already holds the number the correction types in.
+  createMember({ name: "منى", phone: "+972545227703" });
+
+  const phone = await answerFor(id, "phone");
+  const result = updateSubmissionAnswers(id, [{ answerId: phone.id, value: "0545227703" }]);
+
+  assert.equal(result.phoneTaken, true, "the collision is reported");
+  assert.equal(getMember(approved.memberId)!.phone, "+972545227702", "and her number is left alone");
+  assert.ok(!result.reached.includes("الهاتف"));
+});
+
+test("two registrations on one phone mark each other, across the whole form", async () => {
+  const { submissionGrid } = await import("@/app/lib/forms/report");
+  const { form } = await cohort("كلين");
+
+  const first = await register(form, { name: "ريم", phone: "0545227710" });
+  const other = await register(form, { name: "لينا", phone: "0545227711" });
+  const twin = await register(form, { name: "ريم زيدات", phone: "0545227710" });
+
+  const grid = submissionGrid(form.id)!;
+  const byId = new Map(grid.rows.map((row) => [row.submissionId, row]));
+
+  // Each knows about the other, including the one that arrived first — a
+  // row has to see a twin that comes after it, not only before.
+  assert.deepEqual(byId.get(first)!.duplicateOf, [twin]);
+  assert.deepEqual(byId.get(twin)!.duplicateOf, [first]);
+  assert.deepEqual(byId.get(other)!.duplicateOf, [], "a different number is not a duplicate");
+});
+
+test("rejecting a duplicate leaves the منتسبة and her other registration alone", async () => {
+  const { submissionGrid } = await import("@/app/lib/forms/report");
+  const { approveSubmission, rejectSubmission } = await import("@/app/lib/forms/approve");
+  const { getSubmission } = await import("@/app/lib/forms/store");
+  const { findMemberByPhone } = await import("@/app/lib/db");
+
+  const { form } = await cohort("كلين");
+  const first = await register(form, { name: "هدى", phone: "0545227712" });
+  const twin = await register(form, { name: "هدى عواد", phone: "0545227712" });
+
+  // Both accepted — which is exactly when the duplicate starts to hurt.
+  approveSubmission(first);
+  approveSubmission(twin, { overwrite: true });
+  const member = findMemberByPhone("+972545227712")!;
+
+  rejectSubmission(twin);
+
+  assert.equal(getSubmission(twin)!.submission.state, "rejected");
+  assert.equal(getSubmission(first)!.submission.state, "added", "her real registration stands");
+  assert.ok(findMemberByPhone("+972545227712"), "and she is still a منتسبة");
+  assert.equal(findMemberByPhone("+972545227712")!.id, member.id);
+
+  // The mark stays on the row that remains, so the pair is still legible.
+  assert.deepEqual(submissionGrid(form.id)!.rows.find((r) => r.submissionId === first)!.duplicateOf, [twin]);
+});

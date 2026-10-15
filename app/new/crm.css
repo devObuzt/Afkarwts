@@ -662,6 +662,18 @@
   font-weight: 700;
 }
 
+.crm .dupMark {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.crm .dupMark .crmBtn {
+  padding: 2px 8px;
+  font-size: 11.5px;
+}
+
 /* ---- the pager ---- */
 
 .crm .crmPager {

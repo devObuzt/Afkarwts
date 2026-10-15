@@ -39,7 +39,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   try {
-    const { changed } = updateSubmissionAnswers(id, edits);
+    const { changed, reached, phoneTaken } = updateSubmissionAnswers(id, edits);
     const after = getSubmission(id);
 
     if (changed.length > 0) {
@@ -54,7 +54,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         // read by anyone with «إدارة المستخدمين», and writing «حامل: نعم»
         // into it would hand a health answer to someone who is not allowed
         // to open the person's file.
-        detail: `عُدّلت الإجابات: ${changed.join("، ")}`
+        detail:
+          `عُدّلت الإجابات: ${changed.join("، ")}` +
+          (reached.length ? ` · وتغيّر في ملفها: ${reached.join("، ")}` : "")
       });
     }
 
@@ -63,9 +65,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       ok: true,
       changed,
       submission: after?.submission,
+      reached,
       // Said rather than enforced: a half-typed phone is a reason to warn,
       // not a reason to refuse the rest of the correction.
-      phoneWarning: phone && !phoneIsUsable(phone) ? "الرقم ما زال قصيراً ولن يقبله «أضف للمجموعة»." : ""
+      phoneWarning: phoneTaken
+        ? "الرقم الجديد مسجّل باسم منتسبة أخرى، فلم يُغيَّر في ملفها. راجعي التكرار أولاً."
+        : phone && !phoneIsUsable(phone)
+          ? "الرقم ما زال قصيراً ولن يقبله «أضف للمجموعة»."
+          : ""
     });
   } catch (error) {
     return NextResponse.json(

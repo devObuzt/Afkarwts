@@ -98,6 +98,15 @@ export type SubmissionGrid = {
     state: string;
     submittedAt: string;
     cells: string[];
+    /** Her phone as stored, so the table can group two registrations as one woman. */
+    phone: string;
+    /**
+     * The other registrations on this form that carry the same phone.
+     * Same number, same form, same woman — she filled it twice. A woman
+     * who registers for two different cohorts is not a duplicate, so this
+     * never looks outside the form.
+     */
+    duplicateOf: number[];
     /**
      * The answer row behind each cell, so the table can edit in place.
      * Null where this registration never answered that question — there is
@@ -133,7 +142,7 @@ export function submissionGrid(formId: number, filter: { state?: string } = {}):
 
   const submissions = db
     .prepare(
-      `SELECT id, state, submitted_at, member_id
+      `SELECT id, state, submitted_at, member_id, phone
          FROM form_submissions
         WHERE ${where.join(" AND ")}
         ORDER BY submitted_at, id`
@@ -168,14 +177,29 @@ export function submissionGrid(formId: number, filter: { state?: string } = {}):
     return { submission, given, ids };
   });
 
+  // One pass over the phones first: a row has to know about a twin that
+  // comes after it as well as one before.
+  const byPhone = new Map<string, number[]>();
+  for (const { submission } of collected) {
+    const phone = String(submission.phone ?? "").trim();
+    if (!phone) {
+      continue;
+    }
+    byPhone.set(phone, [...(byPhone.get(phone) ?? []), Number(submission.id)]);
+  }
+
   for (const { submission, given, ids } of collected) {
+    const phone = String(submission.phone ?? "").trim();
+    const sharing = (byPhone.get(phone) ?? []).filter((id) => id !== Number(submission.id));
     rows.push({
       submissionId: Number(submission.id),
       memberId: submission.member_id === null ? null : Number(submission.member_id),
       state: String(submission.state),
       submittedAt: String(submission.submitted_at),
       cells: columns.map((column) => given.get(column) ?? ""),
-      answerIds: columns.map((column) => ids.get(column) ?? null)
+      answerIds: columns.map((column) => ids.get(column) ?? null),
+      phone,
+      duplicateOf: sharing
     });
   }
 
