@@ -388,6 +388,14 @@ function migrateCampaignTables(db: DatabaseSync) {
   if (!hasColumn(db, "campaigns", "starts_at")) {
     db.exec("ALTER TABLE campaigns ADD COLUMN starts_at TEXT");
   }
+  // The number a message was actually sent to. Without it there is no way
+  // to tell «this failed on her old number, which has since been fixed»
+  // from «this failed», and the fix never reaches the message it should
+  // have fixed.
+  if (!hasColumn(db, "messages", "sent_to_phone")) {
+    db.exec("ALTER TABLE messages ADD COLUMN sent_to_phone TEXT");
+  }
+
   if (!hasColumn(db, "campaigns", "repeat_mode")) {
     db.exec("ALTER TABLE campaigns ADD COLUMN repeat_mode TEXT NOT NULL DEFAULT 'daily'");
   }
@@ -1072,7 +1080,9 @@ export function createMessage(input: {
 }) {
   const result = getDb()
     .prepare(
-      "INSERT INTO messages (member_id, direction, message_type, body, whatsapp_message_id, status, error, media_url, media_mime_type, media_filename, send_key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+      `INSERT INTO messages (member_id, direction, message_type, body, whatsapp_message_id, status, error,
+                             media_url, media_mime_type, media_filename, send_key, sent_to_phone)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       input.memberId,
@@ -1085,7 +1095,13 @@ export function createMessage(input: {
       input.mediaUrl ?? null,
       input.mediaMimeType ?? null,
       input.mediaFilename ?? null,
-      input.sendKey ?? null
+      input.sendKey ?? null,
+      // Only for what we send: an incoming message came from her number by
+      // definition, and recording it would say nothing.
+      input.direction === "outgoing"
+        ? ((getDb().prepare("SELECT phone FROM members WHERE id = ?").get(input.memberId) as { phone?: string })?.phone ??
+          null)
+        : null
     );
 
   const row = getDb().prepare("SELECT * FROM messages WHERE id = ?").get(Number(result.lastInsertRowid)) as DbMessage;
@@ -1238,6 +1254,90 @@ export function updateMemberPhone(memberId: number, phone: string) {
   }
   getDb().prepare("UPDATE members SET phone = ? WHERE id = ?").run(normalized, memberId);
   return { ok: true as const, phone: normalized };
+}
+
+/**
+ * Two records, one woman — joined into one.
+ *
+ * It happens for a plain reason: she registered with a digit wrong, which
+ * made a second record, while her real number was already in the list from
+ * before. Correcting the phone then cannot work — the number is taken, by
+ * her. Three women in the Clean cohort were exactly this, and the first
+ * message reached neither record.
+ *
+ * Everything hanging off the one being dropped is carried across first,
+ * and only then is it deleted — her messages, her place in every group,
+ * her journeys and what was sent on them, her tasks, her files and her
+ * registrations. Nothing is thrown away: the point of merging rather than
+ * deleting is that her history is one history.
+ *
+ * The caller says which to keep. That is a judgement about which number
+ * is the real one, and the database has no opinion about it.
+ */
+export function mergeMembers(keepId: number, dropId: number) {
+  if (keepId === dropId) {
+    return { ok: false as const, error: "نفس المنتسبة." };
+  }
+
+  const keep = getMember(keepId);
+  const drop = getMember(dropId);
+  if (!keep || !drop) {
+    return { ok: false as const, error: "إحدى المنتسبتين غير موجودة." };
+  }
+
+  const db = getDb();
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    // Her journeys first, because a woman enrolled on both records would
+    // otherwise break the one-enrolment-per-journey rule. The sends made
+    // on the dropped enrolment move onto the kept one, so her history on
+    // that path stays whole.
+    const mine = db
+      .prepare("SELECT id, journey_id FROM journey_enrollments WHERE member_id = ?")
+      .all(keepId) as Array<{ id: number; journey_id: number }>;
+    const byJourney = new Map(mine.map((row) => [row.journey_id, row.id]));
+
+    for (const row of db
+      .prepare("SELECT id, journey_id FROM journey_enrollments WHERE member_id = ?")
+      .all(dropId) as Array<{ id: number; journey_id: number }>) {
+      const existing = byJourney.get(row.journey_id);
+      if (existing) {
+        // Already on this path under the kept record: move the sends over
+        // and drop the second enrolment. INSERT OR IGNORE on the step, so
+        // a step sent on both does not become two.
+        db.prepare("UPDATE OR IGNORE journey_sends SET enrollment_id = ? WHERE enrollment_id = ?").run(existing, row.id);
+        db.prepare("DELETE FROM journey_sends WHERE enrollment_id = ?").run(row.id);
+        db.prepare("DELETE FROM journey_enrollments WHERE id = ?").run(row.id);
+      } else {
+        db.prepare("UPDATE journey_enrollments SET member_id = ? WHERE id = ?").run(keepId, row.id);
+      }
+    }
+
+    db.prepare("UPDATE messages SET member_id = ? WHERE member_id = ?").run(keepId, dropId);
+    db.prepare("UPDATE followups SET member_id = ? WHERE member_id = ?").run(keepId, dropId);
+    db.prepare("UPDATE form_submissions SET member_id = ? WHERE member_id = ?").run(keepId, dropId);
+    db.prepare("UPDATE person_files SET member_id = ? WHERE member_id = ?").run(keepId, dropId);
+    // A group both records were in must not become two rows.
+    db.prepare("INSERT OR IGNORE INTO member_groups (member_id, group_id) SELECT ?, group_id FROM member_groups WHERE member_id = ?").run(keepId, dropId);
+    db.prepare("DELETE FROM member_groups WHERE member_id = ?").run(dropId);
+
+    // What the kept record is missing, the dropped one may have had.
+    db.prepare(
+      `UPDATE members SET
+         name = CASE WHEN TRIM(name) = '' THEN ? ELSE name END,
+         city = CASE WHEN TRIM(COALESCE(city, '')) = '' THEN ? ELSE city END,
+         notes = CASE WHEN TRIM(COALESCE(notes, '')) = '' THEN ? ELSE notes END
+       WHERE id = ?`
+    ).run(drop.name, drop.city ?? "", drop.notes ?? "", keepId);
+
+    db.prepare("DELETE FROM members WHERE id = ?").run(dropId);
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+
+  return { ok: true as const, keep: getMember(keepId)!, dropped: { name: drop.name, phone: drop.phone } };
 }
 
 /**

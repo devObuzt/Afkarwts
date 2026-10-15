@@ -34,7 +34,19 @@ if (!globalForScheduler.__afkarSchedulerStarted) {
   // Journeys tick far more often than campaigns: a step is due at a given hour,
   // and a missed window is reported rather than sent late.
   const journeyTick = () => {
-    runDueJourneys().catch((error) => console.error("Journey scheduler tick failed:", error));
+    // A corrected number is looked at first, so the step that failed on
+    // the old one goes out on this same tick rather than the next.
+    import("./journeys/retry-on-new-number")
+      .then((module) => module.reopenFailedSendsOnNewNumbers())
+      .then((result) => {
+        if (result.reopened) {
+          console.log(`Reopened ${result.reopened} failed sends on corrected numbers.`);
+        }
+      })
+      .catch((error) => console.error("Retry-on-new-number failed:", error))
+      .finally(() => {
+        runDueJourneys().catch((error) => console.error("Journey scheduler tick failed:", error));
+      });
   };
 
   setTimeout(journeyTick, 30 * 1000);
