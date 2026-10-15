@@ -48,6 +48,8 @@ export async function POST(request: Request) {
       bodyParams?: string[];
       bodyPreview?: string;
       skipAlreadySent?: boolean;
+      /** Hand it to the server instead of sending inside this request. */
+      background?: boolean;
       maxRecipients?: number;
     };
 
@@ -96,6 +98,32 @@ export async function POST(request: Request) {
       skipped = before - members.length;
     }
 
+    // A send too big for one request does not belong in a request at all.
+    // It becomes a campaign the server drains every minute until the group
+    // is done — so a closed tab, a dropped connection or a laptop lid
+    // makes no difference to it. Wisam asked exactly this: «ليش لازم تضل
+    // الشاشة مفتوحة واذا قطع النت».
+    if (body.background && group) {
+      const job = createCampaign({
+        groupId: group.id,
+        label: `${mode === "template" ? body.templateName || "template" : "free text"} → ${group.name}`,
+        mode,
+        text,
+        templateName: body.templateName ?? null,
+        templateLanguage: body.templateLanguage ?? null,
+        bodyParams,
+        bodyPreview: body.bodyPreview ?? "",
+        dailyLimit: Math.max(1, Number(body.maxRecipients) || members.length),
+        repeatMode: "now"
+      });
+      return NextResponse.json({
+        background: true,
+        campaignId: job?.id ?? null,
+        total: members.length,
+        skipped
+      });
+    }
+
     const limit = await getMessagingLimit();
     const maxRecipients = Math.min(
       Math.max(1, Number(body.maxRecipients) || limit.suggested),
@@ -109,7 +137,10 @@ export async function POST(request: Request) {
     // So a request takes a slice it can finish, says how many are left,
     // and the screen comes straight back for the next one. The daily
     // limit still governs the whole send; this only governs one trip.
-    const PER_REQUEST = 250;
+    // Each send is about 1.6 seconds against Meta. 250 of them is 400
+    // seconds against a 300-second ceiling — which is exactly where a send
+    // died after 183 had gone out and the screen said «failed».
+    const PER_REQUEST = 100;
     const thisBatch = Math.min(maxRecipients, PER_REQUEST);
     const remainingAfterBatch = Math.max(0, members.length - thisBatch);
     members = members.slice(0, thisBatch);

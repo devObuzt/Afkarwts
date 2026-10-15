@@ -589,7 +589,7 @@ export type Campaign = {
   status: "active" | "paused" | "done";
   lastRunAt: string | null;
   startsAt: string | null;
-  repeatMode: "once" | "daily" | "weekly";
+  repeatMode: "once" | "daily" | "weekly" | "now";
   createdAt: string;
 };
 
@@ -704,6 +704,9 @@ export function listRunnableCampaigns(minHoursSinceLastRun: number): Campaign[] 
          AND (starts_at IS NULL OR starts_at <= ?)
          AND (
            last_run_at IS NULL
+           -- «now» keeps going until the group is done: it is one send
+           -- that is too big for one batch, not a repeat.
+           OR repeat_mode = 'now'
            OR (repeat_mode = 'daily' AND last_run_at <= ?)
            OR (repeat_mode = 'weekly' AND last_run_at <= ?)
          )`

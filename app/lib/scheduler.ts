@@ -19,6 +19,18 @@ if (!globalForScheduler.__afkarSchedulerStarted) {
   setTimeout(tick, 60 * 1000);
   setInterval(tick, 30 * 60 * 1000);
 
+  // A send too big for one batch runs here, not in somebody's browser.
+  // It used to be a loop on the screen, which meant a dropped connection
+  // or a closed tab stopped a send to thousands half way through — and
+  // nobody could tell how far it got. This drains those every minute
+  // until the group is done, whoever is or is not watching.
+  const drainNow = () => {
+    runDueCampaigns(0, "now").catch((error) => console.error("Immediate campaign drain failed:", error));
+  };
+
+  setTimeout(drainNow, 15 * 1000);
+  setInterval(drainNow, 60 * 1000);
+
   // Journeys tick far more often than campaigns: a step is due at a given hour,
   // and a missed window is reported rather than sent late.
   const journeyTick = () => {

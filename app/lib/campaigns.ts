@@ -4,6 +4,7 @@ import {
   getCampaign,
   getGroup,
   listGroupMembers,
+  listCampaignRuns,
   listMemberIdsWithOutgoingBody,
   listRunnableCampaigns,
   markCampaignRun,
@@ -41,6 +42,15 @@ export function campaignProgress(campaign: Campaign) {
   return { total: members.length, delivered, remaining, daysLeft };
 }
 
+/** How many this campaign has already sent today, across its runs. */
+function sentToday(campaignId: number) {
+  const since = new Date();
+  since.setHours(0, 0, 0, 0);
+  return listCampaignRuns(campaignId)
+    .filter((run) => new Date(run.ranAt).getTime() >= since.getTime())
+    .reduce((total, run) => total + run.sent, 0);
+}
+
 export async function runCampaignBatch(campaignId: number) {
   const campaign = getCampaign(campaignId);
   if (!campaign || campaign.status !== "active") {
@@ -57,7 +67,16 @@ export async function runCampaignBatch(campaignId: number) {
   // Never exceed the current Meta allowance, even if the campaign was created
   // when the tier was higher.
   const limit = await getMessagingLimit();
-  const batch = targets.slice(0, Math.min(campaign.dailyLimit, limit.dailyLimit));
+
+  // «now» drains the group a slice at a time, every minute, until it is
+  // done — so its ceiling is what one run can finish, not what the day
+  // allows. The day is still counted: the runs are summed so a send of
+  // thousands cannot walk past Meta's allowance one minute at a time.
+  const perRun =
+    campaign.repeatMode === "now"
+      ? Math.max(0, Math.min(120, limit.dailyLimit - sentToday(campaign.id)))
+      : Math.min(campaign.dailyLimit, limit.dailyLimit);
+  const batch = targets.slice(0, perRun);
 
   markCampaignRun(campaign.id);
 
@@ -102,7 +121,11 @@ export async function runCampaignBatch(campaignId: number) {
   const remaining = targets.length - batch.length;
   recordCampaignRun({ campaignId: campaign.id, sent, failed, remaining });
 
-  if (remaining === 0 || campaign.repeatMode === "once") {
+  // A «now» send that could not take anybody this run has hit the day's
+  // allowance; it stays active and carries on tomorrow rather than being
+  // written off as finished.
+  const outOfAllowance = campaign.repeatMode === "now" && batch.length === 0 && targets.length > 0;
+  if (!outOfAllowance && (remaining === 0 || campaign.repeatMode === "once")) {
     updateCampaignStatus(campaign.id, "done");
   }
 
@@ -124,13 +147,18 @@ export async function runCampaignBatch(campaignId: number) {
   return { sent, failed, remaining };
 }
 
-export async function runDueCampaigns(minHoursSinceLastRun = 24) {
+export async function runDueCampaigns(minHoursSinceLastRun = 24, onlyMode?: Campaign["repeatMode"]) {
   if (globalForRunner.__afkarCampaignRunning) {
     return;
   }
   globalForRunner.__afkarCampaignRunning = true;
   try {
-    const due = listRunnableCampaigns(minHoursSinceLastRun);
+    const all = listRunnableCampaigns(minHoursSinceLastRun);
+    // The minute-by-minute drain only touches the sends that asked for it;
+    // the half-hourly tick leaves them to it.
+    const due = onlyMode
+      ? all.filter((campaign) => campaign.repeatMode === onlyMode)
+      : all.filter((campaign) => campaign.repeatMode !== "now");
     for (const campaign of due) {
       try {
         await runCampaignBatch(campaign.id);

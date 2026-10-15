@@ -2087,9 +2087,49 @@ function BulkModal({ groups, onClose, onDone }: { groups: Group[]; onClose: () =
     // trip would take the same 250 and send to them again — sixty times.
     // One trip then, exactly as before.
     const mayLoop = skipAlreadySent;
+    // Anything big enough to need more than a couple of trips is handed to
+    // the server, which keeps going whoever is watching. The browser only
+    // sends the small ones, where waiting is shorter than explaining.
+    const onTheServer = (selectedGroup?.memberCount ?? 0) > 200;
     // Something on screen from the first second. The first batch takes
     // minutes, and a button that says «Sending…» with nothing behind it
     // is indistinguishable from a button that has hung.
+    if (onTheServer) {
+      try {
+        const response = await fetch("/api/messages/bulk", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            groupId,
+            mode,
+            text,
+            templateName: templateSelection?.name,
+            templateLanguage: templateSelection?.language,
+            bodyParams: templateSelection?.bodyParams ?? [],
+            bodyPreview: templateSelection?.preview,
+            skipAlreadySent,
+            maxRecipients,
+            background: true
+          })
+        });
+        const payload = await response.json();
+        if (!response.ok) {
+          throw new Error(payload.error ?? "Bulk send failed.");
+        }
+        setCampaignStarted({
+          estimatedDays: 1,
+          total: payload.total ?? 0,
+          repeatMode: "now",
+          scheduled: false
+        });
+        await onDone();
+      } catch (bulkError) {
+        setError(bulkError instanceof Error ? bulkError.message : "Bulk send failed.");
+      }
+      setBusy(false);
+      return;
+    }
+
     setResults({ sent: 0, failed: 0, skipped: 0, remaining: 0, inFlight: true, results: [] });
     try {
       for (let trip = 0; trip < (mayLoop ? 60 : 1); trip++) {
@@ -2148,7 +2188,19 @@ function BulkModal({ groups, onClose, onDone }: { groups: Group[]; onClose: () =
     return (
       <Modal onClose={onClose} title="Campaign started 🚀" wide>
         <div className="modalBody">
-          {campaignStarted.scheduled ? (
+          {campaignStarted.repeatMode === "now" ? (
+            <>
+              <p className="hint">
+                Sending to <strong>{campaignStarted.total}</strong> members has started{" "}
+                <strong>on the server</strong>, in batches, until everyone has it.
+              </p>
+              <p className="hint">
+                You can close this window, close the tab, or lose your connection — it carries on without
+                you. Watch it in <strong>Campaigns</strong>, and whatever cannot be delivered shows on each
+                person&apos;s file.
+              </p>
+            </>
+          ) : campaignStarted.scheduled ? (
             <p className="hint">
               Nothing has been sent yet. The first batch of up to {maxRecipients} goes out on{" "}
               <strong>{campaignStarted.startsAt}</strong>
