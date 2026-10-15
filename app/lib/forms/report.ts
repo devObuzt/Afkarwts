@@ -191,6 +191,45 @@ export function rejectedCount(formId: number) {
   return Number(row?.total ?? 0);
 }
 
+/**
+ * The query string every way out of the table shares: the screen, the CSV
+ * and the PDF. When a search is on, what downloads is what is on screen —
+ * anything else and «نزّل Excel» quietly hands over a different set.
+ */
+export function viewQuery(view: { state?: string; q?: string }) {
+  const params = new URLSearchParams();
+  if (view.state) params.set("state", view.state);
+  if (view.q) params.set("q", view.q);
+  const text = params.toString();
+  return text ? `?${text}` : "";
+}
+
+/** The rows of a grid that match a search of the whole row. */
+export function searchRows<T extends { cells: string[]; phone: string; hebrew: { name: string; city: string } }>(
+  rows: T[],
+  search: string
+) {
+  const needle = search.trim().toLowerCase();
+  if (!needle) {
+    return rows;
+  }
+  const digits = needle.replace(/\D/g, "");
+  // «054-123» has to find a phone the form stored as «+972 54-123», so the
+  // search is tried as typed, without the national zero, and with the
+  // country code in its place. Matching the digits raw was not enough: the
+  // stored number has no leading zero, so «0545…» found nothing at all.
+  const national = digits.replace(/^0+/, "").replace(/^972/, "");
+  const forms = digits.length >= 3 ? [...new Set([digits, national, `972${national}`])].filter(Boolean) : [];
+  return rows.filter((row) => {
+    const text = [...row.cells, row.hebrew.name, row.hebrew.city, row.phone].join(" ").toLowerCase();
+    if (text.includes(needle)) {
+      return true;
+    }
+    const bare = text.replace(/\D/g, "");
+    return forms.some((form) => bare.includes(form));
+  });
+}
+
 export function submissionGrid(formId: number, filter: { state?: string } = {}): SubmissionGrid | null {
   const form = getForm(formId);
   if (!form) {

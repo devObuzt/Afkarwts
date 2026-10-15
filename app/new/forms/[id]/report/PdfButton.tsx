@@ -9,7 +9,7 @@ import { useState } from "react";
  * wide table — so the button says so, and falls back to the print sheet
  * if the service has no browser to render with.
  */
-export function PdfButton({ formId, state, printHref }: { formId: number; state: string; printHref: string }) {
+export function PdfButton({ formId, query, printHref }: { formId: number; query: string; printHref: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -17,7 +17,7 @@ export function PdfButton({ formId, state, printHref }: { formId: number; state:
     setBusy(true);
     setError("");
 
-    const response = await fetch(`/api/forms/${formId}/pdf${state ? `?state=${state}` : ""}`);
+    const response = await fetch(`/api/forms/${formId}/pdf${query}`);
 
     if (!response.ok) {
       const payload = await response.json().catch(() => ({}));

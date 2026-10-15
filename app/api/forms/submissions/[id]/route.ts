@@ -8,6 +8,7 @@ import {
   setHebrewFields,
   updateSubmissionAnswers
 } from "@/app/lib/forms/store";
+import { deleteSubmission } from "@/app/lib/forms/approve";
 
 export const runtime = "nodejs";
 
@@ -119,4 +120,40 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       { status: 400 }
     );
   }
+}
+
+/**
+ * Erase a registration.
+ *
+ * Gated on `people.delete` — the one permission already described to its
+ * holder as irreversible, and the one only the owner starts with. Rejecting
+ * is the everyday tool and sits behind `leads.review`; this is not that.
+ */
+export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireApi("people.delete");
+  if (!auth.ok) {
+    return auth.response;
+  }
+
+  const id = Number((await params).id);
+  const before = getSubmission(id)?.submission;
+  const result = deleteSubmission(id);
+
+  if (!result.ok) {
+    return NextResponse.json({ error: result.error }, { status: 404 });
+  }
+
+  // The name, never the answers: the audit log is read by anyone holding
+  // «إدارة المستخدمين», and a deleted registration is still her health file.
+  recordAction({
+    userId: auth.user.id,
+    actor: auth.user.name,
+    action: "lead.delete",
+    subjectType: "submission",
+    subjectId: id,
+    subjectLabel: result.name || `#${id}`,
+    detail: result.leftGroup ? "وأُخرجت من مجموعة المسار" : (before?.state === "added" ? "وبقيت بالمجموعة لتسجيل آخر" : "")
+  });
+
+  return NextResponse.json({ ok: true, leftGroup: result.leftGroup });
 }

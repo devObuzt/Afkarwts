@@ -1,4 +1,4 @@
-import { addMembersToGroup, createMember, findMemberByPhone, getDb } from "../db";
+import { addMembersToGroup, createMember, findMemberByPhone, getDb, removeMemberFromGroup } from "../db";
 import { getForm, getSubmission, phoneIsUsable, setSubmissionState } from "./store";
 
 /**
@@ -91,6 +91,64 @@ export function restoreSubmission(id: number) {
   }
   setSubmissionState(id, "new", null);
   return { ok: true as const };
+}
+
+/**
+ * Erase a registration for good.
+ *
+ * Reject hides; this removes. It is for the rows that should never have
+ * been counted — a staff member who filled the form to see what it looks
+ * like — so leaving them marked «مرفوض» in a view would still be wrong.
+ *
+ * Deleting the registration is not enough on its own: once she was let
+ * into the cohort she is a منتسبة in the path's group, and the journey
+ * keeps writing to her. So she comes out of **this form's group** too, and
+ * the next sync marks her enrolment removed and closes her follow-ups.
+ *
+ * What is deliberately left standing is her منتسبة record and her
+ * messages. She may be a real person the clinic knows for other reasons —
+ * staff, most of all — and a registration is not a reason to erase a
+ * person. Deleting her outright is its own action on her own page.
+ */
+export function deleteSubmission(id: number) {
+  const stored = getSubmission(id);
+  if (!stored) {
+    return { ok: false as const, error: "هذا التسجيل غير موجود." };
+  }
+
+  const { submission } = stored;
+  const form = getForm(submission.formId);
+  const db = getDb();
+
+  // The member comes out of the cohort only when nothing else of hers on
+  // this form still says she belongs in it. A woman who registered twice
+  // and had both approved must not be dropped by deleting one of them.
+  let leftGroup = false;
+  const memberId = submission.memberId;
+  if (memberId !== null && form) {
+    const others = db
+      .prepare(
+        `SELECT COUNT(*) AS n FROM form_submissions
+          WHERE form_id = ? AND id <> ? AND member_id = ? AND state = 'added'`
+      )
+      .get(submission.formId, id, memberId) as { n: number };
+    if (Number(others?.n ?? 0) === 0) {
+      removeMemberFromGroup(form.groupId, memberId);
+      leftGroup = true;
+    }
+  }
+
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    db.prepare("DELETE FROM form_answers WHERE submission_id = ?").run(id);
+    db.prepare("DELETE FROM form_submissions WHERE id = ?").run(id);
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+
+  return { ok: true as const, name: submission.name, phone: submission.phone, leftGroup };
 }
 
 /**

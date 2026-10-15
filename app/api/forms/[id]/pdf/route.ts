@@ -33,11 +33,15 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   const incoming = new URL(request.url);
   const state = incoming.searchParams.get("state") ?? "";
+  const search = incoming.searchParams.get("q") ?? "";
 
   // Rendered against the service's own address: the public hostname may sit
   // behind a proxy the container cannot reach back through.
   const origin = `http://127.0.0.1:${process.env.PORT || 3000}`;
-  const target = `${origin}/new/forms/${formId}/report?print=1${state ? `&state=${state}` : ""}`;
+  const target =
+    `${origin}/new/forms/${formId}/report?print=1` +
+    (state ? `&state=${encodeURIComponent(state)}` : "") +
+    (search ? `&q=${encodeURIComponent(search)}` : "");
 
   try {
     const pdf = await renderPdf({ url: target, cookies: request.headers.get("cookie") ?? "" });

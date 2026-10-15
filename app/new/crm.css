@@ -674,6 +674,99 @@
   font-size: 11.5px;
 }
 
+/* The row's controls, on one line: the duplicate mark and the delete sit
+   side by side in a single column, because a second column would have to
+   be paid for out of the colgroup's 100% and nothing would notice if it
+   were not. */
+.crm .rowActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.crm .rowActions .crmBtn {
+  padding: 2px 8px;
+  font-size: 11.5px;
+}
+
+/* ---- find a row ---- */
+
+.crm .crmFind {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex: 1 1 220px;
+  min-width: 180px;
+}
+
+.crm .crmFind .crmInput {
+  width: 100%;
+  padding: 7px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--body);
+  font: inherit;
+  font-size: 13px;
+}
+
+.crm .crmFind .crmInput:focus-visible {
+  outline: 2px solid var(--tone-ink);
+  outline-offset: 1px;
+}
+
+/* ---- a question before something irreversible ---- */
+
+.crm .crmModalWrap {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgb(0 42 12 / 38%);
+}
+
+.crm .crmModal {
+  width: min(460px, 100%);
+  max-height: calc(100dvh - 40px);
+  overflow: auto;
+  padding: 22px 24px;
+  border-radius: var(--radius);
+  background: var(--card);
+  box-shadow: 0 18px 50px rgb(0 42 12 / 22%);
+  text-align: start;
+}
+
+.crm .crmModal h3 {
+  margin: 0 0 6px;
+  font-size: 17px;
+  color: var(--ink);
+}
+
+.crm .crmModalWho {
+  margin: 0 0 12px;
+  color: var(--body);
+  font-size: 14px;
+}
+
+.crm .crmModalList {
+  margin: 0 0 12px;
+  padding-inline-start: 18px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.75;
+}
+
+.crm .crmModalRow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+
 /* A Hebrew name nobody has checked yet is dimmed and dotted: Afkar will
    rely on these, so a guess must never look like a confirmed value. */
 .crm .heCell {

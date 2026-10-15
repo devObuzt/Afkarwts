@@ -1,6 +1,6 @@
 import { requireApi } from "@/app/lib/users/current";
 import { NextResponse } from "next/server";
-import { gridToCsv, submissionGrid } from "@/app/lib/forms/report";
+import { gridToCsv, searchRows, submissionGrid } from "@/app/lib/forms/report";
 
 export const runtime = "nodejs";
 
@@ -19,12 +19,16 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   }
 
   const formId = Number((await params).id);
-  const state = new URL(request.url).searchParams.get("state") ?? "";
+  const incoming = new URL(request.url).searchParams;
+  const state = incoming.get("state") ?? "";
   const grid = submissionGrid(formId, { state: state || undefined });
 
   if (!grid) {
     return NextResponse.json({ error: "النموذج غير موجود." }, { status: 404 });
   }
+
+  // The file is the page, downloaded — so a search narrows it the same way.
+  grid.rows = searchRows(grid.rows, incoming.get("q") ?? "");
 
   // A Latin, dateless name: Arabic in a Content-Disposition is a per-browser
   // guess, and a file called «تسجيل.csv» has arrived mangled before.

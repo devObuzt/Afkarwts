@@ -33,6 +33,7 @@ export const ACTION_LABEL: Record<string, string> = {
   "lead.approve": "الموافقة على تسجيل",
   "lead.reject": "رفض تسجيل",
   "lead.restore": "إرجاع تسجيل مرفوض",
+  "lead.delete": "حذف تسجيل نهائياً",
   "lead.edit": "تعديل تسجيل",
   "journey.status": "تغيير حالة مسار",
   "user.create": "إنشاء مستخدم",

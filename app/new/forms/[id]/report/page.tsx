@@ -8,11 +8,15 @@ import {
   isNumeric,
   printHeader,
   rejectedCount,
-  submissionGrid
+  searchRows,
+  submissionGrid,
+  viewQuery
 } from "@/app/lib/forms/report";
 import { requireUser } from "@/app/lib/users/current";
+import { DeleteMark } from "./DeleteMark";
 import { DuplicateMark } from "./DuplicateMark";
 import { RestoreMark } from "./RestoreMark";
+import { SearchBox } from "./SearchBox";
 import { EditableCell } from "./EditableCell";
 import { HebrewCell } from "./HebrewCell";
 import { PdfButton } from "./PdfButton";
@@ -43,7 +47,7 @@ export default async function ReportPage({
   searchParams
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ state?: string; print?: string }>;
+  searchParams: Promise<{ state?: string; print?: string; q?: string }>;
 }) {
   const user = await requireUser("journeys.view");
   const query = await searchParams;
@@ -76,6 +80,12 @@ export default async function ReportPage({
   if (onlyDuplicates) {
     grid.rows = grid.rows.filter((row) => row.duplicateOf.length > 0);
   }
+  // Searching the whole row, because what you remember about a woman is
+  // rarely the field it lives in. Digits are compared as digits, so
+  // «054-123» finds a phone the form stored as «+972 54-123».
+  const search = (query.q ?? "").trim();
+  grid.rows = searchRows(grid.rows, search);
+  const view = viewQuery({ state, q: search });
   const printing = query.print === "1";
   // Correcting in place needs both: the form permission and the right to
   // see the answers — the same pair the save route enforces, so a cell is
@@ -83,6 +93,9 @@ export default async function ReportPage({
   // printing: the PDF is a reading of the table, not a way into it.
   const editable = !printing && can(user, "forms.manage");
   const canReject = can(user, "leads.review");
+  // Erasing is not rejecting: it is gated on the one permission already
+  // described to its holder as irreversible, and never offered on paper.
+  const canDelete = !printing && can(user, "people.delete");
   // The form's own count, not the current view's — see duplicateCount.
   const duplicates = duplicateCount(form.id);
   const rejected = rejectedCount(form.id);
@@ -91,7 +104,11 @@ export default async function ReportPage({
   // Keeping it to a single column is what keeps the colgroup honest — a
   // second one would have to be paid for out of the same 100%.
   const viewingRejected = state === "rejected";
-  const markColumn = !printing && (viewingRejected || duplicates > 0);
+  const markColumn = !printing && (viewingRejected || duplicates > 0 || canDelete);
+  // Two controls need more room than a pill. One number, used by both the
+  // colgroup and the share it is paid for with, so they cannot disagree.
+  const markWidth = canDelete ? 10 : 6;
+  const markHeading = viewingRejected ? "إرجاع" : canDelete ? "إجراءات" : "تكرار";
   // Weighted by content: a phone does not need a consent paragraph's room.
   // The Arabic town column is dropped: «البلدة بالعبرية» already carries
   // the same answer in the form the records use. One list drives the
@@ -106,7 +123,7 @@ export default async function ReportPage({
   // the same 100%: the duplicate mark when there is one, and the two
   // Hebrew columns always. A colgroup that is short puts every answer
   // under the wrong heading.
-  const extra = (markColumn ? 6 : 0) + 18;
+  const extra = (markColumn ? markWidth : 0) + 18;
   // Scaled against the widths actually drawn, not against 100. Dropping the
   // Arabic town column took its share of the row with it, and the colgroup
   // came out of production at 95% — the counts were right, so nothing
@@ -118,7 +135,7 @@ export default async function ReportPage({
   const shrink = (width: string) => `${Math.round(num(width) * scale * 100) / 100}%`;
   const laidOut = [
     shrink(widths[0]),
-    ...(markColumn ? ["6%"] : []),
+    ...(markColumn ? [`${markWidth}%`] : []),
     shrink(widths[1]),
     "9%",
     "9%",
@@ -137,7 +154,9 @@ export default async function ReportPage({
           <header className="crmHead">
             <h1>تقرير الاستمارات</h1>
             <p>
-              {form.groupName} · {form.name} · {grid.rows.length} تسجيل · {grid.columns.length} سؤال
+              {form.groupName} · {form.name} ·{" "}
+              {search ? `${grid.rows.length} نتيجة لـ«${search}»` : `${grid.rows.length} تسجيل`} ·{" "}
+              {grid.columns.length} سؤال
             </p>
           </header>
 
@@ -177,14 +196,15 @@ export default async function ReportPage({
                 </Link>
               ))}
             </span>
+            <SearchBox formId={form.id} state={state} value={search} />
             <span className="spacer" style={{ display: "flex", gap: 8, marginInlineStart: "auto" }}>
-              <a className="crmBtn" href={`/api/forms/${form.id}/export${state ? `?state=${state}` : ""}`}>
+              <a className="crmBtn" href={`/api/forms/${form.id}/export${view}`}>
                 تنزيل Excel
               </a>
               <PdfButton
                 formId={form.id}
-                printHref={`/new/forms/${form.id}/report?print=1${state ? `&state=${state}` : ""}`}
-                state={state}
+                printHref={`/new/forms/${form.id}/report?print=1${view ? `&${view.slice(1)}` : ""}`}
+                query={view}
               />
             </span>
           </section>
@@ -212,7 +232,7 @@ export default async function ReportPage({
           <thead>
             <tr>
               <th>#</th>
-              {markColumn && <th>{viewingRejected ? "إرجاع" : "تكرار"}</th>}
+              {markColumn && <th>{markHeading}</th>}
               <th>التاريخ</th>
               <th>الاسم بالعبرية</th>
               <th>البلدة</th>
@@ -252,16 +272,27 @@ export default async function ReportPage({
                 </td>
                 {markColumn && (
                   <td>
-                    {viewingRejected ? (
-                      canReject && <RestoreMark submissionId={row.submissionId} />
-                    ) : (
-                      <DuplicateMark
-                        canReject={canReject}
-                        state={row.state}
-                        submissionId={row.submissionId}
-                        twins={row.duplicateOf}
-                      />
-                    )}
+                    <span className="rowActions">
+                      {viewingRejected
+                        ? canReject && <RestoreMark submissionId={row.submissionId} />
+                        : duplicates > 0 && (
+                            <DuplicateMark
+                              canReject={canReject}
+                              state={row.state}
+                              submissionId={row.submissionId}
+                              twins={row.duplicateOf}
+                            />
+                          )}
+                      {canDelete && (
+                        <DeleteMark
+                          city={row.hebrew.city}
+                          inGroup={row.state === "added"}
+                          name={row.cells[0] || row.hebrew.name}
+                          phone={row.phone}
+                          submissionId={row.submissionId}
+                        />
+                      )}
+                    </span>
                   </td>
                 )}
                 <td>

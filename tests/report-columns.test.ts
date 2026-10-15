@@ -19,14 +19,16 @@ test("every column drawn in the header is drawn in the body too", () => {
   // width it is paid for with must all hang off the same flag.
   assert.equal((SOURCE.match(/\{markColumn && <th>/g) ?? []).length, 1, "the mark heading");
   assert.equal((SOURCE.match(/\{markColumn && \(/g) ?? []).length, 1, "and its cell — a heading with no cell shifts every answer");
-  assert.equal((SOURCE.match(/markColumn \? \["6%"\]/g) ?? []).length, 1, "and its width in the colgroup");
+  assert.equal((SOURCE.match(/markColumn \? \[`\$\{markWidth\}%`\]/g) ?? []).length, 1, "and its width in the colgroup");
+  // One number for the width, used by the colgroup and by the share it is
+  // paid for with. Two literals drifted apart once already.
+  assert.equal((SOURCE.match(/markColumn \? markWidth : 0/g) ?? []).length, 1, "and the same number pays for it");
   // One column, two jobs: the duplicate mark, or the way back out of
   // «المرفوضة». A second column would have to be paid for out of the
   // same 100%, and nothing here would notice it was not.
-  assert.equal(
-    (SOURCE.match(/viewingRejected \? "إرجاع" : "تكرار"/g) ?? []).length,
-    1,
-    "the heading says which of the two jobs the column is doing"
+  assert.ok(
+    /const markHeading = viewingRejected \? "إرجاع" : canDelete \? "إجراءات" : "تكرار"/.test(SOURCE),
+    "the heading says which job the column is doing"
   );
 
   // The Hebrew pair: two headings, and two cells on each of the two paths
@@ -39,7 +41,7 @@ test("every column drawn in the header is drawn in the body too", () => {
 
 test("a component imported into the report is actually rendered", () => {
   // `DuplicateMark` sat imported and unrendered through a deploy.
-  for (const component of ["DuplicateMark", "RestoreMark", "HebrewCell", "EditableCell"]) {
+  for (const component of ["DuplicateMark", "RestoreMark", "DeleteMark", "SearchBox", "HebrewCell", "EditableCell"]) {
     assert.ok(
       new RegExp(`<${component}[\\s/>]`).test(SOURCE),
       `${component} is imported but never rendered — the header it belongs to has no cell`
@@ -61,13 +63,15 @@ test("the widths account for every column the table draws", async () => {
   // Every column the table might drop, including dropping none.
   for (const dropped of [null, 0, 1, 2] as Array<number | null>) {
     const shown = widths.slice(2).map((_, index) => index).filter((index) => index !== dropped);
-    for (const [mark, extra] of [[false, 18], [true, 24]] as Array<[boolean, number]>) {
+    // No mark column, the narrow one (duplicates only), and the wide one
+    // (with delete) — each has to land on 100.
+    for (const [mark, extra] of [[0, 18], [6, 24], [10, 28]] as Array<[number, number]>) {
       const keptTotal = num(widths[0]) + num(widths[1]) + shown.reduce((sum, i) => sum + num(widths[i + 2]), 0);
       const scale = (100 - extra) / keptTotal;
       const shrink = (w: string) => Math.round(num(w) * scale * 100) / 100;
       const laid = [
         shrink(widths[0]),
-        ...(mark ? [6] : []),
+        ...(mark ? [mark] : []),
         shrink(widths[1]),
         9,
         9,
@@ -93,12 +97,16 @@ test("the cells come in the order their headings do", () => {
   // The counts matched while the mark sat after the date instead of
   // before it, so every value still read under the wrong heading. Order
   // is the half the count cannot see.
+  //
+  // Each anchor is something only that cell contains. «row.hebrew.name»
+  // was not: the delete control takes it as a prop from the actions cell,
+  // which made the name look as though it came before the date.
   const head = SOURCE.slice(SOURCE.indexOf("<thead>"), SOURCE.indexOf("</thead>"));
   const body = SOURCE.slice(SOURCE.indexOf("<tbody>"));
 
   const headOrder = [
     head.indexOf("<th>#</th>"),
-    head.indexOf("تكرار"),
+    head.indexOf("markHeading"),
     head.indexOf("<th>التاريخ</th>"),
     head.indexOf("الاسم بالعبرية"),
     head.indexOf("<th>البلدة</th>")
@@ -107,16 +115,23 @@ test("the cells come in the order their headings do", () => {
     body.indexOf("index + 1"),
     body.indexOf("markColumn &&"),
     body.indexOf("row.submittedAt"),
-    body.indexOf("hebrew.name"),
-    body.indexOf("hebrew.city")
+    body.indexOf('field="name"'),
+    body.indexOf('field="city"')
+  ];
+  // Printing renders the same two columns plainly; they have to agree.
+  const printOrder = [
+    body.indexOf('className="heCell">{row.hebrew.name'),
+    body.indexOf('className="heCell">{row.hebrew.city')
   ];
 
-  assert.ok(headOrder.every((at) => at >= 0), "every heading is there");
-  assert.ok(bodyOrder.every((at) => at >= 0), "and every cell");
+  assert.ok(headOrder.every((at) => at >= 0), `every heading is there — ${JSON.stringify(headOrder)}`);
+  assert.ok(bodyOrder.every((at) => at >= 0), `and every cell — ${JSON.stringify(bodyOrder)}`);
+  assert.ok(printOrder.every((at) => at >= 0), "and the printed pair");
 
   const rising = (list: number[]) => list.every((at, i) => i === 0 || at > list[i - 1]);
   assert.ok(rising(headOrder), "headings in order");
   assert.ok(rising(bodyOrder), `cells out of order — ${JSON.stringify(bodyOrder)}`);
+  assert.ok(rising(printOrder), "the printed Hebrew pair is name then town");
 });
 
 test("the headings, the cells and the widths all follow one list", () => {
