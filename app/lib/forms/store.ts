@@ -490,12 +490,19 @@ export function getSubmission(id: number) {
  */
 export function updateSubmissionAnswers(
   submissionId: number,
-  edits: Array<{ answerId: number; value: string }>
+  edits: Array<{ answerId: number; value: string }>,
+  options: { mayEditMember?: boolean } = {}
 ) {
   const db = getDb();
 
-  const submission = db.prepare("SELECT id, form_id FROM form_submissions WHERE id = ?").get(submissionId) as
-    | { id: number; form_id: number }
+  // Read before writing: the member is found by who this registration
+  // belonged to *before* the edit. Looking her up afterwards by the new
+  // phone meant that typing another woman's number into an unlinked
+  // registration found **her** record and overwrote her name and town.
+  const submission = db
+    .prepare("SELECT id, form_id, member_id, phone FROM form_submissions WHERE id = ?")
+    .get(submissionId) as
+    | { id: number; form_id: number; member_id: number | null; phone: string }
     | undefined;
   if (!submission) {
     throw new Error("هذا التسجيل غير موجود.");
@@ -513,6 +520,7 @@ export function updateSubmissionAnswers(
   const reached: string[] = [];
   let memberId: number | null = null;
   let phoneTaken = false;
+  let memberBlocked = false;
 
   db.exec("BEGIN IMMEDIATE");
   try {
@@ -559,18 +567,24 @@ export function updateSubmissionAnswers(
       // the search, the conversation header — all of which read `members`.
       // The registration is where her details came from, so a correction
       // to it is a correction to her.
-      const member = db
-        .prepare(
-          `SELECT id, name, phone, city FROM members
-            WHERE id = (SELECT member_id FROM form_submissions WHERE id = ?)
-               OR (? <> '' AND phone = (SELECT phone FROM form_submissions WHERE id = ?))
-            LIMIT 1`
-        )
-        .get(submissionId, phone, submissionId) as
-        | { id: number; name: string; phone: string; city: string }
-        | undefined;
+      // Her record, identified by what the registration was before this
+      // edit: the link if it has one, otherwise the number it arrived
+      // with. Never the corrected number — that is somebody else's key.
+      const findById = db.prepare("SELECT id, name, phone, city FROM members WHERE id = ?");
+      const findByPhone = db.prepare("SELECT id, name, phone, city FROM members WHERE phone = ?");
+      const member = (submission.member_id
+        ? findById.get(submission.member_id)
+        : submission.phone
+          ? findByPhone.get(submission.phone)
+          : undefined) as { id: number; name: string; phone: string; city: string } | undefined;
 
-      if (member) {
+      // Changing her name, town or number is editing a منتسبة, so it takes
+      // the permission for that. Without it the registration is still
+      // corrected and the caller is told her record was left alone.
+      if (member && !options.mayEditMember) {
+        memberId = member.id;
+        memberBlocked = true;
+      } else if (member) {
         if (name && name !== member.name) {
           db.prepare("UPDATE members SET name = ? WHERE id = ?").run(name, member.id);
           reached.push("الاسم");
@@ -604,7 +618,7 @@ export function updateSubmissionAnswers(
     throw error;
   }
 
-  return { changed, reached, memberId, phoneTaken };
+  return { changed, reached, memberId, phoneTaken, memberBlocked };
 }
 
 export function setSubmissionState(id: number, state: SubmissionRow["state"], memberId: number | null) {

@@ -210,11 +210,15 @@ test("a correction reaches the منتسبة herself, not only her registration",
   const name = await answerFor(id, "name");
   const city = await answerFor(id, "city");
   const phone = await answerFor(id, "phone");
-  const result = updateSubmissionAnswers(id, [
-    { answerId: name.id, value: "سناء حاج" },
-    { answerId: city.id, value: "عرابة" },
-    { answerId: phone.id, value: "0545227701" }
-  ]);
+  const result = updateSubmissionAnswers(
+    id,
+    [
+      { answerId: name.id, value: "سناء حاج" },
+      { answerId: city.id, value: "عرابة" },
+      { answerId: phone.id, value: "0545227701" }
+    ],
+    { mayEditMember: true }
+  );
 
   // The whole point: the people list reads `members`, so a correction that
   // stops at the registration is a correction nobody sees.
@@ -240,7 +244,9 @@ test("a corrected phone that belongs to somebody else is refused, not merged", a
   createMember({ name: "منى", phone: "+972545227703" });
 
   const phone = await answerFor(id, "phone");
-  const result = updateSubmissionAnswers(id, [{ answerId: phone.id, value: "0545227703" }]);
+  const result = updateSubmissionAnswers(id, [{ answerId: phone.id, value: "0545227703" }], {
+    mayEditMember: true
+  });
 
   assert.equal(result.phoneTaken, true, "the collision is reported");
   assert.equal(getMember(approved.memberId)!.phone, "+972545227702", "and her number is left alone");
@@ -289,4 +295,52 @@ test("rejecting a duplicate leaves the منتسبة and her other registration a
 
   // The mark stays on the row that remains, so the pair is still legible.
   assert.deepEqual(submissionGrid(form.id)!.rows.find((r) => r.submissionId === first)!.duplicateOf, [twin]);
+});
+
+test("a correction cannot reach into another woman's record", async () => {
+  const { createMember, getMember } = await import("@/app/lib/db");
+  const { updateSubmissionAnswers } = await import("@/app/lib/forms/store");
+
+  const { form } = await cohort("كلين");
+  // A registration nobody has approved yet, so it has no member_id.
+  const id = await register(form, { name: "ضيف", phone: "0545227720", city: "عرابة" });
+
+  // Somebody else, already a منتسبة, with her own details.
+  const other = createMember({ name: "منى صالح", phone: "+972545227721", city: "سخنين" })!;
+
+  // Typing her number into the loose registration used to find her record
+  // by the *new* phone and overwrite her name and town with the
+  // registration's. The lookup now uses what the registration was before.
+  const name = await answerFor(id, "name");
+  const phone = await answerFor(id, "phone");
+  updateSubmissionAnswers(
+    id,
+    [
+      { answerId: phone.id, value: "0545227721" },
+      { answerId: name.id, value: "اسم من تسجيل غريب" }
+    ],
+    { mayEditMember: true }
+  );
+
+  const untouched = getMember(other.id)!;
+  assert.equal(untouched.name, "منى صالح", "her name is hers");
+  assert.equal(untouched.city, "سخنين", "and so is her town");
+});
+
+test("without «تعديل البيانات» the registration is fixed and her record is not", async () => {
+  const { getMember } = await import("@/app/lib/db");
+  const { approveSubmission } = await import("@/app/lib/forms/approve");
+  const { getSubmission, updateSubmissionAnswers } = await import("@/app/lib/forms/store");
+
+  const { form } = await cohort("كلين");
+  const id = await register(form, { name: "رنا", phone: "0545227722" });
+  const approved = approveSubmission(id) as { ok: true; memberId: number };
+
+  const name = await answerFor(id, "name");
+  const result = updateSubmissionAnswers(id, [{ answerId: name.id, value: "رنا صالح" }]);
+
+  assert.equal(result.memberBlocked, true, "and the caller is told");
+  assert.deepEqual(result.reached, []);
+  assert.equal(getSubmission(id)!.submission.name, "رنا صالح", "the registration is still corrected");
+  assert.equal(getMember(approved.memberId)!.name, "رنا", "her record is untouched");
 });

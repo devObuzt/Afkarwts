@@ -39,7 +39,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   try {
-    const { changed, reached, phoneTaken } = updateSubmissionAnswers(id, edits);
+    // Rewriting her name, town or number is editing a منتسبة. Without
+    // that permission the registration is still corrected; her record is
+    // left alone and the screen says so.
+    const { changed, reached, phoneTaken, memberBlocked } = updateSubmissionAnswers(id, edits, {
+      mayEditMember: can(auth.user, "people.edit")
+    });
     const after = getSubmission(id);
 
     if (changed.length > 0) {
@@ -68,11 +73,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       reached,
       // Said rather than enforced: a half-typed phone is a reason to warn,
       // not a reason to refuse the rest of the correction.
-      phoneWarning: phoneTaken
-        ? "الرقم الجديد مسجّل باسم منتسبة أخرى، فلم يُغيَّر في ملفها. راجعي التكرار أولاً."
-        : phone && !phoneIsUsable(phone)
-          ? "الرقم ما زال قصيراً ولن يقبله «أضف للمجموعة»."
-          : ""
+      memberBlocked,
+      phoneWarning: memberBlocked
+        ? "صُحّح التسجيل، وملف المنتسبة لم يتغيّر: تعديله يحتاج صلاحية «تعديل البيانات»."
+        : phoneTaken
+          ? "الرقم الجديد مسجّل باسم منتسبة أخرى، فلم يُغيَّر في ملفها. راجعي التكرار أولاً."
+          : phone && !phoneIsUsable(phone)
+            ? "الرقم ما زال قصيراً ولن يقبله «أضف للمجموعة»."
+            : ""
     });
   } catch (error) {
     return NextResponse.json(
