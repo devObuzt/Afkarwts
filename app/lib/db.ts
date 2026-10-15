@@ -932,10 +932,21 @@ export function listCampaignRecipients(groupId: number, body: string): Recipient
   }));
 }
 
+/**
+ * Who has already had this exact message, so a second bulk send does not
+ * send it twice.
+ *
+ * A failed send is not «already had it». Counting one meant a message that
+ * Meta refused could never be sent again: the bulk screen answered «4
+ * already got it · 0 sent» over four women who had received nothing at
+ * all, and the only way back was to change the text.
+ */
 export function listMemberIdsWithOutgoingBody(body: string) {
   const rows = getDb()
     .prepare(
-      "SELECT DISTINCT member_id FROM messages WHERE direction = 'outgoing' AND COALESCE(send_key, body) = ?"
+      `SELECT DISTINCT member_id FROM messages
+        WHERE direction = 'outgoing' AND COALESCE(send_key, body) = ?
+          AND status <> 'failed'`
     )
     .all(body) as Array<{ member_id: number }>;
   return new Set(rows.map((row) => row.member_id));

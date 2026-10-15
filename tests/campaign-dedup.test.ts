@@ -110,3 +110,27 @@ test("past sends stay grouped as one send even when personalised", async () => {
   assert.equal(sends[0].recipients, 3);
   assert.equal(sends[0].body, "أهلا {{1}}");
 });
+
+test("a send Meta refused does not count as «already got it»", async () => {
+  const { createMember, createMessage, listMemberIdsWithOutgoingBody, updateMessageStatus } = await import(
+    "@/app/lib/db"
+  );
+
+  const refused = createMember({ name: "ماريا", phone: "+972522577567", notes: "" })!;
+  const got = createMember({ name: "سارة", phone: "+972522577568", notes: "" })!;
+  const body = "نص الدفعة";
+
+  const one = createMessage({ memberId: refused.id, direction: "outgoing", body, status: "accepted" });
+  updateMessageStatus(one.id, {
+    status: "failed",
+    error: "(#132012) Parameter format does not match format in the created template"
+  });
+  createMessage({ memberId: got.id, direction: "outgoing", body, status: "delivered" });
+
+  const already = listMemberIdsWithOutgoingBody(body);
+  assert.ok(already.has(got.id), "the one who received it is skipped next time");
+  assert.ok(
+    !already.has(refused.id),
+    "and the one Meta refused is not — or the message could never be sent to her again"
+  );
+});
