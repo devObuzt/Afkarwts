@@ -15,8 +15,20 @@ const perSource = new Map<string, number[]>();
 const SOURCE_PER_HOUR = 12;
 
 function sourceIsOverLimit(request: Request, now: number) {
-  const forwarded = request.headers.get("x-forwarded-for") ?? "";
-  const source = forwarded.split(",")[0].trim() || "unknown";
+  // The **right-most** entry: that is the one our own proxy wrote. The
+  // left-most is whatever the caller put in the header, so keying on it
+  // means the limit can be stepped over by changing a string.
+  const hops = (request.headers.get("x-forwarded-for") ?? "")
+    .split(",")
+    .map((hop) => hop.trim())
+    .filter(Boolean);
+  const source = hops.length ? hops[hops.length - 1] : "";
+  // No trusted source at all — fall back to the per-phone and shared
+  // ceilings rather than filing every such caller under one key, which
+  // would let one of them lock out all the others.
+  if (!source) {
+    return false;
+  }
   const hourAgo = now - 60 * 60 * 1000;
   const seen = (perSource.get(source) ?? []).filter((at) => at > hourAgo);
   if (seen.length >= SOURCE_PER_HOUR) {
