@@ -111,7 +111,22 @@ export function migrateFormTables(db: DatabaseSync) {
 
     CREATE INDEX IF NOT EXISTS idx_form_fields_form ON form_fields(form_id, position);
     CREATE INDEX IF NOT EXISTS idx_form_submissions_form ON form_submissions(form_id, state);
+    -- Columns Afkar keep themselves, beside the answers but not among
+    -- them: they are not something she wrote, so they are stored apart and
+    -- never travel with her answers. Keyed rather than columns of their
+    -- own, so the next one Afkar want is a line in NOTE_COLUMNS and not a
+    -- migration.
+    CREATE TABLE IF NOT EXISTS submission_notes (
+      submission_id INTEGER NOT NULL,
+      key TEXT NOT NULL,
+      value TEXT NOT NULL DEFAULT '',
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (submission_id, key),
+      FOREIGN KEY (submission_id) REFERENCES form_submissions(id) ON DELETE CASCADE
+    );
+
     CREATE INDEX IF NOT EXISTS idx_form_answers_submission ON form_answers(submission_id);
+    CREATE INDEX IF NOT EXISTS idx_submission_notes ON submission_notes(submission_id);
   `);
 
   addColumnIfMissing(db, "forms", "title", "TEXT NOT NULL DEFAULT ''");

@@ -8,8 +8,10 @@ import {
   isNumeric,
   printHeader,
   rejectedCount,
+  phoneColumn,
   searchRows,
   submissionGrid,
+  tailColumns,
   viewQuery
 } from "@/app/lib/forms/report";
 import { requireUser } from "@/app/lib/users/current";
@@ -21,6 +23,7 @@ import { EditableCell } from "./EditableCell";
 import { HebrewCell } from "./HebrewCell";
 import { PdfButton } from "./PdfButton";
 import { can } from "@/app/lib/users/permissions";
+import { NOTE_COLUMNS } from "@/app/lib/forms/notes";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +38,24 @@ const STATES = [
   // beside the others because it is the same question: which rows now?
   { key: "duplicates", label: "المكررات" }
 ];
+
+/**
+ * The heading over one answer column.
+ *
+ * On screen the question is the column name. On paper a paragraph-long
+ * question would make the header half the sheet, and Chromium then stops
+ * repeating it across pages — so it prints as a number and the key sits
+ * under the table.
+ */
+function ThAnswer({ index, label }: { index: number; label: string }) {
+  const short = printHeader(label, index);
+  return (
+    <th>
+      <span className="thFull">{label}</span>
+      <span className={short === label ? "thShort" : "thShort thRef"}>{short}</span>
+    </th>
+  );
+}
 
 /**
  * The cohort's registrations as the table Afkar reads them in: one row per
@@ -110,10 +131,43 @@ export default async function ReportPage({
   const markWidth = canDelete ? 10 : 6;
   const markHeading = viewingRejected ? "إرجاع" : canDelete ? "إجراءات" : "تكرار";
   // Weighted by content: a phone does not need a consent paragraph's room.
-  // The Arabic town column is dropped: «البلدة بالعبرية» already carries
-  // the same answer in the form the records use. One list drives the
-  // headings, the cells and the widths so they cannot drift apart.
-  const shown = grid.columns.map((_, index) => index).filter((index) => index !== grid.cityColumn);
+  //
+  // Three lists drive every column the table draws, and the headings, the
+  // cells and the widths all walk them in the same order — they used to be
+  // independent maps and drifted apart twice in one day.
+  //
+  //   nameColumn  the Arabic name, lifted out to stand beside the Hebrew
+  //   shown       the answers in the middle, the phone among them
+  //   tail        the id number and the date of birth, pushed to the end
+  //
+  // The Arabic town is dropped outright: «البلدة» already carries the same
+  // answer in the form the records use, and two town columns is one too many.
+  const tail = tailColumns(form.id, grid.columns);
+  // Afkar's own columns go straight after the phone, which is where the
+  // work happens: you read who she is, then you write what you decided.
+  const afterPhone = phoneColumn(form.id, grid.columns);
+  const shown = grid.columns
+    .map((_, index) => index)
+    .filter((index) => index !== grid.cityColumn && index !== grid.nameColumn && !tail.includes(index));
+  // Headings, cells and widths walk this one list in this one order. The
+  // note columns are not answers, so they ride as a marker in the same
+  // list rather than as a second list that could fall out of step.
+  type Slot = { answer: number } | { note: (typeof NOTE_COLUMNS)[number] };
+  const rest: Slot[] = [];
+  for (const index of shown) {
+    rest.push({ answer: index });
+    if (index === afterPhone) {
+      for (const note of NOTE_COLUMNS) rest.push({ note });
+    }
+  }
+  // A form with no phone column still gets them, at the end of the answers.
+  if (afterPhone === null || !shown.includes(afterPhone)) {
+    for (const note of NOTE_COLUMNS) rest.push({ note });
+  }
+  for (const index of tail) rest.push({ answer: index });
+  // Each note column is a fixed share, paid for out of the same 100 — they
+  // hold what Afkar type, and nothing about the answers predicts that.
+  const noteWidth = 7;
   const widths = columnWidths(grid);
   // The duplicate mark is a column too. Without its own width the colgroup
   // is one short and every width lands on the cell to its left — the
@@ -123,25 +177,51 @@ export default async function ReportPage({
   // the same 100%: the duplicate mark when there is one, and the two
   // Hebrew columns always. A colgroup that is short puts every answer
   // under the wrong heading.
-  const extra = (markColumn ? markWidth : 0) + 18;
-  // Scaled against the widths actually drawn, not against 100. Dropping the
-  // Arabic town column took its share of the row with it, and the colgroup
-  // came out of production at 95% — the counts were right, so nothing
-  // shifted, but the table sat narrower than the sheet. Dividing by what is
-  // kept puts it back at 100 whichever column is dropped.
+  const extra = (markColumn ? markWidth : 0) + 18 + NOTE_COLUMNS.length * noteWidth;
+  // Scaled against the widths actually drawn, not against 100. Dropping a
+  // column takes its share of the row with it, and the colgroup came out of
+  // production at 95% once — the counts were right, so nothing shifted, but
+  // the table sat narrower than the sheet. Dividing by what is kept puts it
+  // back at 100 whichever columns are dropped or moved.
   const num = (width: string) => Number(width.replace("%", ""));
-  const keptTotal = num(widths[0]) + num(widths[1]) + shown.reduce((sum, index) => sum + num(widths[index + 2]), 0);
+  const answer = (index: number) => num(widths[index + 2]);
+  const ordered = [...(grid.nameColumn === null ? [] : [grid.nameColumn]), ...shown, ...tail];
+  const keptTotal = num(widths[0]) + num(widths[1]) + ordered.reduce((sum, index) => sum + answer(index), 0);
   const scale = (100 - extra) / (keptTotal || 1);
-  const shrink = (width: string) => `${Math.round(num(width) * scale * 100) / 100}%`;
+  const pct = (value: number) => `${Math.round(value * scale * 100) / 100}%`;
   const laidOut = [
-    shrink(widths[0]),
+    pct(num(widths[0])),
     ...(markColumn ? [`${markWidth}%`] : []),
-    shrink(widths[1]),
+    pct(num(widths[1])),
+    ...(grid.nameColumn === null ? [] : [pct(answer(grid.nameColumn))]),
     "9%",
     "9%",
-    ...shown.map((index) => shrink(widths[index + 2]))
+    ...rest.map((slot) => ("note" in slot ? `${noteWidth}%` : pct(answer(slot.answer))))
   ];
+  // The row stays identifiable while the table scrolls: the leading columns
+  // are pinned, and each one's offset is the sum of the ones before it. The
+  // mark column comes and goes, so the two that follow it are told where
+  // they start rather than guessing from their position.
+  const pinned = { "--offDate": markColumn ? "88px" : "30px", "--offName": markColumn ? "146px" : "88px" };
   const key = headerKey(grid.columns);
+  // Every answer cell is built here, name column included — it used to be
+  // one of the answers and must keep behaving like one when it moves.
+  const answerCell = (row: (typeof grid.rows)[number], cellIndex: number, pin?: string) => {
+    const classes = [pin, isNumeric(row.cells[cellIndex]) ? "num" : ""].filter(Boolean).join(" ");
+    return editable ? (
+      <EditableCell
+        answerId={row.answerIds[cellIndex]}
+        className={classes || undefined}
+        key={grid.columns[cellIndex]}
+        submissionId={row.submissionId}
+        value={row.cells[cellIndex]}
+      />
+    ) : (
+      <td className={classes || undefined} key={grid.columns[cellIndex]}>
+        {row.cells[cellIndex]}
+      </td>
+    );
+  };
 
   return (
     <div className={printing ? "crmPage wide printing" : "crmPage wide"}>
@@ -223,7 +303,7 @@ export default async function ReportPage({
       )}
 
       <div className="gridScroll">
-        <table className="gridTable">
+        <table className="gridTable" style={pinned as React.CSSProperties}>
           <colgroup>
             {laidOut.map((width, index) => (
               <col key={index} style={{ width }} />
@@ -231,35 +311,28 @@ export default async function ReportPage({
           </colgroup>
           <thead>
             <tr>
-              <th>#</th>
-              {markColumn && <th>{markHeading}</th>}
-              <th>التاريخ</th>
+              <th className="colIndex">#</th>
+              {markColumn && <th className="colActions">{markHeading}</th>}
+              <th className="colDate">التاريخ</th>
+              {grid.nameColumn !== null && <th className="colName">{grid.columns[grid.nameColumn]}</th>}
               <th>الاسم بالعبرية</th>
               <th>البلدة</th>
-              {shown.map((index) => (
-                <th key={grid.columns[index]}>
-                  {/* On screen the question is the column name. On paper a
-                      paragraph-long question would make the header half the
-                      sheet, and Chromium then stops repeating it — so it
-                      prints as a number and the key sits under the table. */}
-                  <span className="thFull">{grid.columns[index]}</span>
-                  <span
-                    className={
-                      printHeader(grid.columns[index], index) === grid.columns[index]
-                        ? "thShort"
-                        : "thShort thRef"
-                    }
-                  >
-                    {printHeader(grid.columns[index], index)}
-                  </span>
-                </th>
-              ))}
+              {rest.map((slot) =>
+                "note" in slot ? (
+                  <th className="noteHead" key={`note-${slot.note.key}`}>
+                    <span className="thFull">{slot.note.label}</span>
+                    <span className="thShort">{slot.note.label}</span>
+                  </th>
+                ) : (
+                  <ThAnswer index={slot.answer} key={grid.columns[slot.answer]} label={grid.columns[slot.answer]} />
+                )
+              )}
             </tr>
           </thead>
           <tbody>
             {grid.rows.map((row, index) => (
               <tr key={row.submissionId}>
-                <td>
+                <td className="colIndex">
                   {/* The number is the way in: a typo is noticed while
                       reading the table, so the correction starts there. */}
                   {printing ? (
@@ -271,7 +344,7 @@ export default async function ReportPage({
                   )}
                 </td>
                 {markColumn && (
-                  <td>
+                  <td className="colActions">
                     <span className="rowActions">
                       {viewingRejected
                         ? canReject && <RestoreMark submissionId={row.submissionId} />
@@ -295,12 +368,13 @@ export default async function ReportPage({
                     </span>
                   </td>
                 )}
-                <td>
+                <td className="colDate">
                   {/* The class carries display:inline-block — on the cell
                       itself it stops being a table cell, and the column
                       collapsed to 9px with the date stacked letter by letter. */}
                   <span className="crmLtr">{row.submittedAt.slice(0, 10)}</span>
                 </td>
+                {grid.nameColumn !== null && answerCell(row, grid.nameColumn, "colName")}
                 {printing ? (
                   <>
                     <td className="heCell">{row.hebrew.name || "—"}</td>
@@ -322,22 +396,18 @@ export default async function ReportPage({
                     />
                   </>
                 )}
-                {shown.map((cellIndex) =>
-                  editable ? (
+                {rest.map((slot) =>
+                  "note" in slot ? (
                     <EditableCell
-                      answerId={row.answerIds[cellIndex]}
-                      className={isNumeric(row.cells[cellIndex]) ? "num" : undefined}
-                      key={grid.columns[cellIndex]}
+                      answerId={null}
+                      className="noteCell"
+                      key={`note-${slot.note.key}`}
+                      noteKey={slot.note.key}
                       submissionId={row.submissionId}
-                      value={row.cells[cellIndex]}
+                      value={row.notes[slot.note.key] ?? ""}
                     />
                   ) : (
-                    <td
-                      className={isNumeric(row.cells[cellIndex]) ? "num" : undefined}
-                      key={grid.columns[cellIndex]}
-                    >
-                      {row.cells[cellIndex]}
-                    </td>
+                    answerCell(row, slot.answer)
                   )
                 )}
               </tr>

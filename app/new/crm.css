@@ -1689,19 +1689,102 @@
   background: var(--tone-wash);
 }
 
-.crm .gridTable td:first-child,
-.crm .gridTable th:first-child {
-  position: sticky;
-  inset-inline-start: 0;
-  background: inherit;
-  font-weight: 600;
-  color: var(--faint);
-  min-width: 34px;
+/* Every row paints its own background. A pinned cell inherits it, and
+   without one the scrolling columns show straight through the cell that
+   is supposed to be covering them. */
+.crm .gridTable tbody tr {
+  background: var(--card);
 }
 
-.crm .gridTable thead th:first-child {
+/* ---- the columns that stay put while the table scrolls ----
+   Four of them: the number, the row's controls, the date and the name.
+   Only the name was asked for, but a column cannot be pinned over the
+   ones before it without pinning those too — they would slide underneath.
+   Each offset is the sum of the widths before it, and the two that follow
+   the optional controls column are told where they start (--offDate,
+   --offName on the table) rather than guessing from their position. */
+.crm .gridTable .colIndex,
+.crm .gridTable .colActions,
+.crm .gridTable .colDate,
+.crm .gridTable .colName {
+  position: sticky;
+  z-index: 1;
+  background: inherit;
+}
+
+.crm .gridTable .colIndex {
+  inset-inline-start: 0;
+  width: 30px;
+  min-width: 30px;
+  font-weight: 600;
+  color: var(--faint);
+}
+
+.crm .gridTable .colActions {
+  inset-inline-start: 30px;
+  width: 58px;
+  min-width: 58px;
+  padding-inline: 5px;
+}
+
+.crm .gridTable .colDate {
+  inset-inline-start: var(--offDate, 30px);
+  width: 56px;
+  min-width: 56px;
+  padding-inline: 6px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.crm .gridTable .colName {
+  inset-inline-start: var(--offName, 88px);
+  width: 148px;
+  min-width: 148px;
+  max-width: 148px;
+  font-weight: 600;
+  /* The pinned edge, so the scroll reads as a seam and not as a column
+     that happens to be standing still. */
+  box-shadow: 1px 0 0 var(--line-strong);
+}
+
+.crm .gridTable thead .colIndex,
+.crm .gridTable thead .colActions,
+.crm .gridTable thead .colDate,
+.crm .gridTable thead .colName {
   z-index: 3;
   background: var(--tone-wash);
+}
+
+/* ---- the columns Afkar fill in themselves ----
+   Marked so they read as ours and not as something she answered: an empty
+   note and an unanswered question must not look the same. */
+.crm .gridTable .noteHead {
+  background: var(--peach);
+  color: #4a2f1e;
+}
+
+.crm .gridTable .noteCell {
+  background: #fffaf6;
+  cursor: text;
+}
+
+.crm .gridTable tbody tr:hover .noteCell {
+  background: #fff3e9;
+}
+
+.crm .gridTable .noteCell:empty::after {
+  content: "—";
+  color: var(--line-strong);
+}
+
+/* The controls lose their pill padding here: two buttons in 58px. */
+.crm .gridTable .colActions .rowActions {
+  gap: 3px;
+}
+
+.crm .gridTable .colActions .crmBtn {
+  padding: 2px 5px;
+  font-size: 10.5px;
 }
 
 .crm .printHead {
@@ -1798,6 +1881,20 @@
     overflow-wrap: anywhere;
     border-inline-end: 1px solid #ccc;
     border-bottom: 1px solid #ddd;
+  }
+
+  /* Nothing is pinned on paper: the sheet does not scroll, and a sticky
+     cell with its own width fights the fixed layout for the page. */
+  .crm .gridTable .colIndex,
+  .crm .gridTable .colActions,
+  .crm .gridTable .colDate,
+  .crm .gridTable .colName {
+    position: static;
+    width: auto;
+    min-width: 0;
+    max-width: none;
+    box-shadow: none;
+    font-size: inherit;
   }
 
   .crm .gridTable thead th {

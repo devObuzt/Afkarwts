@@ -160,6 +160,7 @@ test("the same guard for every opener Excel treats as a formula", async () => {
     groupName: "y",
     columns: ["س"],
     cityColumn: null,
+    nameColumn: null,
     rows: ["=1+1", "+1", "-1", "@SUM(A1)", "\tx", "عادي", "+972521234567"].map((value, index) => ({
       submissionId: index,
       memberId: null,
@@ -169,7 +170,8 @@ test("the same guard for every opener Excel treats as a formula", async () => {
       answerIds: [null],
       phone: "",
       hebrew: { name: "", nameConfirmed: false, city: "", cityConfirmed: false },
-      duplicateOf: []
+      duplicateOf: [],
+      notes: {}
     }))
   };
 
@@ -177,8 +179,20 @@ test("the same guard for every opener Excel treats as a formula", async () => {
   for (const line of lines.slice(0, 5)) {
     assert.ok(line.includes(`"'`), `an opener slipped through: ${line}`);
   }
-  assert.ok(lines[5].endsWith('"عادي"'), "ordinary text is left alone");
+  assert.ok(lines[5].includes('"عادي"'), "ordinary text is left alone");
   assert.ok(lines[6].includes(`"'+972521234567"`), "a phone is neutralised too, and Excel still shows it whole");
+
+  // Afkar's own columns ride along at the end, one per NOTE_COLUMNS entry.
+  const { NOTE_COLUMNS } = await import("@/app/lib/forms/notes");
+  const header = gridToCsv(grid).split("\r\n")[0].split('","');
+  for (const note of NOTE_COLUMNS) {
+    assert.ok(header.some((cell) => cell.includes(note.label)), `«${note.label}» is in the file`);
+  }
+  assert.equal(
+    lines[5].split('","').length,
+    header.length,
+    "and every row has a cell for each of them"
+  );
 });
 
 test("a group's report is reachable through the form bound to it", async () => {

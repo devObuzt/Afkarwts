@@ -1,5 +1,6 @@
 import { getDb } from "../db";
 import { hebrewNameFor } from "./hebrew-name";
+import { NOTE_COLUMNS, notesForForm } from "./notes";
 import { hebrewTownFor } from "./hebrew-town";
 import { getForm, listFields } from "./store";
 
@@ -56,7 +57,9 @@ export function headerKey(columns: string[]) {
 export function columnWidths(grid: { columns: string[]; rows: Array<{ cells: string[] }> }) {
   // The index and the date are columns too. Leaving them out of the sum
   // made the table 109% wide, and the id printed on top of the phone.
-  const leading = [3, 7];
+  // The date is 5, not 7: it only ever holds «2026-10-11», and the room
+  // it was keeping belongs to the answers.
+  const leading = [3, 5];
 
   const answers = grid.columns.map((column, index) => {
     const values = grid.rows.map((row) => row.cells[index] ?? "").filter((value) => value.trim() !== "");
@@ -100,6 +103,12 @@ export type SubmissionGrid = {
    * records use, and two town columns is one too many.
    */
   cityColumn: number | null;
+  /**
+   * Which column holds the Arabic name, so the table can lift it out of
+   * the answers and stand it beside the Hebrew one. Reading a name in two
+   * scripts means reading them side by side, not with the town between.
+   */
+  nameColumn: number | null;
   rows: Array<{
     submissionId: number;
     memberId: number | null;
@@ -122,6 +131,8 @@ export type SubmissionGrid = {
      * never looks outside the form.
      */
     duplicateOf: number[];
+    /** The columns Afkar keep themselves, by key. See NOTE_COLUMNS. */
+    notes: Record<string, string>;
     /**
      * The answer row behind each cell, so the table can edit in place.
      * Null where this registration never answered that question — there is
@@ -230,6 +241,34 @@ export function searchRows<T extends { cells: string[]; phone: string; hebrew: {
   });
 }
 
+/**
+ * The columns pushed to the end of the table: the id number, then the date
+ * of birth. They are looked up, not read across, and they were sitting
+ * between the name and the answers taking the width the answers needed.
+ *
+ * The phone deliberately stays where it is — Wisam asked for it back after
+ * seeing the three moved together: it is read, not just looked up.
+ *
+ * The birth date is found by what it is (the form's only date field). The
+ * id number has no structural mark of its own, so it is found by its
+ * label — if Afkar reword that question it simply stops moving and sits
+ * among the answers. Nothing breaks, so nothing here guesses harder.
+ */
+export function tailColumns(formId: number, columns: string[]) {
+  const fields = listFields(formId);
+  const indexOf = (label: string | undefined) => (label ? columns.indexOf(label) : -1);
+  const identity = indexOf(fields.find((field) => /هوية|זהות|ת\.?ז/.test(field.label))?.label);
+  const born = indexOf(fields.find((field) => field.kind === "date")?.label);
+  return [identity, born].filter((index) => index >= 0);
+}
+
+/** Where the phone column sits, so the manual columns can follow it. */
+export function phoneColumn(formId: number, columns: string[]) {
+  const field = listFields(formId).find((one) => one.mapsTo === "phone" || one.kind === "phone");
+  const at = field ? columns.indexOf(field.label) : -1;
+  return at >= 0 ? at : null;
+}
+
 export function submissionGrid(formId: number, filter: { state?: string } = {}): SubmissionGrid | null {
   const form = getForm(formId);
   if (!form) {
@@ -289,6 +328,8 @@ export function submissionGrid(formId: number, filter: { state?: string } = {}):
     return { submission, given, ids };
   });
 
+  const notes = notesForForm(formId);
+
   // One pass over the phones first: a row has to know about a twin that
   // comes after it as well as one before.
   const byPhone = new Map<string, number[]>();
@@ -312,17 +353,27 @@ export function submissionGrid(formId: number, filter: { state?: string } = {}):
       answerIds: columns.map((column) => ids.get(column) ?? null),
       phone,
       duplicateOf: sharing,
-      hebrew: hebrewFor(submission)
+      hebrew: hebrewFor(submission),
+      notes: notes.get(Number(submission.id)) ?? {}
     });
   }
 
-  const cityField = listFields(formId).find((field) => field.mapsTo === "city");
+  const fields = listFields(formId);
+  const at = (mapsTo: string) => {
+    const field = fields.find((one) => one.mapsTo === mapsTo);
+    if (!field) {
+      return null;
+    }
+    const index = columns.indexOf(field.label);
+    return index < 0 ? null : index;
+  };
   return {
     formId,
     formName: form.name,
     groupName: form.groupName,
     columns,
-    cityColumn: cityField ? columns.indexOf(cityField.label) : null,
+    cityColumn: at("city"),
+    nameColumn: at("name"),
     rows
   };
 }
@@ -347,13 +398,17 @@ export function gridToCsv(grid: SubmissionGrid) {
   const neutralise = (value: string) => (/^[=+\-@\t\r]/.test(value) ? `'${value}` : value);
   const escape = (value: string) => `"${neutralise(String(value ?? "")).replace(/"/g, '""')}"`;
 
-  const header = ["#", "التاريخ", "الحالة", ...grid.columns].map(escape).join(",");
+  const header = ["#", "التاريخ", "الحالة", ...grid.columns, ...NOTE_COLUMNS.map((note) => note.label)]
+    .map(escape)
+    .join(",");
   const lines = grid.rows.map((row, index) =>
     [
       String(index + 1),
       row.submittedAt.slice(0, 16),
       STATE_LABEL[row.state] ?? row.state,
-      ...row.cells
+      ...row.cells,
+      // Afkar's own columns ride along: the file is what gets worked from.
+      ...NOTE_COLUMNS.map((note) => row.notes[note.key] ?? "")
     ]
       .map(escape)
       .join(",")

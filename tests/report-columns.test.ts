@@ -17,7 +17,7 @@ const SOURCE = readFileSync(new URL("../app/new/forms/[id]/report/page.tsx", imp
 test("every column drawn in the header is drawn in the body too", () => {
   // The mark column is conditional, so the heading, the cell and the
   // width it is paid for with must all hang off the same flag.
-  assert.equal((SOURCE.match(/\{markColumn && <th>/g) ?? []).length, 1, "the mark heading");
+  assert.equal((SOURCE.match(/\{markColumn && <th className="colActions">/g) ?? []).length, 1, "the mark heading");
   assert.equal((SOURCE.match(/\{markColumn && \(/g) ?? []).length, 1, "and its cell — a heading with no cell shifts every answer");
   assert.equal((SOURCE.match(/markColumn \? \[`\$\{markWidth\}%`\]/g) ?? []).length, 1, "and its width in the colgroup");
   // One number for the width, used by the colgroup and by the share it is
@@ -35,6 +35,10 @@ test("every column drawn in the header is drawn in the body too", () => {
   // (printing renders plain, the screen renders the editor).
   assert.equal((SOURCE.match(/<th>الاسم بالعبرية<\/th>/g) ?? []).length, 1);
   assert.equal((SOURCE.match(/<th>البلدة<\/th>/g) ?? []).length, 1, "one town column, in Hebrew");
+  // The Arabic name stands beside the Hebrew one, pinned, so the two can
+  // be read against each other — with no town between them.
+  assert.equal((SOURCE.match(/className="colName"/g) ?? []).length, 1, "the name heading");
+  assert.ok(/answerCell\(row, grid\.nameColumn, "colName"\)/.test(SOURCE), "and its cell, pinned the same");
   assert.equal((SOURCE.match(/<HebrewCell/g) ?? []).length, 2, "name and city, on screen");
   assert.equal((SOURCE.match(/className="heCell">\{row\.hebrew\./g) ?? []).length, 2, "and when printing");
 });
@@ -93,6 +97,35 @@ test("the widths account for every column the table draws", async () => {
   );
 });
 
+test("the pinned columns are pinned in the header and the body alike", () => {
+  // A cell pinned in one and not the other slides out from under its own
+  // heading the moment the table scrolls.
+  for (const column of ["colIndex", "colActions", "colDate"]) {
+    assert.equal(
+      (SOURCE.match(new RegExp(`className="${column}"`, "g")) ?? []).length,
+      2,
+      `${column}: one heading and one cell`
+    );
+  }
+  // The name cell is built by the shared answer renderer, so it takes the
+  // class as an argument rather than writing it out.
+  assert.equal((SOURCE.match(/className="colName"/g) ?? []).length, 1, "colName: the heading");
+  assert.ok(/answerCell\(row, grid\.nameColumn, "colName"\)/.test(SOURCE), "colName: and the cell");
+  // Their offsets are told to them, because the controls column comes and
+  // goes and the two after it cannot work out where they start.
+  assert.ok(/--offDate/.test(SOURCE) && /--offName/.test(SOURCE), "the offsets are passed to the table");
+  assert.ok(/style=\{pinned as React\.CSSProperties\}/.test(SOURCE), "and the table carries them");
+});
+
+test("Afkar's own columns follow the phone, in the header and the body", () => {
+  // One list of slots drives both, so a note column cannot appear in the
+  // headings without its cell — the failure that shipped twice.
+  assert.equal((SOURCE.match(/rest\.map\(\(slot\)/g) ?? []).length, 3, "widths, headings and cells walk the same list");
+  assert.equal((SOURCE.match(/"note" in slot/g) ?? []).length, 3, "and each of the three knows a note from an answer");
+  assert.ok(/if \(index === afterPhone\)/.test(SOURCE), "they are placed after the phone");
+  assert.ok(/noteKey=\{slot\.note\.key\}/.test(SOURCE), "and each cell saves to its own column");
+});
+
 test("the cells come in the order their headings do", () => {
   // The counts matched while the mark sat after the date instead of
   // before it, so every value still read under the wrong heading. Order
@@ -105,18 +138,22 @@ test("the cells come in the order their headings do", () => {
   const body = SOURCE.slice(SOURCE.indexOf("<tbody>"));
 
   const headOrder = [
-    head.indexOf("<th>#</th>"),
-    head.indexOf("markHeading"),
-    head.indexOf("<th>التاريخ</th>"),
+    head.indexOf('className="colIndex"'),
+    head.indexOf('className="colActions"'),
+    head.indexOf('className="colDate"'),
+    head.indexOf('className="colName"'),
     head.indexOf("الاسم بالعبرية"),
-    head.indexOf("<th>البلدة</th>")
+    head.indexOf("<th>البلدة</th>"),
+    head.indexOf("rest.map(")
   ];
   const bodyOrder = [
-    body.indexOf("index + 1"),
-    body.indexOf("markColumn &&"),
-    body.indexOf("row.submittedAt"),
+    body.indexOf('className="colIndex"'),
+    body.indexOf('className="colActions"'),
+    body.indexOf('className="colDate"'),
+    body.indexOf('answerCell(row, grid.nameColumn, "colName")'),
     body.indexOf('field="name"'),
-    body.indexOf('field="city"')
+    body.indexOf('field="city"'),
+    body.indexOf("rest.map(")
   ];
   // Printing renders the same two columns plainly; they have to agree.
   const printOrder = [
@@ -137,10 +174,10 @@ test("the cells come in the order their headings do", () => {
 test("the headings, the cells and the widths all follow one list", () => {
   // They used to be three independent maps over grid.columns, and the
   // Arabic town column could be dropped from one and not the others.
-  const uses = (SOURCE.match(/shown\.map\(/g) ?? []).length;
-  assert.equal(uses, 3, `headings, cells and widths — found ${uses} maps over «shown»`);
+  const uses = (SOURCE.match(/rest\.map\(/g) ?? []).length;
+  assert.equal(uses, 3, `headings, cells and widths — found ${uses} maps over «rest»`);
   assert.ok(
-    /const shown = grid\.columns[\s\S]{0,120}!== grid\.cityColumn/.test(SOURCE),
-    "and «shown» is what drops the Arabic town column"
+    /index !== grid\.cityColumn && index !== grid\.nameColumn/.test(SOURCE),
+    "and the town and the name are taken out of the answers deliberately"
   );
 });

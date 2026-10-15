@@ -14,11 +14,14 @@ import { useEffect, useRef, useState } from "react";
 export function EditableCell({
   answerId,
   className,
+  noteKey,
   submissionId,
   value
 }: {
   answerId: number | null;
   className?: string;
+  /** Set for one of Afkar's own columns: it is saved as a note, not an answer. */
+  noteKey?: string;
   submissionId: number;
   value: string;
 }) {
@@ -67,7 +70,7 @@ export function EditableCell({
     const response = await fetch(`/api/forms/submissions/${submissionId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ edits: [{ answerId, value: draft }] })
+      body: JSON.stringify(noteKey ? { note: { key: noteKey, value: draft } } : { edits: [{ answerId, value: draft }] })
     });
     const payload = await response.json().catch(() => ({}));
     setBusy(false);
@@ -87,7 +90,8 @@ export function EditableCell({
   }
 
   // Nothing to patch: the question was never answered on this registration.
-  if (answerId === null) {
+  // A note column always has somewhere to write, so it never lands here.
+  if (answerId === null && !noteKey) {
     return <td className={className}>{current}</td>;
   }
 

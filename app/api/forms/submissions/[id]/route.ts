@@ -9,6 +9,7 @@ import {
   updateSubmissionAnswers
 } from "@/app/lib/forms/store";
 import { deleteSubmission } from "@/app/lib/forms/approve";
+import { setNote } from "@/app/lib/forms/notes";
 
 export const runtime = "nodejs";
 
@@ -38,7 +39,28 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const body = (await request.json()) as {
     edits?: Array<{ answerId?: number; value?: string }>;
     hebrew?: { name?: string; city?: string };
+    note?: { key?: string; value?: string };
   };
+
+  // Afkar's own columns. Not an answer she gave, so it never touches the
+  // form — but it sits on her registration, so it is gated the same.
+  if (body.note) {
+    const saved = setNote(id, String(body.note.key ?? ""), String(body.note.value ?? ""));
+    if (!saved.ok) {
+      return NextResponse.json({ error: saved.error }, { status: 400 });
+    }
+    recordAction({
+      userId: auth.user.id,
+      actor: auth.user.name,
+      action: "lead.edit",
+      subjectType: "submission",
+      subjectId: id,
+      subjectLabel: getSubmission(id)?.submission.name || `#${id}`,
+      // The column's name, never what was written in it.
+      detail: `عمود «${body.note.key}»`
+    });
+    return NextResponse.json({ ok: true, note: true });
+  }
 
   // The Hebrew name and town are ours, not hers: they are not an answer
   // she gave, so they are saved on their own and never touch the form.
