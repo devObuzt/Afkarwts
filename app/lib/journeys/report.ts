@@ -214,6 +214,83 @@ export function stepBreakdown(journeyId: number): StepRow[] {
     .sort((a, b) => a.dueAt.localeCompare(b.dueAt));
 }
 
+/**
+ * The women behind one number on the report.
+ *
+ * Every count on that screen is a question — who did not get it, who read
+ * it, who wrote back — and a number nobody can open is a number nobody can
+ * act on. The eight that failed today are eight phone numbers to correct,
+ * and they were only reachable by reading the database by hand.
+ */
+export type WhoRow = { memberId: number; name: string; phone: string; detail: string };
+
+export function whoOnStep(journeyId: number, stepId: number | null, bucket: string): WhoRow[] {
+  const db = getDb();
+  const onStep = stepId === null ? "" : "AND s.step_id = @stepId";
+  const args = { journeyId, stepId, limit: 500 };
+
+  // Each bucket is defined exactly as the count beside it is, so the list
+  // and the number can never disagree.
+  const where: Record<string, string> = {
+    // Meta refused it, or accepted and then rejected it.
+    failed: `(s.state = 'failed' OR m.status = 'failed')`,
+    sent: `s.state = 'sent'`,
+    delivered: `m.status IN ('delivered', 'read')`,
+    read: `m.status = 'read'`,
+    skipped: `s.state = 'skipped'`,
+    stuck: `s.state = 'sent' AND m.status = 'pending'`
+  };
+
+  if (bucket === "replied") {
+    return db
+      .prepare(
+        `SELECT DISTINCT mem.id AS memberId, mem.name, mem.phone,
+                COALESCE((SELECT i.body FROM messages i
+                           WHERE i.member_id = mem.id AND i.direction = 'incoming'
+                           ORDER BY i.id DESC LIMIT 1), '') AS detail
+           FROM journey_sends s
+           JOIN journey_enrollments e ON e.id = s.enrollment_id
+           JOIN members mem ON mem.id = e.member_id
+           JOIN messages i ON i.member_id = e.member_id AND i.direction = 'incoming'
+             AND i.created_at >= s.attempted_at
+             AND julianday(i.created_at) - julianday(s.attempted_at) <= 2
+          WHERE e.journey_id = @journeyId ${onStep} AND s.state = 'sent'
+          ORDER BY mem.name LIMIT @limit`
+      )
+      .all(args) as WhoRow[];
+  }
+
+  if (bucket === "enrolled") {
+    return db
+      .prepare(
+        `SELECT mem.id AS memberId, mem.name, mem.phone, e.state AS detail
+           FROM journey_enrollments e
+           JOIN members mem ON mem.id = e.member_id
+          WHERE e.journey_id = @journeyId
+          ORDER BY mem.name LIMIT @limit`
+      )
+      .all({ journeyId, limit: 500 }) as WhoRow[];
+  }
+
+  const clause = where[bucket];
+  if (!clause) {
+    return [];
+  }
+
+  return db
+    .prepare(
+      `SELECT DISTINCT mem.id AS memberId, mem.name, mem.phone,
+              COALESCE(m.error, m.status, s.state) AS detail
+         FROM journey_sends s
+         JOIN journey_enrollments e ON e.id = s.enrollment_id
+         JOIN members mem ON mem.id = e.member_id
+         LEFT JOIN messages m ON m.id = s.message_id
+        WHERE e.journey_id = @journeyId ${onStep} AND ${clause}
+        ORDER BY mem.name LIMIT @limit`
+    )
+    .all(args) as WhoRow[];
+}
+
 export function journeyLabel(journeyId: number) {
   const journey = getJourney(journeyId);
   if (!journey) {
