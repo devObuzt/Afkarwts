@@ -1257,6 +1257,19 @@ export function updateMemberPhone(memberId: number, phone: string) {
 }
 
 /**
+ * Every table that hangs off a member and is moved on a merge.
+ *
+ * `member_groups`, `journey_enrollments` and `journey_sends` are handled
+ * on their own above: they have rules of their own about what two rows
+ * becoming one means. Everything here is a plain re-pointing.
+ *
+ * A test reads the schema and fails if a table has a member_id and is in
+ * neither list — a table added next year must not be left holding rows
+ * that point at a record which no longer exists.
+ */
+const MEMBER_TABLES = ["messages", "followups", "form_submissions", "person_files", "label_refusals", "payments"];
+
+/**
  * Two records, one woman — joined into one.
  *
  * It happens for a plain reason: she registered with a digit wrong, which
@@ -1313,10 +1326,16 @@ export function mergeMembers(keepId: number, dropId: number) {
       }
     }
 
-    db.prepare("UPDATE messages SET member_id = ? WHERE member_id = ?").run(keepId, dropId);
-    db.prepare("UPDATE followups SET member_id = ? WHERE member_id = ?").run(keepId, dropId);
-    db.prepare("UPDATE form_submissions SET member_id = ? WHERE member_id = ?").run(keepId, dropId);
-    db.prepare("UPDATE person_files SET member_id = ? WHERE member_id = ?").run(keepId, dropId);
+    // Everything else that points at her, by the table's own key. Listed
+    // rather than guessed, and a test walks the schema for any table with
+    // a member_id that is not here — so a table added later cannot be
+    // quietly left behind with rows pointing at a record that is gone.
+    for (const table of MEMBER_TABLES) {
+      db.prepare(`UPDATE OR IGNORE ${table} SET member_id = ? WHERE member_id = ?`).run(keepId, dropId);
+      // Whatever could not move because the kept record already had it —
+      // a refusal of the same label, say — belongs to her either way.
+      db.prepare(`DELETE FROM ${table} WHERE member_id = ?`).run(dropId);
+    }
     // A group both records were in must not become two rows.
     db.prepare("INSERT OR IGNORE INTO member_groups (member_id, group_id) SELECT ?, group_id FROM member_groups WHERE member_id = ?").run(keepId, dropId);
     db.prepare("DELETE FROM member_groups WHERE member_id = ?").run(dropId);

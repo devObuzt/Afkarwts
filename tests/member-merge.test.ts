@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { useTempDataDir } from "./helpers/data-dir.ts";
 
 useTempDataDir();
@@ -102,4 +103,61 @@ test("merging a record into itself is refused", async () => {
   seq += 1;
   const her = createMember({ name: "أ", phone: "+97250555" + seq + "00", notes: "" })!;
   assert.equal(mergeMembers(her.id, her.id).ok, false);
+});
+
+test("every table that points at a member is accounted for by the merge", async () => {
+  const { getDb } = await import("@/app/lib/db");
+  const db = getDb();
+
+  // Walk the real schema rather than a list somebody remembered to update.
+  const tables = (
+    db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'").all() as Array<{
+      name: string;
+    }>
+  ).map((row) => row.name);
+
+  const pointingAtMembers = tables.filter((table) =>
+    (db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>).some(
+      (column) => column.name === "member_id"
+    )
+  );
+
+  // The three with rules of their own, handled explicitly in mergeMembers.
+  const handledSeparately = ["member_groups", "journey_enrollments", "journey_sends"];
+  const source = readFileSync(new URL("../app/lib/db.ts", import.meta.url), "utf8");
+  const listed = (source.match(/const MEMBER_TABLES = \[([^\]]+)\]/)?.[1] ?? "")
+    .split(",")
+    .map((name) => name.trim().replace(/['"]/g, ""))
+    .filter(Boolean);
+
+  for (const table of pointingAtMembers) {
+    assert.ok(
+      listed.includes(table) || handledSeparately.includes(table),
+      `«${table}» has a member_id and the merge would leave its rows pointing at a deleted record`
+    );
+  }
+});
+
+test("a label she refused under the old record is still refused", async () => {
+  const { createGroup, createMember, getDb, mergeMembers } = await import("@/app/lib/db");
+  seq += 1;
+  const keep = createMember({ name: "أ", phone: "+97250666" + seq + "00", notes: "" })!;
+  const drop = createMember({ name: "ب", phone: "+97250777" + seq + "00", notes: "" })!;
+  const label = createGroup(`ملصق ${seq}`);
+
+  getDb()
+    .prepare("INSERT OR IGNORE INTO label_refusals (member_id, group_id) VALUES (?, ?)")
+    .run(drop.id, label.id);
+
+  mergeMembers(keep.id, drop.id);
+
+  const kept = getDb()
+    .prepare("SELECT COUNT(*) AS n FROM label_refusals WHERE member_id = ?")
+    .get(keep.id) as { n: number };
+  assert.equal(kept.n, 1, "a «no» she gave does not disappear because her record was merged");
+
+  const orphan = getDb()
+    .prepare("SELECT COUNT(*) AS n FROM label_refusals WHERE member_id = ?")
+    .get(drop.id) as { n: number };
+  assert.equal(orphan.n, 0);
 });
