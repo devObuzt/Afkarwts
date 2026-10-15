@@ -65,3 +65,18 @@ export function canActOnPerson(user: { id: number; role: string; permissions: st
     | undefined;
   return row?.owner === user.id;
 }
+
+/**
+ * For a route on one person's page: may this user act on her, and what is her app account?
+ * Returns the app member id, or the response to send instead.
+ */
+export async function appMemberFor(
+  user: { id: number; name: string; role: string; permissions: string[] },
+  personId: number
+): Promise<{ ok: true; memberId: string } | { ok: false; status: number; error: string }> {
+  if (!Number.isInteger(personId) || !canActOnPerson(user, personId)) return { ok: false, status: 403, error: "FORBIDDEN" };
+  const view = await appPersonView(user, personId);
+  if (!view.ok) return { ok: false, status: 502, error: view.error };
+  if (!view.data.member) return { ok: false, status: 404, error: "NO_APP_ACCOUNT" };
+  return { ok: true, memberId: view.data.member.id };
+}
