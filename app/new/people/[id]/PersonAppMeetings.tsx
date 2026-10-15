@@ -30,6 +30,8 @@ const tomorrow = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusa
 export function PersonAppMeetings({ memberId, canEdit }: { memberId: number; canEdit: boolean }) {
   const [view, setView] = useState<View>({ state: "loading" });
   const [form, setForm] = useState({ date: tomorrow(), time: "18:00", duration: "30", kind: "video", link: "", place: "", title: "متابعة", note: "" });
+  // One key per filled form: a click after a timeout is the same meeting, not a second one.
+  const [clientKey, setClientKey] = useState(() => crypto.randomUUID());
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
 
@@ -44,17 +46,21 @@ export function PersonAppMeetings({ memberId, canEdit }: { memberId: number; can
   useEffect(() => { void load(); }, [load]);
   if (view.state === "off") return null;
 
-  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setForm({ ...form, [k]: e.target.value });
+  // An edited form is a different meeting: new key. An unchanged one clicked again after a timeout keeps it.
+  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    setForm({ ...form, [k]: e.target.value });
+    setClientKey(crypto.randomUUID());
+  };
 
   async function create() {
     setBusy(true);
     setMessage(null);
     const response = await fetch(`/api/people/${memberId}/app/meetings`, {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form)
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, client_key: clientKey })
     }).catch(() => null);
     const body = response ? await response.json().catch(() => ({})) : {};
     setBusy(false);
-    if (response?.ok) { setMessage({ ok: true, text: "حُدّد — وصلها إشعار وسيذكّرها التطبيق قبل ساعة." }); await load(); }
+    if (response?.ok) { setMessage({ ok: true, text: "حُدّد — وصلها إشعار وسيذكّرها التطبيق قبل ساعة." }); setClientKey(crypto.randomUUID()); await load(); }
     else setMessage({ ok: false, text: ERROR_TEXT[body.error] ?? "لم يُحدّد — حاولي مرة أخرى." });
   }
 
