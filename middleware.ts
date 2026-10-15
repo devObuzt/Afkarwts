@@ -12,6 +12,12 @@ const publicPrefixes = [
   "/api/f",
   // The town list the public form's picker reads.
   "/api/locations",
+  // A template's header image. Meta fetches this itself when the message
+  // goes out and arrives with no cookie of ours — and what it serves is
+  // already printed on every copy of that template. The POST on the same
+  // path does its own permission check, so letting the prefix through
+  // opens the picture, not the upload.
+  "/api/t",
   "/api/campaigns/tick",
   "/api/dev/simulate",
   "/api/journeys/tick",
