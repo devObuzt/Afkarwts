@@ -2,6 +2,38 @@ import { NextResponse } from "next/server";
 import { getFormByToken } from "@/app/lib/forms/store";
 import { checkCode, startVerification, type Channel } from "@/app/lib/forms/verify";
 
+/**
+ * A ceiling per source, in front of the shared one.
+ *
+ * The budget for everyone together stops a runaway, but on its own it
+ * hands any single script the power to spend it and lock every real woman
+ * out with «الخدمة مشغولة». This makes that cost the script its own quota
+ * first. Kept in memory on purpose: it is a speed bump, it resets when the
+ * service restarts, and it must never be a reason a registration fails.
+ */
+const perSource = new Map<string, number[]>();
+const SOURCE_PER_HOUR = 12;
+
+function sourceIsOverLimit(request: Request, now: number) {
+  const forwarded = request.headers.get("x-forwarded-for") ?? "";
+  const source = forwarded.split(",")[0].trim() || "unknown";
+  const hourAgo = now - 60 * 60 * 1000;
+  const seen = (perSource.get(source) ?? []).filter((at) => at > hourAgo);
+  if (seen.length >= SOURCE_PER_HOUR) {
+    perSource.set(source, seen);
+    return true;
+  }
+  seen.push(now);
+  perSource.set(source, seen);
+  // Nothing sweeps this map, so it is swept here.
+  if (perSource.size > 5000) {
+    for (const [key, times] of perSource) {
+      if (!times.some((at) => at > hourAgo)) perSource.delete(key);
+    }
+  }
+  return false;
+}
+
 export const runtime = "nodejs";
 
 /**
@@ -24,6 +56,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
   const phone = String(body.phone ?? "");
 
   if (body.action === "send") {
+    if (sourceIsOverLimit(request, Date.now())) {
+      return NextResponse.json({ error: "طلبات كثيرة من هذا الجهاز. حاولي بعد قليل." }, { status: 429 });
+    }
     const channel: Channel = body.channel === "sms" ? "sms" : "whatsapp";
     const result = await startVerification(form.id, phone, channel);
     if (!result.ok) {
