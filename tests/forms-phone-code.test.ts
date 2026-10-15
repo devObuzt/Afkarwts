@@ -172,3 +172,44 @@ test("a confirmed number lets the registration through", async () => {
   }
   assert.equal(submitForm(made.token, answers).ok, true);
 });
+
+test("a fresh code is not already expired", async () => {
+  const { startVerification, CODE_TTL_MS } = await import("@/app/lib/forms/verify");
+  const { getDb } = await import("@/app/lib/db");
+  const made = await form();
+
+  // A stray «expire the old ones» statement once ran *after* the insert
+  // and burned the new row on its way out: every code was born dead, and
+  // the only symptom was «انتهت صلاحية الكود» on the first try.
+  const now = new Date("2026-10-15T10:00:00.000Z");
+  await startVerification(made.id, "0545227698", "sms", now);
+
+  const row = getDb()
+    .prepare("SELECT sent_at, expires_at FROM form_phone_codes WHERE form_id = ? ORDER BY id DESC LIMIT 1")
+    .get(made.id) as { sent_at: string; expires_at: string };
+  const life = new Date(`${row.expires_at}Z`).getTime() - new Date(`${row.sent_at}Z`).getTime();
+  assert.equal(life, CODE_TTL_MS, "it lives exactly its ten minutes");
+});
+
+test("the whole service has a ceiling, not only each number", async () => {
+  const { startVerification } = await import("@/app/lib/forms/verify");
+  const { getDb } = await import("@/app/lib/db");
+  const made = await form();
+  const now = new Date("2026-11-01T10:00:00.000Z");
+
+  // The endpoint is public because the form is, and every code costs
+  // money. A script walking a list of numbers never trips the per-phone
+  // limit once, so there is a budget for everyone together.
+  const stamp = (at: Date) => at.toISOString().slice(0, 19).replace("T", " ");
+  const insert = getDb().prepare(
+    `INSERT INTO form_phone_codes (form_id, phone, code_hash, channel, sent_at, expires_at)
+     VALUES (?, ?, 'x', 'sms', ?, ?)`
+  );
+  for (let at = 0; at < 120; at++) {
+    insert.run(made.id, `+97253${String(1000000 + at)}`, stamp(now), stamp(new Date(now.getTime() + 60000)));
+  }
+
+  const blocked = await startVerification(made.id, "0545227699", "sms", new Date(now.getTime() + 1000));
+  assert.equal(blocked.ok, false, "a fresh number is refused once the hour's budget is gone");
+  assert.match((blocked as { error: string }).error, /مشغولة/);
+});
