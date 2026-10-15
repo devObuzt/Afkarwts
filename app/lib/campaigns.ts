@@ -4,7 +4,8 @@ import {
   getCampaign,
   getGroup,
   listGroupMembers,
-  listCampaignRuns,
+  failedAttempts,
+  initiatedToday,
   listMemberIdsWithOutgoingBody,
   listRunnableCampaigns,
   markCampaignRun,
@@ -42,14 +43,8 @@ export function campaignProgress(campaign: Campaign) {
   return { total: members.length, delivered, remaining, daysLeft };
 }
 
-/** How many this campaign has already sent today, across its runs. */
-function sentToday(campaignId: number) {
-  const since = new Date();
-  since.setHours(0, 0, 0, 0);
-  return listCampaignRuns(campaignId)
-    .filter((run) => new Date(run.ranAt).getTime() >= since.getTime())
-    .reduce((total, run) => total + run.sent, 0);
-}
+/** A send refused this many times for one member is not tried again. */
+const MAX_ATTEMPTS = 3;
 
 export async function runCampaignBatch(campaignId: number) {
   const campaign = getCampaign(campaignId);
@@ -63,7 +58,14 @@ export async function runCampaignBatch(campaignId: number) {
 
   const members = listGroupMembers(campaign.groupId);
   const already = listMemberIdsWithOutgoingBody(storedBody);
-  const targets = members.filter((member) => !already.has(member.id));
+  // A refused send is retried — that is the point of not counting it as
+  // delivered — but not for ever: a number that can never receive this
+  // would otherwise come back every minute and keep the send alive with
+  // nothing left to do.
+  const reachable = members.filter(
+    (member) => !already.has(member.id) && failedAttempts(storedBody, member.id) < MAX_ATTEMPTS
+  );
+  const targets = reachable;
   // Never exceed the current Meta allowance, even if the campaign was created
   // when the tier was higher.
   const limit = await getMessagingLimit();
@@ -74,7 +76,7 @@ export async function runCampaignBatch(campaignId: number) {
   // thousands cannot walk past Meta's allowance one minute at a time.
   const perRun =
     campaign.repeatMode === "now"
-      ? Math.max(0, Math.min(120, limit.dailyLimit - sentToday(campaign.id)))
+      ? Math.max(0, Math.min(120, campaign.dailyLimit, limit.dailyLimit - initiatedToday()))
       : Math.min(campaign.dailyLimit, limit.dailyLimit);
   const batch = targets.slice(0, perRun);
 
@@ -124,6 +126,9 @@ export async function runCampaignBatch(campaignId: number) {
   // A «now» send that could not take anybody this run has hit the day's
   // allowance; it stays active and carries on tomorrow rather than being
   // written off as finished.
+  // «Nothing went out» means the day is spent, not that the send is over.
+  // But if nobody is left who could still be reached, it *is* over — the
+  // ones remaining have been refused their three times.
   const outOfAllowance = campaign.repeatMode === "now" && batch.length === 0 && targets.length > 0;
   if (!outOfAllowance && (remaining === 0 || campaign.repeatMode === "once")) {
     updateCampaignStatus(campaign.id, "done");

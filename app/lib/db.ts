@@ -730,6 +730,46 @@ export function recordCampaignRun(input: { campaignId: number; sent: number; fai
     .run(input.campaignId, input.sent, input.failed, input.remaining);
 }
 
+/**
+ * Everything this number has initiated today, against Meta's daily
+ * allowance — which is an allowance for the number, not for one campaign.
+ *
+ * Counted from the messages themselves and not from campaign runs: runs
+ * are read back with a LIMIT, and a send that drains every minute passes
+ * that limit within the hour — after which the day's total silently falls
+ * and the ceiling stops being a ceiling. Manual sends and journey steps
+ * come out of the same allowance too, and they leave no campaign run at
+ * all.
+ *
+ * A refused message never reached anybody, so it does not count.
+ */
+export function initiatedToday() {
+  const row = getDb()
+    .prepare(
+      `SELECT COUNT(*) AS n FROM messages
+        WHERE direction = 'outgoing'
+          AND status <> 'failed'
+          AND created_at >= date('now')`
+    )
+    .get() as { n: number };
+  return Number(row?.n ?? 0);
+}
+
+/**
+ * How many times this send has already been refused for one member, so a
+ * number that can never receive it is not retried every minute for ever.
+ */
+export function failedAttempts(sendKey: string, memberId: number) {
+  const row = getDb()
+    .prepare(
+      `SELECT COUNT(*) AS n FROM messages
+        WHERE member_id = ? AND direction = 'outgoing'
+          AND COALESCE(send_key, body) = ? AND status = 'failed'`
+    )
+    .get(memberId, sendKey) as { n: number };
+  return Number(row?.n ?? 0);
+}
+
 export function listCampaignRuns(campaignId: number): CampaignRun[] {
   const rows = getDb()
     .prepare("SELECT * FROM campaign_runs WHERE campaign_id = ? ORDER BY id DESC LIMIT 30")

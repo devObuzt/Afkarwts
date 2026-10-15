@@ -104,6 +104,10 @@ export async function POST(request: Request) {
     // makes no difference to it. Wisam asked exactly this: «ليش لازم تضل
     // الشاشة مفتوحة واذا قطع النت».
     if (body.background && group) {
+      // Clamped here too: what the screen asks for is a wish, and the
+      // day's allowance is not.
+      const allowance = await getMessagingLimit();
+      const asked = Math.max(1, Number(body.maxRecipients) || members.length);
       const job = createCampaign({
         groupId: group.id,
         label: `${mode === "template" ? body.templateName || "template" : "free text"} → ${group.name}`,
@@ -113,7 +117,7 @@ export async function POST(request: Request) {
         templateLanguage: body.templateLanguage ?? null,
         bodyParams,
         bodyPreview: body.bodyPreview ?? "",
-        dailyLimit: Math.max(1, Number(body.maxRecipients) || members.length),
+        dailyLimit: Math.min(asked, allowance.dailyLimit),
         repeatMode: "now"
       });
       return NextResponse.json({

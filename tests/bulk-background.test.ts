@@ -58,3 +58,40 @@ test("a draining send is still counted against the day's allowance", async () =>
   const today = listCampaignRuns(job.id).reduce((total, run) => total + run.sent, 0);
   assert.equal(today, 40, "the runs are summed, so a minute-by-minute drain cannot walk past the allowance");
 });
+
+test("the day's allowance is counted across everything, not one campaign's runs", async () => {
+  const { createMember, createMessage, initiatedToday } = await import("@/app/lib/db");
+
+  // campaign_runs is read back with a LIMIT, and a send draining every
+  // minute passes it within the hour — after which the day's total falls
+  // and the ceiling stops being one. And a manual send or a journey step
+  // comes out of the same allowance while leaving no run at all.
+  const her = createMember({ name: "سارة", phone: "+972521234999", notes: "" })!;
+  const before = initiatedToday();
+  createMessage({ memberId: her.id, direction: "outgoing", body: "واحدة", status: "accepted" });
+  createMessage({ memberId: her.id, direction: "outgoing", body: "تنتين", status: "delivered" });
+  createMessage({ memberId: her.id, direction: "outgoing", body: "رُفضت", status: "failed" });
+
+  // The refused one reached nobody, so it is not one of today's.
+  assert.equal(initiatedToday(), before + 2);
+});
+
+test("a number that keeps refusing is not retried for ever", async () => {
+  const { createMember, createMessage, failedAttempts } = await import("@/app/lib/db");
+  const her = createMember({ name: "ليلى", phone: "+972521234998", notes: "" })!;
+
+  assert.equal(failedAttempts("نص الدفعة", her.id), 0);
+  for (let attempt = 0; attempt < 3; attempt++) {
+    createMessage({
+      memberId: her.id,
+      direction: "outgoing",
+      body: "نص الدفعة",
+      status: "failed",
+      sendKey: "نص الدفعة"
+    });
+  }
+  assert.equal(failedAttempts("نص الدفعة", her.id), 3, "after three the drain lets her go");
+
+  // And another send to the same woman is counted on its own.
+  assert.equal(failedAttempts("نص تاني", her.id), 0);
+});
