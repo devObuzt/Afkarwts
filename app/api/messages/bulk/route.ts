@@ -101,8 +101,18 @@ export async function POST(request: Request) {
       Math.max(1, Number(body.maxRecipients) || limit.suggested),
       limit.dailyLimit
     );
-    const remainingAfterBatch = Math.max(0, members.length - maxRecipients);
-    members = members.slice(0, maxRecipients);
+    // One request cannot carry a whole group. Each message is its own
+    // round trip to Meta — about a second — so 3,746 of them is twenty
+    // minutes against a five-minute ceiling, and the send died with
+    // «Bulk send failed» after working for five of those minutes.
+    //
+    // So a request takes a slice it can finish, says how many are left,
+    // and the screen comes straight back for the next one. The daily
+    // limit still governs the whole send; this only governs one trip.
+    const PER_REQUEST = 250;
+    const thisBatch = Math.min(maxRecipients, PER_REQUEST);
+    const remainingAfterBatch = Math.max(0, members.length - thisBatch);
+    members = members.slice(0, thisBatch);
 
     if (!members.length) {
       return NextResponse.json(

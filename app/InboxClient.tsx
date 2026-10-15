@@ -1959,6 +1959,9 @@ function BulkModal({ groups, onClose, onDone }: { groups: Group[]; onClose: () =
     failed: number;
     skipped?: number;
     remaining?: number;
+    /** True while more trips are still going out, so the screen says so. */
+    inFlight?: boolean;
+    error?: string;
     results: BulkResult[];
   } | null>(null);
   const [templateSelection, setTemplateSelection] = useState<TemplateSelection | null>(null);
@@ -2071,27 +2074,54 @@ function BulkModal({ groups, onClose, onDone }: { groups: Group[]; onClose: () =
     }
     setBusy(true);
     setError("");
+    // The server takes a slice it can finish inside one request, so a
+    // group of thousands is several trips. The screen makes them — and
+    // keeps a running total, because «sent 250» over a group of 3,746
+    // would read like a failure.
+    const running = { sent: 0, failed: 0, skipped: 0, remaining: 0, results: [] as BulkResult[] };
     try {
-      const response = await fetch("/api/messages/bulk", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          groupId,
-          mode,
-          text,
-          templateName: templateSelection?.name,
-          templateLanguage: templateSelection?.language,
-          bodyParams: templateSelection?.bodyParams ?? [],
-          bodyPreview: templateSelection?.preview,
-          skipAlreadySent,
-          maxRecipients
-        })
-      });
-      const payload = await response.json();
-      if (!response.ok) {
-        throw new Error(payload.error ?? "Bulk send failed.");
+      for (let trip = 0; trip < 60; trip++) {
+        const response = await fetch("/api/messages/bulk", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            groupId,
+            mode,
+            text,
+            templateName: templateSelection?.name,
+            templateLanguage: templateSelection?.language,
+            bodyParams: templateSelection?.bodyParams ?? [],
+            bodyPreview: templateSelection?.preview,
+            skipAlreadySent,
+            maxRecipients: Math.max(1, maxRecipients - running.sent - running.failed)
+          })
+        });
+        const payload = await response.json();
+        if (!response.ok) {
+          // Whatever already went out stays reported: a trip that fails
+          // half way through does not unsend the ones before it.
+          if (running.sent || running.failed) {
+            setResults({ ...running, error: payload.error ?? "Bulk send failed." });
+            await onDone();
+            setBusy(false);
+            return;
+          }
+          throw new Error(payload.error ?? "Bulk send failed.");
+        }
+
+        running.sent += payload.sent ?? 0;
+        running.failed += payload.failed ?? 0;
+        running.skipped += payload.skipped ?? 0;
+        running.remaining = payload.remaining ?? 0;
+        running.results = [...running.results, ...(payload.results ?? [])];
+        setResults({ ...running, inFlight: running.remaining > 0 });
+
+        const budgetLeft = maxRecipients - running.sent - running.failed;
+        if (!running.remaining || budgetLeft <= 0 || (!payload.sent && !payload.failed)) {
+          break;
+        }
       }
-      setResults(payload);
+      setResults({ ...running, inFlight: false });
       await onDone();
     } catch (bulkError) {
       setError(bulkError instanceof Error ? bulkError.message : "Bulk send failed.");
@@ -2137,12 +2167,35 @@ function BulkModal({ groups, onClose, onDone }: { groups: Group[]; onClose: () =
         {results ? (
           <>
             <div className="importSummary">
-              <div><strong>{results.sent}</strong><span>sent</span></div>
-              <div className={results.failed ? "bad" : ""}><strong>{results.failed}</strong><span>failed</span></div>
+              <div><strong>{results.sent}</strong><span>accepted by WhatsApp</span></div>
+              <div className={results.failed ? "bad" : ""}><strong>{results.failed}</strong><span>refused</span></div>
               <div><strong>{results.skipped ?? 0}</strong><span>already got it</span></div>
-              <div><strong>{results.remaining ?? 0}</strong><span>left for next batch</span></div>
+              <div><strong>{results.remaining ?? 0}</strong><span>left to go</span></div>
             </div>
-            {(results.remaining ?? 0) > 0 ? (
+
+            {results.inFlight ? (
+              <p className="hint">
+                Still sending — {results.remaining} to go. Leave this open until it finishes.
+              </p>
+            ) : null}
+
+            {results.error ? <p className="hint warning">{results.error}</p> : null}
+
+            {/* «Accepted» is not «delivered». WhatsApp takes the message and
+                can still drop it afterwards — a number with no WhatsApp on
+                it is accepted and then quietly discarded — and that
+                rejection arrives minutes later, over the webhook, long
+                after this screen is closed. Saying «sent» here was the
+                difference between «we sent 226» and «226 people read it». */}
+            {results.sent > 0 && !results.inFlight ? (
+              <p className="hint">
+                Accepted is not delivered: WhatsApp can still refuse a message after taking it. The real
+                outcome lands on each person&apos;s file, and on the journey report where the counts open
+                into names.
+              </p>
+            ) : null}
+
+            {(results.remaining ?? 0) > 0 && !results.inFlight ? (
               <p className="hint warning">
                 {results.remaining} members still have not received this message — run Bulk send again
                 (tomorrow if you hit the daily limit) with the same template and they will be picked up automatically.
@@ -2153,7 +2206,7 @@ function BulkModal({ groups, onClose, onDone }: { groups: Group[]; onClose: () =
                 <div className={result.ok ? "bulkRow" : "bulkRow bad"} key={result.memberId}>
                   <span dir="auto">{result.name}</span>
                   <span className="bulkPhone">{result.phone}</span>
-                  <span className="bulkStatus">{result.ok ? "✓ sent" : result.error}</span>
+                  <span className="bulkStatus">{result.ok ? "✓ accepted" : result.error}</span>
                 </div>
               ))}
             </div>
