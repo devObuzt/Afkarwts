@@ -134,3 +134,28 @@ test("a send Meta refused does not count as «already got it»", async () => {
     "and the one Meta refused is not — or the message could never be sent to her again"
   );
 });
+
+test("pressing a template's button lands in the inbox like any reply", async () => {
+  const { createMember, listMessages } = await import("@/app/lib/db");
+  const { buildButtonPayload, handleWebhookPayload } = await import("@/app/lib/whatsapp-webhook");
+
+  // She pressed «معني». WhatsApp sends that as its own message type, not
+  // as text — and reading only `text` dropped it: the inbox showed
+  // nothing while the press had already opened the 24-hour window.
+  const her = createMember({ name: "ليلى", phone: "+972522577570", notes: "" })!;
+  await handleWebhookPayload(buildButtonPayload({ phone: "+972522577570", text: "معني" }));
+
+  const incoming = listMessages(her.id).filter((message) => message.direction === "incoming");
+  assert.equal(incoming.length, 1, "the press is a message");
+  assert.equal(incoming[0].body, "معني", "and it says what she pressed");
+});
+
+test("a button press from an unknown number creates her, like any first message", async () => {
+  const { findMemberByPhone, listMessages } = await import("@/app/lib/db");
+  const { buildButtonPayload, handleWebhookPayload } = await import("@/app/lib/whatsapp-webhook");
+
+  await handleWebhookPayload(buildButtonPayload({ phone: "+972522577571", text: "معني" }));
+  const made = findMemberByPhone("+972522577571");
+  assert.ok(made, "a woman who only ever pressed a button is still a woman who wrote in");
+  assert.equal(listMessages(made!.id).filter((m) => m.direction === "incoming")[0].body, "معني");
+});

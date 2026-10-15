@@ -30,6 +30,14 @@ export type WhatsAppWebhookPayload = {
           video?: { id?: string; mime_type?: string; caption?: string; sha256?: string };
           document?: { id?: string; mime_type?: string; caption?: string; filename?: string; sha256?: string };
           audio?: { id?: string; mime_type?: string; sha256?: string; voice?: boolean };
+          /** A quick-reply button on a template: she pressed «معني». */
+          button?: { payload?: string; text?: string };
+          /** The buttons and lists we send ourselves, outside a template. */
+          interactive?: {
+            type?: string;
+            button_reply?: { id?: string; title?: string };
+            list_reply?: { id?: string; title?: string };
+          };
         }>;
         statuses?: Array<{
           id?: string;
@@ -85,6 +93,29 @@ export async function handleWebhookPayload(payload: WhatsAppWebhookPayload) {
             status: "received"
           });
           notifyDevices(member.name, "text", incoming.text.body, member.id);
+          continue;
+        }
+
+        // A pressed button is a reply. It arrives as its own type and not
+        // as text, so reading only `text` dropped it on the floor: the
+        // woman pressed «معني», WhatsApp delivered it, and the inbox
+        // showed nothing — while the press had already opened the
+        // 24-hour window nobody knew was open.
+        const pressed =
+          (incoming.type === "button" && (incoming.button?.text || incoming.button?.payload)) ||
+          (incoming.type === "interactive" &&
+            (incoming.interactive?.button_reply?.title || incoming.interactive?.list_reply?.title));
+
+        if (pressed) {
+          createMessage({
+            memberId: member.id,
+            direction: "incoming",
+            messageType: "text",
+            body: pressed,
+            whatsappMessageId: incoming.id ?? null,
+            status: "received"
+          });
+          notifyDevices(member.name, "text", pressed, member.id);
           continue;
         }
 
@@ -171,6 +202,22 @@ export async function handleWebhookPayload(payload: WhatsAppWebhookPayload) {
 
 function wrap(value: Record<string, unknown>) {
   return { entry: [{ changes: [{ value }] }] } as WhatsAppWebhookPayload;
+}
+
+/** The shape WhatsApp sends when a template's quick-reply button is pressed. */
+export function buildButtonPayload(input: { phone: string; text: string; messageId?: string }) {
+  const from = input.phone.replace(/[^\d]/g, "");
+  return wrap({
+    contacts: [],
+    messages: [
+      {
+        from,
+        id: input.messageId ?? `sim.${Date.now()}.${Math.random().toString(36).slice(2, 8)}`,
+        type: "button",
+        button: { payload: input.text, text: input.text }
+      }
+    ]
+  });
 }
 
 export function buildIncomingPayload(input: {
