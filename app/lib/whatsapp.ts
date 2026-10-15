@@ -251,6 +251,7 @@ const TIER_LIMITS: Record<string, number> = {
   TIER_50: 50,
   TIER_250: 250,
   TIER_1K: 1000,
+  TIER_2K: 2000,
   TIER_10K: 10000,
   TIER_100K: 100000,
   TIER_UNLIMITED: 1000000
@@ -300,15 +301,21 @@ export async function getMessagingLimit(): Promise<MessagingLimit> {
     }
   }
 
-  const envLimit = Number(process.env.WHATSAPP_DAILY_LIMIT) || 1000;
-  const dailyLimit = tier && TIER_LIMITS[tier] ? TIER_LIMITS[tier] : envLimit;
+  // An explicit WHATSAPP_DAILY_LIMIT is what the account actually has, and
+  // it wins over the tier Meta reports. The tier field goes stale: it kept
+  // reading the old number long after the account was raised, and the
+  // screen then capped a 4,000-person send at the stale figure. Meta's
+  // number is still used when nobody has stated one.
+  const stated = Number(process.env.WHATSAPP_DAILY_LIMIT);
+  const fromMeta = tier && TIER_LIMITS[tier] ? TIER_LIMITS[tier] : null;
+  const dailyLimit = Number.isFinite(stated) && stated > 0 ? stated : (fromMeta ?? 1000);
 
   const value: MessagingLimit = {
     dailyLimit,
     suggested: Math.max(1, Math.floor(dailyLimit * 0.7)),
     tier,
     quality,
-    source: tier && TIER_LIMITS[tier] ? "meta" : "env"
+    source: Number.isFinite(stated) && stated > 0 ? "env" : fromMeta ? "meta" : "env"
   };
 
   limitCache = { value, at: Date.now() };
