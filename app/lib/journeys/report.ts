@@ -224,10 +224,18 @@ export function stepBreakdown(journeyId: number): StepRow[] {
  */
 export type WhoRow = { memberId: number; name: string; phone: string; detail: string };
 
-export function whoOnStep(journeyId: number, stepId: number | null, bucket: string): WhoRow[] {
+export function whoOnStep(
+  journeyId: number,
+  stepId: number | null,
+  bucket: string,
+  view: { onlyAssignedTo?: number | null; withReplyText?: boolean } = {}
+): WhoRow[] {
   const db = getDb();
   const onStep = stepId === null ? "" : "AND s.step_id = @stepId";
-  const args = { journeyId, stepId, limit: 500 };
+  // The same rule the people list follows: without «people.all» a coach
+  // sees the women assigned to her and nobody else.
+  const mine = view.onlyAssignedTo ? "AND mem.assigned_user_id = @assigned" : "";
+  const args = { journeyId, stepId, limit: 500, assigned: view.onlyAssignedTo ?? 0 };
 
   // Each bucket is defined exactly as the count beside it is, so the list
   // and the number can never disagree.
@@ -245,16 +253,22 @@ export function whoOnStep(journeyId: number, stepId: number | null, bucket: stri
     return db
       .prepare(
         `SELECT DISTINCT mem.id AS memberId, mem.name, mem.phone,
-                COALESCE((SELECT i.body FROM messages i
-                           WHERE i.member_id = mem.id AND i.direction = 'incoming'
-                           ORDER BY i.id DESC LIMIT 1), '') AS detail
+                ${
+                  // Her words only for somebody who may read the inbox.
+                  view.withReplyText
+                    ? `COALESCE((SELECT i2.body FROM messages i2
+                                  WHERE i2.member_id = mem.id AND i2.direction = 'incoming'
+                                    AND i2.created_at >= s.attempted_at
+                                  ORDER BY i2.id DESC LIMIT 1), '')`
+                    : `'ردّت'`
+                } AS detail
            FROM journey_sends s
            JOIN journey_enrollments e ON e.id = s.enrollment_id
            JOIN members mem ON mem.id = e.member_id
            JOIN messages i ON i.member_id = e.member_id AND i.direction = 'incoming'
              AND i.created_at >= s.attempted_at
              AND julianday(i.created_at) - julianday(s.attempted_at) <= 2
-          WHERE e.journey_id = @journeyId ${onStep} AND s.state = 'sent'
+          WHERE e.journey_id = @journeyId ${onStep} ${mine} AND s.state = 'sent'
           ORDER BY mem.name LIMIT @limit`
       )
       .all(args) as WhoRow[];
@@ -266,10 +280,10 @@ export function whoOnStep(journeyId: number, stepId: number | null, bucket: stri
         `SELECT mem.id AS memberId, mem.name, mem.phone, e.state AS detail
            FROM journey_enrollments e
            JOIN members mem ON mem.id = e.member_id
-          WHERE e.journey_id = @journeyId
+          WHERE e.journey_id = @journeyId ${mine}
           ORDER BY mem.name LIMIT @limit`
       )
-      .all({ journeyId, limit: 500 }) as WhoRow[];
+      .all(args) as WhoRow[];
   }
 
   const clause = where[bucket];
@@ -285,7 +299,7 @@ export function whoOnStep(journeyId: number, stepId: number | null, bucket: stri
          JOIN journey_enrollments e ON e.id = s.enrollment_id
          JOIN members mem ON mem.id = e.member_id
          LEFT JOIN messages m ON m.id = s.message_id
-        WHERE e.journey_id = @journeyId ${onStep} AND ${clause}
+        WHERE e.journey_id = @journeyId ${onStep} ${mine} AND ${clause}
         ORDER BY mem.name LIMIT @limit`
     )
     .all(args) as WhoRow[];
