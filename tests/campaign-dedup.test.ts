@@ -159,3 +159,52 @@ test("a button press from an unknown number creates her, like any first message"
   assert.ok(made, "a woman who only ever pressed a button is still a woman who wrote in");
   assert.equal(listMessages(made!.id).filter((m) => m.direction === "incoming")[0].body, "معني");
 });
+
+test("correcting a phone carries it onto her registration too", async () => {
+  const { createGroup, createMember, getMember, updateMemberPhone } = await import("@/app/lib/db");
+  const { carryPhoneToSubmissions, createForm, listFields, submitForm, getSubmission } = await import(
+    "@/app/lib/forms/store"
+  );
+  const { approveSubmission } = await import("@/app/lib/forms/approve");
+
+  const group = createGroup("كلين رقم");
+  const form = createForm({ name: "كلين رقم", groupId: group.id, fromTemplate: true });
+  const answers: Record<string, string> = {};
+  for (const field of listFields(form.id)) {
+    answers[String(field.id)] =
+      field.mapsTo === "name"
+        ? "سوار"
+        : field.mapsTo === "phone"
+          ? "0208254566"
+          : field.mapsTo === "city"
+            ? "شعب"
+            : field.kind === "date"
+              ? "2026-10-02"
+              : field.options.length
+                ? field.options[0]
+                : "نعم";
+  }
+  const submitted = submitForm(form.token, answers, { requirePhoneCode: false }) as { ok: true; id: number };
+  approveSubmission(submitted.id);
+
+  const before = getSubmission(submitted.id)!.submission;
+  const member = getMember(before.memberId!)!;
+  const moved = updateMemberPhone(member.id, "0508254566") as { ok: true; phone: string };
+  carryPhoneToSubmissions(member.id, member.phone, moved.phone);
+
+  assert.equal(getMember(member.id)!.phone, "+972508254566", "her record carries the correction");
+  assert.equal(
+    getSubmission(submitted.id)!.submission.phone,
+    "+972508254566",
+    "and so does the registration, or the table keeps showing the broken one"
+  );
+});
+
+test("a phone already on somebody else is refused, not silently moved", async () => {
+  const { createMember, updateMemberPhone } = await import("@/app/lib/db");
+  const hers = createMember({ name: "أ", phone: "+972521111222", notes: "" })!;
+  const his = createMember({ name: "ب", phone: "+972521111333", notes: "" })!;
+  const clash = updateMemberPhone(his.id, "+972521111222");
+  assert.equal(clash.ok, false, "two women cannot share one WhatsApp number");
+  assert.ok(hers.id > 0);
+});

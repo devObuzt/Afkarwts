@@ -7,6 +7,7 @@ import { ago, clock, day, hueOf, initials } from "../../format";
 import { listLabels } from "@/app/lib/labels/store";
 import { listUsers } from "@/app/lib/users/store";
 import { PersonFiles } from "./PersonFiles";
+import { PersonIdentity } from "./PersonIdentity";
 import { PersonLabels } from "./PersonLabels";
 import { PersonNotes } from "./PersonNotes";
 import { PersonReply } from "./PersonReply";
@@ -63,6 +64,12 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
             {record.coach ? `المرافِقة: ${record.coach.name}` : "بلا مرافِقة"}
           </div>
         </div>
+        <PersonIdentity
+          canEdit={can(user, "people.edit")}
+          memberId={member.id}
+          name={member.name}
+          phone={member.phone}
+        />
         <a
           className="crmBtn"
           href={`https://wa.me/${member.phone.replace(/\D/g, "")}`}

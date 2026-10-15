@@ -1178,8 +1178,15 @@ export function updateMemberProfile(
   return getMember(memberId);
 }
 
+/**
+ * Correcting the number on a record.
+ *
+ * Takes it the way a person writes it — «050-825-4566» — not only the
+ * international form: this is the hand-typed path, and refusing a local
+ * number here means the correction cannot be made at all.
+ */
 export function updateMemberPhone(memberId: number, phone: string) {
-  const normalized = normalizePhone(phone);
+  const normalized = normalizeImportPhone(phone);
   const existing = getDb().prepare("SELECT id FROM members WHERE phone = ? AND id <> ?").get(normalized, memberId) as
     | { id: number }
     | undefined;

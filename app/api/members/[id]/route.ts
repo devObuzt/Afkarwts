@@ -1,7 +1,8 @@
 import { recordAction } from "@/app/lib/users/audit";
 import { requireApi } from "@/app/lib/users/current";
 import { NextResponse } from "next/server";
-import { deleteMember, getMember, updateMemberProfile } from "@/app/lib/db";
+import { deleteMember, getMember, updateMemberPhone, updateMemberProfile } from "@/app/lib/db";
+import { carryPhoneToSubmissions } from "@/app/lib/forms/store";
 
 export const runtime = "nodejs";
 
@@ -32,7 +33,41 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     city?: string;
     notes?: string;
     service?: string;
+    phone?: string;
   };
+
+  // The phone is her identity on WhatsApp, not just a field: the journey,
+  // the group and every message hang off this record, so correcting it
+  // here corrects it everywhere they look. The one place that keeps its
+  // own copy is her registration, and that is corrected with it — Wisam
+  // asked for one number, not a number per screen.
+  if (typeof body.phone === "string" && body.phone.trim()) {
+    const before = getMember(id);
+    let moved;
+    try {
+      moved = updateMemberPhone(id, body.phone);
+    } catch (error) {
+      return NextResponse.json(
+        { error: "رقم غير صالح. اكتبيه هكذا: 05X-XXX-XXXX" },
+        { status: 400 }
+      );
+    }
+    if (!moved.ok) {
+      return NextResponse.json({ error: "هذا الرقم مستعمل لمنتسبة أخرى." }, { status: 409 });
+    }
+    if (before) {
+      carryPhoneToSubmissions(id, before.phone, moved.phone);
+    }
+    recordAction({
+      userId: auth.user.id,
+      actor: auth.user.name,
+      action: "member.update",
+      subjectType: "member",
+      subjectId: id,
+      subjectLabel: before?.name ?? String(id),
+      detail: `الهاتف ${before?.phone ?? "—"} ← ${moved.phone}`
+    });
+  }
 
   const member = updateMemberProfile(id, body);
 

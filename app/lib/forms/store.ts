@@ -683,6 +683,25 @@ function isShown(field: Field, answers: Record<string, string>) {
   return given === field.showWhenValue || given.split("، ").includes(field.showWhenValue);
 }
 
+/**
+ * Carry a corrected phone onto her registrations.
+ *
+ * A registration keeps its own copy of the phone, taken from what she
+ * typed. When the number is corrected on her record, the copy has to move
+ * with it or the report table keeps showing the broken one — which is how
+ * «siwar belal» stayed at 020… on screen after the member was fixed.
+ *
+ * Matched by member id, and by the old number for the registrations that
+ * were never approved into a member.
+ */
+export function carryPhoneToSubmissions(memberId: number, oldPhone: string, newPhone: string) {
+  const db = getDb();
+  const changed = db
+    .prepare("UPDATE form_submissions SET phone = ? WHERE member_id = ? OR (phone = ? AND phone <> '')")
+    .run(newPhone, memberId, oldPhone);
+  return Number(changed.changes ?? 0);
+}
+
 export function submitForm(
   token: string,
   answers: Record<string, string>,
