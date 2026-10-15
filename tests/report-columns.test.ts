@@ -50,26 +50,43 @@ test("a component imported into the report is actually rendered", () => {
 test("the widths account for every column the table draws", async () => {
   const { columnWidths } = await import("@/app/lib/forms/report");
 
-  // Two Hebrew columns are always drawn and one duplicate column
-  // sometimes, none of which columnWidths knows about. The page adds
-  // them, and the total still has to be 100 or the colgroup slides.
+  // Two Hebrew columns are always drawn and one mark column sometimes,
+  // none of which columnWidths knows about — and the Arabic town column is
+  // dropped, taking its share of the row with it. The page has to put that
+  // share back: this test used to divide by a flat 100 and passed while
+  // production shipped a colgroup of 95%.
   const widths = columnWidths({ columns: ["أ", "ب", "ج"], rows: [{ cells: ["1", "22", "333"] }] });
-  const shrink = (w: string, scale: number) => Math.round(Number(w.replace("%", "")) * scale * 100) / 100;
+  const num = (w: string) => Number(w.replace("%", ""));
 
-  for (const [dup, extra] of [[false, 18], [true, 24]] as Array<[boolean, number]>) {
-    const scale = (100 - extra) / 100;
-    const laid = [
-      shrink(widths[0], scale),
-      ...(dup ? [6] : []),
-      shrink(widths[1], scale),
-      9,
-      9,
-      ...widths.slice(2).map((w) => shrink(w, scale))
-    ];
-    const total = laid.reduce((sum, value) => sum + value, 0);
-    assert.ok(Math.abs(total - 100) < 0.5, `with${dup ? "" : "out"} the mark the row is ${total}%`);
-    assert.equal(laid.length, widths.length + (dup ? 3 : 2), "one width per column drawn");
+  // Every column the table might drop, including dropping none.
+  for (const dropped of [null, 0, 1, 2] as Array<number | null>) {
+    const shown = widths.slice(2).map((_, index) => index).filter((index) => index !== dropped);
+    for (const [mark, extra] of [[false, 18], [true, 24]] as Array<[boolean, number]>) {
+      const keptTotal = num(widths[0]) + num(widths[1]) + shown.reduce((sum, i) => sum + num(widths[i + 2]), 0);
+      const scale = (100 - extra) / keptTotal;
+      const shrink = (w: string) => Math.round(num(w) * scale * 100) / 100;
+      const laid = [
+        shrink(widths[0]),
+        ...(mark ? [6] : []),
+        shrink(widths[1]),
+        9,
+        9,
+        ...shown.map((i) => shrink(widths[i + 2]))
+      ];
+      const total = laid.reduce((sum, value) => sum + value, 0);
+      assert.ok(
+        Math.abs(total - 100) < 0.5,
+        `dropping ${dropped === null ? "nothing" : `column ${dropped}`}${mark ? " with" : " without"} the mark: ${total}%`
+      );
+      assert.equal(laid.length, shown.length + (mark ? 5 : 4), "one width per column drawn");
+    }
   }
+
+  // And the page divides by what it keeps, not by a flat 100.
+  assert.ok(
+    /const scale = \(100 - extra\) \/ \(keptTotal \|\| 1\)/.test(SOURCE),
+    "the page scales against the widths it actually draws"
+  );
 });
 
 test("the cells come in the order their headings do", () => {

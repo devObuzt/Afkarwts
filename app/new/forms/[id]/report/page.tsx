@@ -107,8 +107,15 @@ export default async function ReportPage({
   // Hebrew columns always. A colgroup that is short puts every answer
   // under the wrong heading.
   const extra = (markColumn ? 6 : 0) + 18;
-  const scale = (100 - extra) / 100;
-  const shrink = (width: string) => `${Math.round(Number(width.replace("%", "")) * scale * 100) / 100}%`;
+  // Scaled against the widths actually drawn, not against 100. Dropping the
+  // Arabic town column took its share of the row with it, and the colgroup
+  // came out of production at 95% — the counts were right, so nothing
+  // shifted, but the table sat narrower than the sheet. Dividing by what is
+  // kept puts it back at 100 whichever column is dropped.
+  const num = (width: string) => Number(width.replace("%", ""));
+  const keptTotal = num(widths[0]) + num(widths[1]) + shown.reduce((sum, index) => sum + num(widths[index + 2]), 0);
+  const scale = (100 - extra) / (keptTotal || 1);
+  const shrink = (width: string) => `${Math.round(num(width) * scale * 100) / 100}%`;
   const laidOut = [
     shrink(widths[0]),
     ...(markColumn ? ["6%"] : []),
