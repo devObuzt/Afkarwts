@@ -28,8 +28,8 @@ export function israelToUtc(date: string, time: string): string | null {
   return new Date(at).toISOString();
 }
 
-type MeetingForm = { date?: unknown; time?: unknown; duration?: unknown; kind?: unknown; link?: unknown; place?: unknown; title?: unknown; note?: unknown };
-export type MeetingBody = { starts_at: string; duration_min: number; kind: "video" | "phone" | "in_person"; link?: string; place?: string; title: string; note: string };
+type MeetingForm = { date?: unknown; time?: unknown; duration?: unknown; kind?: unknown; link?: unknown; place?: unknown; title?: unknown; note?: unknown; client_key?: unknown };
+export type MeetingBody = { starts_at: string; duration_min: number; kind: "video" | "phone" | "in_person"; link?: string; place?: string; title: string; note: string; client_key?: string };
 const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
 
 export function meetingPayload(form: MeetingForm): { ok: true; body: MeetingBody } | { ok: false; error: "WHEN" | "DURATION" | "KIND" | "LINK" | "TITLE" } {
@@ -39,14 +39,19 @@ export function meetingPayload(form: MeetingForm): { ok: true; body: MeetingBody
   if (!Number.isInteger(duration) || duration < 5 || duration > 240) return { ok: false, error: "DURATION" };
   const kind = str(form.kind);
   if (kind !== "video" && kind !== "phone" && kind !== "in_person") return { ok: false, error: "KIND" };
-  const link = str(form.link);
+  // Only the field the kind shows is sent: a link left in the form from «فيديو» doesn't ride along on a phone call.
+  const link = kind === "video" ? str(form.link) : "";
   if ((kind === "video" && !link) || (link && (!link.startsWith("https://") || link.length > 500))) return { ok: false, error: "LINK" };
   const title = str(form.title);
   if (!title || title.length > 80) return { ok: false, error: "TITLE" };
-  const place = str(form.place).slice(0, 200);
+  const place = kind === "in_person" ? str(form.place).slice(0, 200) : "";
+  const clientKey = str(form.client_key).slice(0, 100);
   return {
     ok: true,
-    body: { starts_at: startsAt, duration_min: duration, kind, ...(link ? { link } : {}), ...(place ? { place } : {}), title, note: str(form.note).slice(0, 500) }
+    body: {
+      starts_at: startsAt, duration_min: duration, kind, ...(link ? { link } : {}), ...(place ? { place } : {}), title,
+      note: str(form.note).slice(0, 500), ...(clientKey ? { client_key: clientKey } : {})
+    }
   };
 }
 

@@ -31,5 +31,5 @@ export async function POST(request: Request, { params }: P) {
   if (!member.ok) return NextResponse.json({ error: member.error }, { status: member.status });
   const made = await appAdmin<AppMeeting>(auth.user, `/admin/v1/members/${member.memberId}/meetings`, { method: "POST", body: form.body });
   if (!made.ok) return NextResponse.json({ error: made.error }, { status: made.status === 400 ? 400 : 502 });
-  return NextResponse.json(made.data, { status: 201 });
+  return NextResponse.json(made.data, { status: 201 }); // 200 from the app = the same form sent again; still a success
 }
