@@ -4,7 +4,13 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 /**
- * Two registrations, one phone, one form — she filled it twice.
+ * The same woman, twice on one form.
+ *
+ * «تكرار» is the same phone: proof. «تشابه» is the same name with a
+ * different phone — which is how the two that mattered actually looked,
+ * because each mistyped her number the second time and the phone match
+ * read «0» over a real pair. Two women do share a name, so that one asks
+ * before it rejects.
  *
  * The mark stays on both rows after they are approved, because that is
  * when the duplicate actually hurts: two records, two welcome messages,
@@ -14,11 +20,14 @@ import { useState } from "react";
  */
 export function DuplicateMark({
   canReject,
+  similar,
   state,
   submissionId,
   twins
 }: {
   canReject: boolean;
+  /** Same name, or a phone one keystroke away — likely, not certain. */
+  similar: number[];
   state: string;
   submissionId: number;
   twins: number[];
@@ -28,16 +37,24 @@ export function DuplicateMark({
   const [done, setDone] = useState(state === "rejected");
   const [error, setError] = useState("");
 
-  if (twins.length === 0) {
+  if (twins.length === 0 && similar.length === 0) {
     return null;
   }
+
+  // Same phone is proof; same name is a question. They must not look alike
+  // on the table, because one of them is a reason to act and one is not.
+  const certain = twins.length > 0;
+  const others = certain ? twins : similar;
 
   if (done) {
     return <span className="crmPill">مرفوض</span>;
   }
 
   async function reject() {
-    if (!confirm("رفض هذا التسجيل كتكرار؟ المنتسبة لا تُحذف — التسجيل الآخر يبقى لها.")) {
+    const question = certain
+      ? "رفض هذا التسجيل كتكرار؟ المنتسبة لا تُحذف — التسجيل الآخر يبقى لها."
+      : `نفس الاسم في التسجيل ${others.join("، ")} لكن الرقم مختلف. تأكّدت أنها نفس الشخص؟`;
+    if (!confirm(question)) {
       return;
     }
     setBusy(true);
@@ -59,8 +76,15 @@ export function DuplicateMark({
 
   return (
     <span className="dupMark">
-      <span className="crmPill alert" title={`نفس رقم الهاتف في التسجيل ${twins.join("، ")}`}>
-        تكرار
+      <span
+        className={certain ? "crmPill alert" : "crmPill warn"}
+        title={
+          certain
+            ? `نفس رقم الهاتف في التسجيل ${twins.join("، ")}`
+            : `نفس الاسم في التسجيل ${similar.join("، ")} — الرقم مختلف، افحصه قبل الرفض`
+        }
+      >
+        {certain ? "تكرار" : "تشابه"}
       </span>
       {canReject && (
         <button className="crmBtn danger" disabled={busy} onClick={reject} type="button">

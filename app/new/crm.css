@@ -678,6 +678,13 @@
    side by side in a single column, because a second column would have to
    be paid for out of the colgroup's 100% and nothing would notice if it
    were not. */
+/* A suspected pair, not a proven one: amber, so it never reads as the
+   red «same phone» mark that is safe to act on. */
+.crm .crmPill.warn {
+  background: var(--peach);
+  color: #7a4a22;
+}
+
 .crm .rowActions {
   display: inline-flex;
   align-items: center;

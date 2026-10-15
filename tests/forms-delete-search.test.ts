@@ -126,3 +126,46 @@ test("the screen, the CSV and the PDF are handed the same query", async () => {
   assert.equal(viewQuery({ q: "ليلى" }), `?q=${encodeURIComponent("ليلى")}`);
   assert.equal(viewQuery({ state: "new", q: "054" }), "?state=new&q=054");
 });
+
+test("a woman who mistyped her number the second time is still found", async () => {
+  const { markDuplicates } = await import("@/app/lib/forms/report");
+
+  // The pair that the phone match read as «0»: she registered twice and
+  // one digit moved. Same name, so the table has to raise it.
+  const marked = markDuplicates([
+    { id: 1, name: "غدير تيتي", phone: "+972545549500" },
+    { id: 2, name: "غدير تيتي", phone: "+972545579500" },
+    { id: 3, name: "رزان غنايم", phone: "+972517717863" },
+    { id: 4, name: "רזאן גנאים", phone: "+972547717863" },
+    { id: 5, name: "سارة عوض", phone: "+972545227674" }
+  ]);
+  const at = (id: number) => marked.find((row) => row.id === id)!;
+
+  assert.deepEqual(at(1).similarTo, [2], "same name, one digit apart");
+  assert.deepEqual(at(1).duplicateOf, [], "and not called certain, because the phones differ");
+  // One wrote her name in Arabic and the other in Hebrew — same woman.
+  assert.deepEqual(at(3).similarTo, [4], "across the two scripts");
+  assert.deepEqual(at(5).similarTo, [], "and a woman who registered once is left alone");
+});
+
+test("the same phone is still proof, and outranks the name", async () => {
+  const { markDuplicates } = await import("@/app/lib/forms/report");
+  const marked = markDuplicates([
+    { id: 1, name: "هدى", phone: "+972545227683" },
+    { id: 2, name: "هدى عواد", phone: "+972545227683" }
+  ]);
+  assert.deepEqual(marked[0].duplicateOf, [2], "same phone is certain");
+  assert.deepEqual(marked[0].similarTo, [], "and it is not also listed as a guess");
+});
+
+test("two different women who share a name are flagged, never merged", async () => {
+  const { markDuplicates } = await import("@/app/lib/forms/report");
+  const marked = markDuplicates([
+    { id: 1, name: "سارة عوض", phone: "+972521111111" },
+    { id: 2, name: "سارة عوض", phone: "+972529999999" }
+  ]);
+  // Raised for a human to look at — and only ever as «تشابه», because the
+  // numbers are nothing alike and two women really do share a name.
+  assert.deepEqual(marked[0].similarTo, [2]);
+  assert.deepEqual(marked[0].duplicateOf, []);
+});

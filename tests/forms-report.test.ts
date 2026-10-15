@@ -171,6 +171,7 @@ test("the same guard for every opener Excel treats as a formula", async () => {
       phone: "",
       hebrew: { name: "", nameConfirmed: false, city: "", cityConfirmed: false },
       duplicateOf: [],
+      similarTo: [],
       notes: {}
     }))
   };

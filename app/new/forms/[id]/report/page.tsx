@@ -99,7 +99,7 @@ export default async function ReportPage({
   // has been read.
   const grid = submissionGrid(form.id, { state: onlyDuplicates ? undefined : state || undefined })!;
   if (onlyDuplicates) {
-    grid.rows = grid.rows.filter((row) => row.duplicateOf.length > 0);
+    grid.rows = grid.rows.filter((row) => row.duplicateOf.length > 0 || row.similarTo.length > 0);
   }
   // Searching the whole row, because what you remember about a woman is
   // rarely the field it lives in. Digits are compared as digits, so
@@ -351,6 +351,7 @@ export default async function ReportPage({
                         : duplicates > 0 && (
                             <DuplicateMark
                               canReject={canReject}
+                              similar={row.similarTo}
                               state={row.state}
                               submissionId={row.submissionId}
                               twins={row.duplicateOf}

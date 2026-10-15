@@ -1,5 +1,5 @@
 import { getDb } from "../db";
-import { hebrewNameFor } from "./hebrew-name";
+import { hebrewNameFor, isArabicText } from "./hebrew-name";
 import { NOTE_COLUMNS, notesForForm } from "./notes";
 import { hebrewTownFor } from "./hebrew-town";
 import { getForm, listFields } from "./store";
@@ -131,6 +131,12 @@ export type SubmissionGrid = {
      * never looks outside the form.
      */
     duplicateOf: number[];
+    /**
+     * Registrations that look like the same woman without proving it: the
+     * same name, or a phone one keystroke away. Two women really can share
+     * a name, so this is a flag for a human and never a reason to act.
+     */
+    similarTo: number[];
     /** The columns Afkar keep themselves, by key. See NOTE_COLUMNS. */
     notes: Record<string, string>;
     /**
@@ -181,17 +187,117 @@ function hebrewFor(row: Record<string, string | number | null>) {
  * is exactly how a duplicate is resolved. Leaving it in would keep the
  * warning up over a pair somebody already dealt with.
  */
+/**
+ * A name reduced to what survives being typed twice.
+ *
+ * Both spellings are carried to Hebrew first, so «ندين» and «נדין» meet;
+ * then the matres lectionis (א ה ו י) and the spaces go, because those are
+ * exactly where a name drifts — «أبو سبيه» is one word in Arabic and two
+ * in Hebrew.
+ */
+function nameKey(name: string) {
+  const hebrew = isArabicText(name) ? hebrewNameFor(name) : name;
+  // Letters Arabic lands on more than one way, folded onto one. «رزان
+  // غنايم» carries across as «רזאן ע\u05F3נאים» while she writes it
+  // «רזאן גנאים» herself — one letter apart, and the pair was missed.
+  const same: Record<string, string> = {
+    ע: "ג", // ع · غ
+    ק: "כ", // ق · ك
+    ט: "ת", // ط · ت
+    צ: "ס", // ص · ث
+    ד: "ז" //  ض · ذ · ز
+  };
+  return hebrew
+    .replace(/[\u0591-\u05C7]/g, "")
+    .replace(/[ךםןףץ]/g, (letter) => ({ ך: "כ", ם: "מ", ן: "נ", ף: "פ", ץ: "צ" })[letter as "ך"])
+    .replace(/['"`׳״\-\s]/g, "")
+    // The matres lectionis go last: they are the least stable of all.
+    .replace(/[אהוי]/g, "")
+    .replace(/[עקטצד]/g, (letter) => same[letter] ?? letter)
+    .toLowerCase();
+}
+
+/** True when two phones are one keystroke apart: a slip, not another woman. */
+function oneKeyApart(a: string, b: string) {
+  if (!a || !b || a === b) {
+    return false;
+  }
+  if (a.length === b.length) {
+    const differ = [...a].map((digit, at) => (digit === b[at] ? -1 : at)).filter((at) => at >= 0);
+    if (differ.length === 1) {
+      return true;
+    }
+    // Two digits swapped: «547543062» typed as «574543062».
+    return differ.length === 2 && differ[1] === differ[0] + 1 && a[differ[0]] === b[differ[1]] && a[differ[1]] === b[differ[0]];
+  }
+  if (Math.abs(a.length - b.length) !== 1) {
+    return false;
+  }
+  const [long, short] = a.length > b.length ? [a, b] : [b, a];
+  for (let at = 0; at <= long.length; at++) {
+    if (long.slice(0, at) + long.slice(at + 1) === short) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export function duplicateCount(formId: number) {
-  const row = getDb()
+  // Counted the same way the table marks them, so the button's number and
+  // the rows it opens are the same thing. Matching on the phone alone
+  // missed two women who registered twice and mistyped their number the
+  // second time — the tab read «0» over a real pair.
+  const rows = getDb()
     .prepare(
-      `SELECT COALESCE(SUM(n), 0) AS total FROM (
-         SELECT COUNT(*) AS n FROM form_submissions
-          WHERE form_id = ? AND TRIM(phone) <> '' AND state <> 'rejected'
-          GROUP BY phone HAVING COUNT(*) > 1
-       )`
+      `SELECT id, name, phone FROM form_submissions
+        WHERE form_id = ? AND state <> 'rejected'`
     )
-    .get(formId) as { total: number };
-  return Number(row?.total ?? 0);
+    .all(formId) as Array<{ id: number; name: string; phone: string }>;
+  return markDuplicates(rows).filter((row) => row.duplicateOf.length || row.similarTo.length).length;
+}
+
+/**
+ * Which registrations look like the same woman twice.
+ *
+ * Three rules, in order of how sure they are:
+ *   · the same phone — she filled it twice, certain
+ *   · the same name on the same form — likely, and a human decides
+ *   · a phone one keystroke away AND a name that agrees — a slip
+ *
+ * The name alone is never enough to call it certain: two women really do
+ * share a name. That is why the table marks the second two differently.
+ */
+export function markDuplicates(rows: Array<{ id: number; name: string; phone: string }>) {
+  const phoneOf = new Map(rows.map((row) => [row.id, String(row.phone ?? "").replace(/\D/g, "")]));
+  const keyOf = new Map(rows.map((row) => [row.id, nameKey(String(row.name ?? ""))]));
+
+  return rows.map((row) => {
+    const duplicateOf: number[] = [];
+    const similarTo: number[] = [];
+    const myPhone = phoneOf.get(row.id) ?? "";
+    const myKey = keyOf.get(row.id) ?? "";
+
+    for (const other of rows) {
+      if (other.id === row.id) {
+        continue;
+      }
+      const theirPhone = phoneOf.get(other.id) ?? "";
+      const theirKey = keyOf.get(other.id) ?? "";
+
+      if (myPhone && myPhone === theirPhone) {
+        duplicateOf.push(other.id);
+        continue;
+      }
+      if (myKey.length > 3 && myKey === theirKey) {
+        similarTo.push(other.id);
+        continue;
+      }
+      if (myKey.length > 3 && oneKeyApart(myPhone, theirPhone) && myKey === theirKey) {
+        similarTo.push(other.id);
+      }
+    }
+    return { id: row.id, duplicateOf, similarTo };
+  });
 }
 
 /** How many registrations on this form were rejected — the tab's own count. */
@@ -330,20 +436,21 @@ export function submissionGrid(formId: number, filter: { state?: string } = {}):
 
   const notes = notesForForm(formId);
 
-  // One pass over the phones first: a row has to know about a twin that
+  // One pass over the whole set first: a row has to know about a twin that
   // comes after it as well as one before.
-  const byPhone = new Map<string, number[]>();
-  for (const { submission } of collected) {
-    const phone = String(submission.phone ?? "").trim();
-    if (!phone) {
-      continue;
-    }
-    byPhone.set(phone, [...(byPhone.get(phone) ?? []), Number(submission.id)]);
-  }
+  const twins = new Map(
+    markDuplicates(
+      collected.map(({ submission }) => ({
+        id: Number(submission.id),
+        name: String(submission.name ?? ""),
+        phone: String(submission.phone ?? "")
+      }))
+    ).map((row) => [row.id, row])
+  );
 
   for (const { submission, given, ids } of collected) {
     const phone = String(submission.phone ?? "").trim();
-    const sharing = (byPhone.get(phone) ?? []).filter((id) => id !== Number(submission.id));
+    const twin = twins.get(Number(submission.id));
     rows.push({
       submissionId: Number(submission.id),
       memberId: submission.member_id === null ? null : Number(submission.member_id),
@@ -352,7 +459,8 @@ export function submissionGrid(formId: number, filter: { state?: string } = {}):
       cells: columns.map((column) => given.get(column) ?? ""),
       answerIds: columns.map((column) => ids.get(column) ?? null),
       phone,
-      duplicateOf: sharing,
+      duplicateOf: twin?.duplicateOf ?? [],
+      similarTo: twin?.similarTo ?? [],
       hebrew: hebrewFor(submission),
       notes: notes.get(Number(submission.id)) ?? {}
     });
