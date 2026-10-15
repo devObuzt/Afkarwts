@@ -74,8 +74,8 @@ test("past the window it is never sent — not late, not at all", async () => {
   assert.equal(await sentTo(early.id), 0, "the window had shut before anyone switched it on");
 });
 
-test("🔴 a woman added after the window shut gets nothing the others got", async () => {
-  const { addMembersToGroup, createMember } = await import("@/app/lib/db");
+test("a woman added after the window shut is caught up, not written off", async () => {
+  const { addMembersToGroup, createMember, getDb } = await import("@/app/lib/db");
   const { setJourneyStatus } = await import("@/app/lib/journeys/store");
   const { runDueJourneys } = await import("@/app/lib/journeys/runner");
   const { group, journey, early } = await cohort();
@@ -90,10 +90,11 @@ test("🔴 a woman added after the window shut gets nothing the others got", asy
   addMembersToGroup(group.id, [late.id]);
   await runDueJourneys(new Date("2026-10-16T07:00:00.000Z"));
 
-  assert.equal(await sentTo(late.id), 0, "and she gets nothing: the step was marked skipped when she joined");
+  // One message behind is just sent: she is a day late, not lost. This
+  // used to assert the opposite — the step was written off at the moment
+  // she joined and nothing ever tried again.
+  assert.equal(await sentTo(late.id), 1, "the welcome reaches her too");
 
-  // Proving it is the skip and not a delay: the row exists, already closed.
-  const { getDb } = await import("@/app/lib/db");
   const states = (
     getDb()
       .prepare(
@@ -103,5 +104,5 @@ test("🔴 a woman added after the window shut gets nothing the others got", asy
       )
       .all(late.id, journey.id) as Array<{ state: string }>
   ).map((row) => row.state);
-  assert.deepEqual(states, ["skipped"], "the step is written off for her, not queued");
+  assert.deepEqual(states, ["sent"], "and it is recorded as sent, not skipped");
 });

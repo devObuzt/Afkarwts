@@ -21,6 +21,7 @@ import {
   stopEnrollment,
   syncEnrollments
 } from "./store";
+import { greetLateJoiner, releaseNextCatchUp } from "./catch-up";
 
 const globalForRunner = globalThis as typeof globalThis & { __afkarJourneyRunning?: boolean };
 
@@ -96,7 +97,19 @@ export async function runDueJourneys(now = new Date()) {
     const allowance = await remainingAllowance(now);
 
     for (const journey of listActiveJourneys()) {
-      syncEnrollments(journey.id, now);
+      const sync = syncEnrollments(journey.id, now);
+
+      // Whoever arrived after something had already gone out. One missed
+      // message is simply sent; several are offered first, and nothing
+      // goes out until she answers.
+      for (const late of sync.joinedLate) {
+        try {
+          await greetLateJoiner(late);
+        } catch (error) {
+          console.error(`Catch-up for enrolment ${late.enrollmentId} failed:`, error);
+        }
+      }
+      releaseNextCatchUp(now);
 
       const smsText = getTemplate(journey.templateId)?.smsText ?? "";
       const round = { sent: 0, sentText: 0, sentTemplate: 0, failed: 0, deferred: 0, stopped: 0, smsFallback: 0 };

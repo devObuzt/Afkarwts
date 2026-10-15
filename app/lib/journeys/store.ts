@@ -319,11 +319,23 @@ function sqliteStamp(date: Date) {
 /** A deferred row is a note that a step waited, not a claim on it. */
 const SETTLED_STATES = "('pending', 'sent', 'failed', 'missed', 'skipped')";
 
+/** Whether anybody on this journey actually received a given step. */
+function othersGot(journeyId: number, stepId: number) {
+  const row = getDb()
+    .prepare(
+      `SELECT COUNT(*) AS n FROM journey_sends s
+         JOIN journey_enrollments e ON e.id = s.enrollment_id
+        WHERE e.journey_id = ? AND s.step_id = ? AND s.state = 'sent'`
+    )
+    .get(journeyId, stepId) as { n: number };
+  return Number(row?.n ?? 0) > 0;
+}
+
 export function syncEnrollments(journeyId: number, now: Date) {
   const db = getDb();
   const journey = getJourney(journeyId);
   if (!journey) {
-    return { added: 0, removed: 0 };
+    return { added: 0, removed: 0, joinedLate: [] };
   }
 
   // Only a دفعة is a cohort. A مسار is a record of what somebody bought,
@@ -337,7 +349,7 @@ export function syncEnrollments(journeyId: number, now: Date) {
     | { kind: string }
     | undefined;
   if (kind?.kind !== "batch") {
-    return { added: 0, removed: 0 };
+    return { added: 0, removed: 0, joinedLate: [] };
   }
 
   const steps = listSteps(journey.templateId);
@@ -358,6 +370,8 @@ export function syncEnrollments(journeyId: number, now: Date) {
   );
 
   let added = 0;
+  /** Who arrived after something had already gone out, and how much. */
+  const joinedLate: Array<{ enrollmentId: number; memberId: number; missed: number }> = [];
   for (const memberId of memberIds) {
     if (enrolled.has(memberId)) {
       continue;
@@ -370,12 +384,29 @@ export function syncEnrollments(journeyId: number, now: Date) {
     added += 1;
 
     // Steps whose window shut before this member joined were never theirs.
+    //
+    // «Never theirs» was the whole story until now, and it was too short:
+    // a woman who registers on the Friday of a cohort that started on the
+    // Thursday was simply written off for the welcome and the programme
+    // file. What she missed is counted here so something can be done
+    // about it — one message is just sent, and more than one is offered.
+    let missed = 0;
     for (const step of steps) {
       if (now.getTime() >= stepDueAt(journey.anchorDate, step).getTime() + SEND_WINDOW_MS) {
         db.prepare(
           "INSERT INTO journey_sends (enrollment_id, step_id, state, attempted_at) VALUES (?, ?, 'skipped', ?)"
         ).run(enrollmentId, step.id, sqliteStamp(now));
+        // Only a step the cohort actually received is one she is behind
+        // on. A whole path switched on late missed its hour for everybody
+        // — nobody is owed that, and sending it now would be the midnight
+        // message the window exists to prevent.
+        if (othersGot(journeyId, step.id)) {
+          missed += 1;
+        }
       }
+    }
+    if (missed > 0) {
+      joinedLate.push({ enrollmentId, memberId, missed });
     }
   }
 
@@ -393,8 +424,39 @@ export function syncEnrollments(journeyId: number, now: Date) {
     }
   }
 
-  return { added, removed };
+  return { added, removed, joinedLate };
 }
+
+/**
+ * The steps a member was written off for when she joined, oldest first.
+ *
+ * These are the ones the catch-up offers her. A step marked skipped for
+ * any other reason is not among them: this only reads the ones recorded
+ * at the moment she was enrolled.
+ */
+export function missedOnJoin(enrollmentId: number) {
+  return getDb()
+    .prepare(
+      `SELECT s.step_id AS stepId FROM journey_sends s
+        WHERE s.enrollment_id = ? AND s.state = 'skipped'
+        ORDER BY s.step_id`
+    )
+    .all(enrollmentId) as Array<{ stepId: number }>;
+}
+
+/** Clear a written-off step so the runner treats it as due again. */
+export function reopenMissedStep(enrollmentId: number, stepId: number) {
+  const db = getDb();
+  db.prepare("DELETE FROM journey_sends WHERE enrollment_id = ? AND step_id = ? AND state = 'skipped'").run(
+    enrollmentId,
+    stepId
+  );
+  // Clearing the write-off is not enough on its own: the step's hour is
+  // long past, and the send window would drop it again on the same tick.
+  // This is the note that says she is owed it.
+  db.prepare("INSERT OR IGNORE INTO journey_owed (enrollment_id, step_id) VALUES (?, ?)").run(enrollmentId, stepId);
+}
+
 
 export function loadTickState(journeyId: number, now: Date): EnrollmentState[] {
   const db = getDb();
@@ -426,6 +488,16 @@ export function loadTickState(journeyId: number, now: Date): EnrollmentState[] {
       | { step_id: number; attempted_at: string; state: "sent" | "failed"; message_status: string | null; error: string | null }
       | undefined;
 
+    // Steps a late joiner was written off for and has since been given
+    // back — by the catch-up, or by somebody pressing «أعد الإرسال».
+    const owed = new Set(
+      (
+        db
+          .prepare("SELECT step_id FROM journey_owed WHERE enrollment_id = ?")
+          .all(enrollment.id) as Array<{ step_id: number }>
+      ).map((row) => row.step_id)
+    );
+
     const settled = new Set(
       (
         db
@@ -452,7 +524,12 @@ export function loadTickState(journeyId: number, now: Date): EnrollmentState[] {
 
       if (now.getTime() < dueAt.getTime()) {
         hasUnsentStepsAhead = true;
-      } else if (now.getTime() < dueAt.getTime() + SEND_WINDOW_MS) {
+      } else if (now.getTime() < dueAt.getTime() + SEND_WINDOW_MS || owed.has(step.id)) {
+        // The window says «do not send a morning message at midnight»,
+        // and that is right for a step whose hour simply passed. A step
+        // she is owed is not that: it is a message she never got, that
+        // somebody decided she should have. The window would silence
+        // exactly the case the catch-up exists for.
         dueSteps.push(pending);
       } else {
         expiredSteps.push(pending);
@@ -507,9 +584,23 @@ export function recordSend(
   sendId: number,
   input: { channel: "text" | "template"; messageId: number | null; state: "sent" | "failed"; error?: string | null }
 ) {
-  getDb()
-    .prepare("UPDATE journey_sends SET channel = ?, message_id = ?, state = ?, error = ? WHERE id = ?")
-    .run(input.channel, input.messageId, input.state, input.error ?? null, sendId);
+  const db = getDb();
+  db.prepare("UPDATE journey_sends SET channel = ?, message_id = ?, state = ?, error = ? WHERE id = ?").run(
+    input.channel,
+    input.messageId,
+    input.state,
+    input.error ?? null,
+    sendId
+  );
+
+  // She has it now, so the window applies to this step again. Left behind,
+  // the note would keep one step permanently exempt for one woman.
+  if (input.state === "sent") {
+    db.prepare(
+      `DELETE FROM journey_owed
+        WHERE (enrollment_id, step_id) IN (SELECT enrollment_id, step_id FROM journey_sends WHERE id = ?)`
+    ).run(sendId);
+  }
 }
 
 export function recordSendState(

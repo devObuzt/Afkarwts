@@ -392,6 +392,28 @@ function migrateCampaignTables(db: DatabaseSync) {
   // to tell «this failed on her old number, which has since been fixed»
   // from «this failed», and the fix never reaches the message it should
   // have fixed.
+  // A step a member is owed: written off when she joined late, and since
+  // given back. The send window does not apply to one of these.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS journey_owed (
+      enrollment_id INTEGER NOT NULL,
+      step_id INTEGER NOT NULL,
+      PRIMARY KEY (enrollment_id, step_id),
+      FOREIGN KEY (enrollment_id) REFERENCES journey_enrollments(id) ON DELETE CASCADE
+    );
+  `);
+
+  // Where a late joiner's catch-up stands: offered, accepted, declined or
+  // finished. One row per enrolment, so she is asked once.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS journey_catchup (
+      enrollment_id INTEGER PRIMARY KEY,
+      state TEXT NOT NULL,
+      at TEXT NOT NULL,
+      FOREIGN KEY (enrollment_id) REFERENCES journey_enrollments(id) ON DELETE CASCADE
+    );
+  `);
+
   if (!hasColumn(db, "messages", "sent_to_phone")) {
     db.exec("ALTER TABLE messages ADD COLUMN sent_to_phone TEXT");
   }

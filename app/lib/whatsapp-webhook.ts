@@ -107,6 +107,16 @@ export async function handleWebhookPayload(payload: WhatsAppWebhookPayload) {
             (incoming.interactive?.button_reply?.title || incoming.interactive?.list_reply?.title));
 
         if (pressed) {
+          // «يا ريت» / «ما في داعي» answer the catch-up offer. Answered
+          // here rather than by reading her words later: the press is
+          // unambiguous, and a woman who said yes is waiting.
+          try {
+            const { answerCatchUpByPress } = await import("./journeys/catch-up-reply");
+            await answerCatchUpByPress(member.id, pressed);
+          } catch (error) {
+            console.error("Catch-up reply failed:", error);
+          }
+
           createMessage({
             memberId: member.id,
             direction: "incoming",
