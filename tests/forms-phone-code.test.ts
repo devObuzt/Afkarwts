@@ -213,3 +213,21 @@ test("the whole service has a ceiling, not only each number", async () => {
   assert.equal(blocked.ok, false, "a fresh number is refused once the hour's budget is gone");
   assert.match((blocked as { error: string }).error, /مشغولة/);
 });
+
+test("a template with an image header goes out with the image", async () => {
+  // Meta answers a missing header with «Parameter format does not match
+  // format in the created template» — a sentence that never mentions a
+  // picture. The send has to carry it.
+  const { saveTemplateHeader, templateHeaderUrl } = await import("@/app/lib/template-media");
+  saveTemplateHeader("clean_reminder_extra_plus_img", new Uint8Array([1, 2, 3]), "image/jpeg");
+
+  const url = templateHeaderUrl("clean_reminder_extra_plus_img");
+  assert.ok(url && url.startsWith("http"), "an absolute address, because Meta fetches it");
+  assert.match(url!, /\/api\/t\/clean_reminder_extra_plus_img\/header$/);
+
+  // A template nobody stored an image for carries none, and the send is
+  // unchanged for every text template there is.
+  assert.equal(templateHeaderUrl("some_other_template"), null);
+  // And a name that is not a template name never reaches the filesystem.
+  assert.equal(templateHeaderUrl("../../etc/passwd"), null);
+});

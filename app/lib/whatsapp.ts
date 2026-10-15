@@ -1,5 +1,6 @@
 import { formatBytes, MAX_MEDIA_BYTES, MAX_MEDIA_LABEL } from "./media-store";
 import { dryRunId, isLive } from "./outbound-guard";
+import { templateHeaderUrl } from "./template-media";
 import { phoneForWhatsApp, type Member } from "./db";
 
 type WhatsAppSendResponse = {
@@ -102,6 +103,8 @@ export type TemplateSendOptions = {
   name?: string;
   language?: string;
   bodyParams?: string[];
+  /** Overrides the stored header image; normally left out. */
+  headerImageUrl?: string | null;
 };
 
 /** Placeholder the UI writes into a template value to mean "this contact's name". */
@@ -187,13 +190,24 @@ export async function sendWhatsAppTemplate(member: Member, options: TemplateSend
     }
   };
 
+  // A template with an image header cannot be sent without the image.
+  // Meta answers a missing one with «Parameter format does not match
+  // format in the created template» (#132012) — a sentence that never
+  // mentions a picture, which is why this cost an afternoon. The image
+  // the template was approved with is the one that belongs there, so it
+  // is attached from what we kept when the template was made.
+  const components: Array<Record<string, unknown>> = [];
+  const headerUrl = options.headerImageUrl ?? (templateName ? templateHeaderUrl(templateName) : null);
+  if (headerUrl) {
+    components.push({ type: "header", parameters: [{ type: "image", image: { link: headerUrl } }] });
+  }
+
   if (bodyParams.length) {
-    template.components = [
-      {
-        type: "body",
-        parameters: bodyParams.map((text) => ({ type: "text", text }))
-      }
-    ];
+    components.push({ type: "body", parameters: bodyParams.map((text) => ({ type: "text", text })) });
+  }
+
+  if (components.length) {
+    template.components = components;
   }
 
   if (!isLive()) {
