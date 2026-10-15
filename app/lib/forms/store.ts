@@ -696,8 +696,15 @@ function isShown(field: Field, answers: Record<string, string>) {
  */
 export function carryPhoneToSubmissions(memberId: number, oldPhone: string, newPhone: string) {
   const db = getDb();
+  // Matching the old number alone would reach across to somebody else's
+  // registration: two women really do end up sharing a number in this
+  // data — one typed her husband's. Only her own registrations, and the
+  // ones nobody has approved into a member yet.
   const changed = db
-    .prepare("UPDATE form_submissions SET phone = ? WHERE member_id = ? OR (phone = ? AND phone <> '')")
+    .prepare(
+      `UPDATE form_submissions SET phone = ?
+        WHERE member_id = ? OR (member_id IS NULL AND phone = ? AND phone <> '')`
+    )
     .run(newPhone, memberId, oldPhone);
   return Number(changed.changes ?? 0);
 }

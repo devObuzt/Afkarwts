@@ -208,3 +208,57 @@ test("a phone already on somebody else is refused, not silently moved", async ()
   assert.equal(clash.ok, false, "two women cannot share one WhatsApp number");
   assert.ok(hers.id > 0);
 });
+
+test("correcting one woman's phone never rewrites another's registration", async () => {
+  const { createGroup, createMember } = await import("@/app/lib/db");
+  const { carryPhoneToSubmissions, createForm, listFields, submitForm, getSubmission } = await import(
+    "@/app/lib/forms/store"
+  );
+  const { approveSubmission } = await import("@/app/lib/forms/approve");
+
+  // One number, two registrations — «هاد رقم زوجي» is a real line from
+  // this cohort. Correcting one must not reach into the other.
+  const group = createGroup("كلين مشترك");
+  const form = createForm({ name: "كلين مشترك", groupId: group.id, fromTemplate: true });
+  const fill = (name: string) => {
+    const answers: Record<string, string> = {};
+    for (const field of listFields(form.id)) {
+      answers[String(field.id)] =
+        field.mapsTo === "name"
+          ? name
+          : field.mapsTo === "phone"
+            ? "0526993111"
+            : field.mapsTo === "city"
+              ? "الناصرة"
+              : field.kind === "date"
+                ? "2026-10-02"
+                : field.options.length
+                  ? field.options[0]
+                  : "نعم";
+    }
+    return (submitForm(form.token, answers, { requirePhoneCode: false }) as { ok: true; id: number }).id;
+  };
+
+  const hers = fill("ضحى");
+  const his = fill("زوجها");
+  approveSubmission(hers);
+  const member = getSubmission(hers)!.submission.memberId!;
+
+  carryPhoneToSubmissions(member, "+972526993111", "+972526993222");
+
+  assert.equal(getSubmission(hers)!.submission.phone, "+972526993222", "hers moves");
+  assert.equal(
+    getSubmission(his)!.submission.phone,
+    "+972526993222",
+    "and the unapproved one on the same number moves with it"
+  );
+
+  // But a registration already approved to a *different* member is left
+  // alone: that is somebody else's record.
+  approveSubmission(his);
+  const other = getSubmission(his)!.submission.memberId;
+  if (other && other !== member) {
+    carryPhoneToSubmissions(member, "+972526993222", "+972526993333");
+    assert.equal(getSubmission(his)!.submission.phone, "+972526993222", "the other member's registration stands");
+  }
+});
