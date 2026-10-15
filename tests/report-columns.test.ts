@@ -24,7 +24,7 @@ test("every column drawn in the header is drawn in the body too", () => {
   // The Hebrew pair: two headings, and two cells on each of the two paths
   // (printing renders plain, the screen renders the editor).
   assert.equal((SOURCE.match(/<th>الاسم بالعبرية<\/th>/g) ?? []).length, 1);
-  assert.equal((SOURCE.match(/<th>البلدة بالعبرية<\/th>/g) ?? []).length, 1);
+  assert.equal((SOURCE.match(/<th>البلدة<\/th>/g) ?? []).length, 1, "one town column, in Hebrew");
   assert.equal((SOURCE.match(/<HebrewCell/g) ?? []).length, 2, "name and city, on screen");
   assert.equal((SOURCE.match(/className="heCell">\{row\.hebrew\./g) ?? []).length, 2, "and when printing");
 });
@@ -76,7 +76,7 @@ test("the cells come in the order their headings do", () => {
     head.indexOf("تكرار"),
     head.indexOf("<th>التاريخ</th>"),
     head.indexOf("الاسم بالعبرية"),
-    head.indexOf("البلدة بالعبرية")
+    head.indexOf("<th>البلدة</th>")
   ];
   const bodyOrder = [
     body.indexOf("index + 1"),
@@ -92,4 +92,15 @@ test("the cells come in the order their headings do", () => {
   const rising = (list: number[]) => list.every((at, i) => i === 0 || at > list[i - 1]);
   assert.ok(rising(headOrder), "headings in order");
   assert.ok(rising(bodyOrder), `cells out of order — ${JSON.stringify(bodyOrder)}`);
+});
+
+test("the headings, the cells and the widths all follow one list", () => {
+  // They used to be three independent maps over grid.columns, and the
+  // Arabic town column could be dropped from one and not the others.
+  const uses = (SOURCE.match(/shown\.map\(/g) ?? []).length;
+  assert.equal(uses, 3, `headings, cells and widths — found ${uses} maps over «shown»`);
+  assert.ok(
+    /const shown = grid\.columns[\s\S]{0,120}!== grid\.cityColumn/.test(SOURCE),
+    "and «shown» is what drops the Arabic town column"
+  );
 });

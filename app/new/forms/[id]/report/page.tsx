@@ -81,6 +81,10 @@ export default async function ReportPage({
   // The form's own count, not the current view's — see duplicateCount.
   const duplicates = duplicateCount(form.id);
   // Weighted by content: a phone does not need a consent paragraph's room.
+  // The Arabic town column is dropped: «البلدة بالعبرية» already carries
+  // the same answer in the form the records use. One list drives the
+  // headings, the cells and the widths so they cannot drift apart.
+  const shown = grid.columns.map((_, index) => index).filter((index) => index !== grid.cityColumn);
   const widths = columnWidths(grid);
   // The duplicate mark is a column too. Without its own width the colgroup
   // is one short and every width lands on the cell to its left — the
@@ -99,7 +103,7 @@ export default async function ReportPage({
     shrink(widths[1]),
     "9%",
     "9%",
-    ...widths.slice(2).map(shrink)
+    ...shown.map((index) => shrink(widths[index + 2]))
   ];
   const key = headerKey(grid.columns);
 
@@ -183,20 +187,22 @@ export default async function ReportPage({
               {!printing && duplicates > 0 && <th>تكرار</th>}
               <th>التاريخ</th>
               <th>الاسم بالعبرية</th>
-              <th>البلدة بالعبرية</th>
-              {grid.columns.map((column, index) => (
-                <th key={column}>
+              <th>البلدة</th>
+              {shown.map((index) => (
+                <th key={grid.columns[index]}>
                   {/* On screen the question is the column name. On paper a
                       paragraph-long question would make the header half the
                       sheet, and Chromium then stops repeating it — so it
                       prints as a number and the key sits under the table. */}
-                  <span className="thFull">{column}</span>
+                  <span className="thFull">{grid.columns[index]}</span>
                   <span
                     className={
-                      printHeader(column, index) === column ? "thShort" : "thShort thRef"
+                      printHeader(grid.columns[index], index) === grid.columns[index]
+                        ? "thShort"
+                        : "thShort thRef"
                     }
                   >
-                    {printHeader(column, index)}
+                    {printHeader(grid.columns[index], index)}
                   </span>
                 </th>
               ))}
@@ -253,18 +259,21 @@ export default async function ReportPage({
                     />
                   </>
                 )}
-                {row.cells.map((cell, cellIndex) =>
+                {shown.map((cellIndex) =>
                   editable ? (
                     <EditableCell
                       answerId={row.answerIds[cellIndex]}
-                      className={isNumeric(cell) ? "num" : undefined}
+                      className={isNumeric(row.cells[cellIndex]) ? "num" : undefined}
                       key={grid.columns[cellIndex]}
                       submissionId={row.submissionId}
-                      value={cell}
+                      value={row.cells[cellIndex]}
                     />
                   ) : (
-                    <td className={isNumeric(cell) ? "num" : undefined} key={grid.columns[cellIndex]}>
-                      {cell}
+                    <td
+                      className={isNumeric(row.cells[cellIndex]) ? "num" : undefined}
+                      key={grid.columns[cellIndex]}
+                    >
+                      {row.cells[cellIndex]}
                     </td>
                   )
                 )}

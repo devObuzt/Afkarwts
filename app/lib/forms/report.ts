@@ -94,6 +94,12 @@ export type SubmissionGrid = {
   formName: string;
   groupName: string;
   columns: string[];
+  /**
+   * Which column holds the town, so the table can drop it: the Hebrew
+   * town column already carries the same answer in the form Afkar's
+   * records use, and two town columns is one too many.
+   */
+  cityColumn: number | null;
   rows: Array<{
     submissionId: number;
     memberId: number | null;
@@ -253,11 +259,13 @@ export function submissionGrid(formId: number, filter: { state?: string } = {}):
     });
   }
 
+  const cityField = listFields(formId).find((field) => field.mapsTo === "city");
   return {
     formId,
     formName: form.name,
     groupName: form.groupName,
     columns,
+    cityColumn: cityField ? columns.indexOf(cityField.label) : null,
     rows
   };
 }
