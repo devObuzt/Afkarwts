@@ -5,7 +5,9 @@ test("an Arabic name comes across in Hebrew letters", async () => {
   const { hebrewNameFor } = await import("@/app/lib/forms/hebrew-name");
 
   assert.equal(hebrewNameFor("سناء حاج"), "סנאא חאג'");
-  assert.equal(hebrewNameFor("ليلى عوض"), "לילא עוץ'");
+  // ض is ד in Israeli practice: رمضان is רמדאן, not רמצאן.
+  assert.equal(hebrewNameFor("ليلى عوض"), "לילא עוד");
+  assert.equal(hebrewNameFor("رمضان"), "רמדאן");
   assert.equal(hebrewNameFor("هدى"), "הדא");
   assert.equal(hebrewNameFor("نور الدين"), "נור אלדין");
 });
@@ -25,7 +27,7 @@ test("letters that change shape at the end of a word do", async () => {
 test("a name already in Hebrew is left exactly as somebody typed it", async () => {
   const { hebrewNameFor } = await import("@/app/lib/forms/hebrew-name");
 
-  assert.equal(hebrewNameFor("מנאר בוירات"), "מנאר בוירات".replace("ات", "ات"));
+  assert.equal(hebrewNameFor("מנאר בוירת"), "מנאר בוירת");
   assert.equal(hebrewNameFor("רנדה קיס"), "רנדה קיס");
   assert.equal(hebrewNameFor("סברא עביר"), "סברא עביר");
 });
