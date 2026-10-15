@@ -1055,6 +1055,46 @@ export function markMemberMessagesRead(memberId: number) {
   return getMember(memberId);
 }
 
+/**
+ * Put a conversation back among the unread, from one of her messages.
+ *
+ * «Unread» is one mark per person, not per message: it is the id of the
+ * last one that was read. So marking *this* message unread means moving
+ * that mark to just before it — this message and everything after it are
+ * unread again, which is what reopening a thread from a given point
+ * actually means.
+ *
+ * The thread then sits with the other unread ones, ordered by when its
+ * messages arrived, exactly as if it had just come in — no separate flag,
+ * no second sort, nothing that could disagree with the rest of the inbox.
+ */
+export function markMessageUnread(memberId: number, messageId: number) {
+  const db = getDb();
+  const message = db
+    .prepare("SELECT id, member_id, direction FROM messages WHERE id = ?")
+    .get(messageId) as { id: number; member_id: number; direction: string } | undefined;
+
+  if (!message || message.member_id !== memberId) {
+    return { ok: false as const, error: "هذه الرسالة ليست في هذه المحادثة." };
+  }
+  if (message.direction !== "incoming") {
+    // Ours are not unread; nobody is waiting on a message we sent.
+    return { ok: false as const, error: "الرسائل الصادرة لا تُعلَّم كغير مقروءة." };
+  }
+
+  // The newest read message strictly before this one — or nothing read at
+  // all, which is what the column means by null.
+  const before = db
+    .prepare(
+      `SELECT MAX(id) AS id FROM messages
+        WHERE member_id = ? AND direction = 'incoming' AND id < ?`
+    )
+    .get(memberId, messageId) as { id: number | null };
+
+  db.prepare("UPDATE members SET last_read_message_id = ? WHERE id = ?").run(before.id ?? null, memberId);
+  return { ok: true as const, member: getMember(memberId) };
+}
+
 export function findOrCreateMemberByPhone(input: { phone: string; profileName?: string }) {
   const phone = normalizePhone(input.phone);
   if (!phone) {

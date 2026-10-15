@@ -338,6 +338,8 @@ function Icon({ path, size = 18 }: { path: string; size?: number }) {
 }
 
 const icons = {
+  /** The unread dot — the same mark the inbox already uses for a waiting thread. */
+  dot: "M12 12m-7 0a7 7 0 1 0 14 0a7 7 0 1 0 -14 0",
   search: "M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm10 2-4.35-4.35",
   plus: "M12 5v14M5 12h14",
   upload: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12",
@@ -519,6 +521,34 @@ export function InboxClient() {
   function openMember(memberId: number) {
     setSelectedMemberId(memberId);
     setMobileChatOpen(true);
+  }
+
+  /**
+   * Put this conversation back among the unread, from this message on.
+   *
+   * Afkar read it, could not deal with it then, and want it waiting
+   * again. It re-sorts with the other unread by arrival time because
+   * «unread» here is the same count the inbox already orders by — not a
+   * second flag that could disagree with it.
+   */
+  async function markUnread(messageId: number) {
+    if (!selectedMember) {
+      return;
+    }
+    const response = await fetch(`/api/members/${selectedMember.id}/unread`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messageId })
+    });
+    if (!response.ok) {
+      return;
+    }
+    // Leaving the thread open would mark it read again on the next poll,
+    // undoing the very thing that was just asked for.
+    setSelectedMemberId(null);
+    setMobileChatOpen(false);
+    await loadMembers();
+    flash("رجعت للمحادثات غير المقروءة");
   }
 
   async function sendMessage(event: FormEvent<HTMLFormElement>) {
@@ -875,7 +905,21 @@ export function InboxClient() {
                         {renderMessageContent(message)}
                         <footer>
                           <span>{timeLabel(message.createdAt)}</span>
-                          {message.direction === "outgoing" ? <StatusTicks status={message.status} /> : null}
+                          {message.direction === "outgoing" ? (
+                            <StatusTicks status={message.status} />
+                          ) : (
+                            // Putting a thread back among the unread, from
+                            // this message on. Nobody is waiting on a
+                            // message we sent, so ours do not offer it.
+                            <button
+                              className="markUnread"
+                              onClick={() => void markUnread(message.id)}
+                              title="علّمها كغير مقروءة — بترجع المحادثة للي مش مقروءة من هون"
+                              type="button"
+                            >
+                              <Icon path={icons.dot} size={11} />
+                            </button>
+                          )}
                         </footer>
                         {message.error ? <small className="bubbleError">{message.error}</small> : null}
                       </article>

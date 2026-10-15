@@ -495,6 +495,30 @@ label {
   white-space: pre-wrap;
 }
 
+/* The dot that puts a thread back among the unread. Quiet until the
+   bubble is hovered: it sits on every message she sent, and six visible
+   dots down a conversation would read as status, not as an action. */
+.markUnread {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 2px;
+  border: 0;
+  background: none;
+  color: currentColor;
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 120ms ease;
+}
+
+.bubble:hover .markUnread,
+.markUnread:focus-visible {
+  opacity: 0.55;
+}
+
+.markUnread:hover {
+  opacity: 1;
+}
+
 .bubble footer {
   align-items: center;
   color: var(--muted);
