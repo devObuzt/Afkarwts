@@ -138,7 +138,11 @@ function mapSubmission(row: DbSubmission): SubmissionRow {
 
 const FORM_SELECT = `
   SELECT forms.*, groups.name AS group_name,
-         (SELECT COUNT(*) FROM form_submissions s WHERE s.form_id = forms.id) AS submission_count,
+         -- Rejected registrations are out of the table this number opens,
+         -- so they are out of the number too: a card promising 220 over a
+         -- table of 215 is the drift that sends somebody counting by hand.
+         (SELECT COUNT(*) FROM form_submissions s
+           WHERE s.form_id = forms.id AND s.state <> 'rejected') AS submission_count,
          (SELECT COUNT(*) FROM form_submissions s WHERE s.form_id = forms.id AND s.state = 'new') AS new_count
   FROM forms
   LEFT JOIN groups ON groups.id = forms.group_id

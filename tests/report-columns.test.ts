@@ -15,11 +15,19 @@ import { readFileSync } from "node:fs";
 const SOURCE = readFileSync(new URL("../app/new/forms/[id]/report/page.tsx", import.meta.url), "utf8");
 
 test("every column drawn in the header is drawn in the body too", () => {
-  // The duplicate mark is conditional, so its two conditions must match.
-  const header = (SOURCE.match(/\{!printing && duplicates > 0 && <th>/g) ?? []).length;
-  const body = (SOURCE.match(/\{!printing && duplicates > 0 && \(/g) ?? []).length;
-  assert.equal(header, 1, "the duplicate heading");
-  assert.equal(body, 1, "and the duplicate cell — a heading with no cell shifts every answer");
+  // The mark column is conditional, so the heading, the cell and the
+  // width it is paid for with must all hang off the same flag.
+  assert.equal((SOURCE.match(/\{markColumn && <th>/g) ?? []).length, 1, "the mark heading");
+  assert.equal((SOURCE.match(/\{markColumn && \(/g) ?? []).length, 1, "and its cell — a heading with no cell shifts every answer");
+  assert.equal((SOURCE.match(/markColumn \? \["6%"\]/g) ?? []).length, 1, "and its width in the colgroup");
+  // One column, two jobs: the duplicate mark, or the way back out of
+  // «المرفوضة». A second column would have to be paid for out of the
+  // same 100%, and nothing here would notice it was not.
+  assert.equal(
+    (SOURCE.match(/viewingRejected \? "إرجاع" : "تكرار"/g) ?? []).length,
+    1,
+    "the heading says which of the two jobs the column is doing"
+  );
 
   // The Hebrew pair: two headings, and two cells on each of the two paths
   // (printing renders plain, the screen renders the editor).
@@ -31,7 +39,7 @@ test("every column drawn in the header is drawn in the body too", () => {
 
 test("a component imported into the report is actually rendered", () => {
   // `DuplicateMark` sat imported and unrendered through a deploy.
-  for (const component of ["DuplicateMark", "HebrewCell", "EditableCell"]) {
+  for (const component of ["DuplicateMark", "RestoreMark", "HebrewCell", "EditableCell"]) {
     assert.ok(
       new RegExp(`<${component}[\\s/>]`).test(SOURCE),
       `${component} is imported but never rendered — the header it belongs to has no cell`
@@ -80,7 +88,7 @@ test("the cells come in the order their headings do", () => {
   ];
   const bodyOrder = [
     body.indexOf("index + 1"),
-    body.indexOf("DuplicateMark"),
+    body.indexOf("markColumn &&"),
     body.indexOf("row.submittedAt"),
     body.indexOf("hebrew.name"),
     body.indexOf("hebrew.city")

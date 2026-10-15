@@ -159,12 +159,17 @@ test("the same guard for every opener Excel treats as a formula", async () => {
     formName: "x",
     groupName: "y",
     columns: ["س"],
+    cityColumn: null,
     rows: ["=1+1", "+1", "-1", "@SUM(A1)", "\tx", "عادي", "+972521234567"].map((value, index) => ({
       submissionId: index,
       memberId: null,
       state: "new",
       submittedAt: "2026-10-11 10:00",
-      cells: [value]
+      cells: [value],
+      answerIds: [null],
+      phone: "",
+      hebrew: { name: "", nameConfirmed: false, city: "", cityConfirmed: false },
+      duplicateOf: []
     }))
   };
 

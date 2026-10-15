@@ -7,10 +7,12 @@ import {
   headerKey,
   isNumeric,
   printHeader,
+  rejectedCount,
   submissionGrid
 } from "@/app/lib/forms/report";
 import { requireUser } from "@/app/lib/users/current";
 import { DuplicateMark } from "./DuplicateMark";
+import { RestoreMark } from "./RestoreMark";
 import { EditableCell } from "./EditableCell";
 import { HebrewCell } from "./HebrewCell";
 import { PdfButton } from "./PdfButton";
@@ -22,6 +24,9 @@ const STATES = [
   { key: "", label: "الكل" },
   { key: "added", label: "في المجموعة" },
   { key: "new", label: "بانتظار المراجعة" },
+  // A rejected registration is out of «الكل» and out of every export —
+  // this tab is the only place it still appears, and the only way back.
+  { key: "rejected", label: "المرفوضة" },
   // Not a state the registration carries — a view of the table. Kept
   // beside the others because it is the same question: which rows now?
   { key: "duplicates", label: "المكررات" }
@@ -80,6 +85,13 @@ export default async function ReportPage({
   const canReject = can(user, "leads.review");
   // The form's own count, not the current view's — see duplicateCount.
   const duplicates = duplicateCount(form.id);
+  const rejected = rejectedCount(form.id);
+  // One extra column carries the row's action, and which action depends on
+  // the view: the duplicate mark normally, the way back in «المرفوضة».
+  // Keeping it to a single column is what keeps the colgroup honest — a
+  // second one would have to be paid for out of the same 100%.
+  const viewingRejected = state === "rejected";
+  const markColumn = !printing && (viewingRejected || duplicates > 0);
   // Weighted by content: a phone does not need a consent paragraph's room.
   // The Arabic town column is dropped: «البلدة بالعبرية» already carries
   // the same answer in the form the records use. One list drives the
@@ -94,12 +106,12 @@ export default async function ReportPage({
   // the same 100%: the duplicate mark when there is one, and the two
   // Hebrew columns always. A colgroup that is short puts every answer
   // under the wrong heading.
-  const extra = (duplicates > 0 && !printing ? 6 : 0) + 18;
+  const extra = (markColumn ? 6 : 0) + 18;
   const scale = (100 - extra) / 100;
   const shrink = (width: string) => `${Math.round(Number(width.replace("%", "")) * scale * 100) / 100}%`;
   const laidOut = [
     shrink(widths[0]),
-    ...(duplicates > 0 && !printing ? ["6%"] : []),
+    ...(markColumn ? ["6%"] : []),
     shrink(widths[1]),
     "9%",
     "9%",
@@ -122,7 +134,15 @@ export default async function ReportPage({
             </p>
           </header>
 
-          {duplicates > 0 && (
+          {viewingRejected && (
+            <p className="crmNote" style={{ marginBottom: -6 }}>
+              التسجيلات المرفوضة لا تظهر في «الكل» ولا في ملف Excel ولا في PDF — هذه الشاشة هي
+              مكانها الوحيد. «أرجعه» يعيد التسجيل إلى «بانتظار المراجعة»، وإضافته إلى المجموعة
+              تبقى قراراً منفصلاً.
+            </p>
+          )}
+
+          {!viewingRejected && duplicates > 0 && (
             <p className="crmNote" style={{ marginBottom: -6 }}>
               {duplicates} تسجيل يحمل رقم هاتف مكرر على هذه الاستمارة — نفس المرأة سجّلت أكثر من
               مرة. «ارفض» يرفض التسجيل وحده؛ المنتسبة تبقى، لأن تسجيلها الآخر ما زال لها.
@@ -146,6 +166,7 @@ export default async function ReportPage({
                 >
                   {option.label}
                   {option.key === "duplicates" && duplicates > 0 ? ` (${duplicates})` : ""}
+                  {option.key === "rejected" && rejected > 0 ? ` (${rejected})` : ""}
                 </Link>
               ))}
             </span>
@@ -184,7 +205,7 @@ export default async function ReportPage({
           <thead>
             <tr>
               <th>#</th>
-              {!printing && duplicates > 0 && <th>تكرار</th>}
+              {markColumn && <th>{viewingRejected ? "إرجاع" : "تكرار"}</th>}
               <th>التاريخ</th>
               <th>الاسم بالعبرية</th>
               <th>البلدة</th>
@@ -222,14 +243,18 @@ export default async function ReportPage({
                     </Link>
                   )}
                 </td>
-                {!printing && duplicates > 0 && (
+                {markColumn && (
                   <td>
-                    <DuplicateMark
-                      canReject={canReject}
-                      state={row.state}
-                      submissionId={row.submissionId}
-                      twins={row.duplicateOf}
-                    />
+                    {viewingRejected ? (
+                      canReject && <RestoreMark submissionId={row.submissionId} />
+                    ) : (
+                      <DuplicateMark
+                        canReject={canReject}
+                        state={row.state}
+                        submissionId={row.submissionId}
+                        twins={row.duplicateOf}
+                      />
+                    )}
                   </td>
                 )}
                 <td>

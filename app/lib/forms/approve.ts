@@ -76,6 +76,24 @@ export function rejectSubmission(id: number) {
 }
 
 /**
+ * Undo a rejection: the registration goes back to waiting, not into the
+ * group. A wrong reject is a mistake someone makes on a crowded table,
+ * and the way back has to be one button — but it lands where it started,
+ * so letting her in stays its own decision with its own record.
+ */
+export function restoreSubmission(id: number) {
+  const stored = getSubmission(id);
+  if (!stored) {
+    return { ok: false as const, error: "هذا التسجيل غير موجود." };
+  }
+  if (stored.submission.state !== "rejected") {
+    return { ok: false as const, error: "هذا التسجيل غير مرفوض." };
+  }
+  setSubmissionState(id, "new", null);
+  return { ok: true as const };
+}
+
+/**
  * Only the fields a registration can speak for. The phone is deliberately not
  * among them: it is the key the member was found by, and changing it here
  * would collide with another member's record.

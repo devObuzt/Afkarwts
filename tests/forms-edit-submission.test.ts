@@ -293,8 +293,14 @@ test("rejecting a duplicate leaves the منتسبة and her other registration a
   assert.ok(findMemberByPhone("+972545227712"), "and she is still a منتسبة");
   assert.equal(findMemberByPhone("+972545227712")!.id, member.id);
 
-  // The mark stays on the row that remains, so the pair is still legible.
-  assert.deepEqual(submissionGrid(form.id)!.rows.find((r) => r.submissionId === first)!.duplicateOf, [twin]);
+  // The mark comes down off the row that remains: rejecting one of a pair
+  // is how a duplicate is resolved, and a warning that stays up over a
+  // pair somebody already dealt with is a warning nobody reads. The pair
+  // is still legible in «المرفوضة» and in the audit log.
+  assert.deepEqual(submissionGrid(form.id)!.rows.find((r) => r.submissionId === first)!.duplicateOf, []);
+  // Asking for the rejected view by name still shows both as a pair.
+  const kept = submissionGrid(form.id, { state: "rejected" })!;
+  assert.deepEqual(kept.rows.map((r) => r.submissionId), [twin]);
 });
 
 test("a correction cannot reach into another woman's record", async () => {

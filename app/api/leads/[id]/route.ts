@@ -1,7 +1,7 @@
 import { recordAction } from "@/app/lib/users/audit";
 import { requireApi } from "@/app/lib/users/current";
 import { NextResponse } from "next/server";
-import { approveSubmission, rejectSubmission } from "@/app/lib/forms/approve";
+import { approveSubmission, rejectSubmission, restoreSubmission } from "@/app/lib/forms/approve";
 import { getSubmission } from "@/app/lib/forms/store";
 
 export const runtime = "nodejs";
@@ -39,6 +39,23 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       subjectType: "submission",
       subjectId: id,
       subjectLabel: getSubmission(id)?.submission.name ?? ""
+    });
+    return NextResponse.json({ ok: true });
+  }
+
+  if (body.action === "restore") {
+    const name = getSubmission(id)?.submission.name ?? "";
+    const result = restoreSubmission(id);
+    if (!result.ok) {
+      return NextResponse.json({ error: result.error }, { status: 400 });
+    }
+    recordAction({
+      userId: auth.user.id,
+      actor: auth.user.name,
+      action: "lead.restore",
+      subjectType: "submission",
+      subjectId: id,
+      subjectLabel: name
     });
     return NextResponse.json({ ok: true });
   }

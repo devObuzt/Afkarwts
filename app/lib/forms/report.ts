@@ -165,16 +165,28 @@ function hebrewFor(row: Record<string, string | number | null>) {
  * button says «المكررات (10)» and that has to be ten whichever view is
  * open, or pressing it from «بانتظار المراجعة» would promise two and
  * show ten.
+ *
+ * A rejected registration is not counted, because rejecting one of a pair
+ * is exactly how a duplicate is resolved. Leaving it in would keep the
+ * warning up over a pair somebody already dealt with.
  */
 export function duplicateCount(formId: number) {
   const row = getDb()
     .prepare(
       `SELECT COALESCE(SUM(n), 0) AS total FROM (
          SELECT COUNT(*) AS n FROM form_submissions
-          WHERE form_id = ? AND TRIM(phone) <> ''
+          WHERE form_id = ? AND TRIM(phone) <> '' AND state <> 'rejected'
           GROUP BY phone HAVING COUNT(*) > 1
        )`
     )
+    .get(formId) as { total: number };
+  return Number(row?.total ?? 0);
+}
+
+/** How many registrations on this form were rejected — the tab's own count. */
+export function rejectedCount(formId: number) {
+  const row = getDb()
+    .prepare("SELECT COUNT(*) AS total FROM form_submissions WHERE form_id = ? AND state = 'rejected'")
     .get(formId) as { total: number };
   return Number(row?.total ?? 0);
 }
@@ -192,6 +204,12 @@ export function submissionGrid(formId: number, filter: { state?: string } = {}):
   if (filter.state) {
     where.push("form_submissions.state = ?");
     args.push(filter.state);
+  } else {
+    // A rejected registration leaves the table. This is the one gate every
+    // reader of the cohort inherits — the screen, the CSV and the PDF all
+    // come through here — so «rejected» means out of the list everywhere,
+    // not out of one view. Asking for it by name is the only way back in.
+    where.push("form_submissions.state <> 'rejected'");
   }
 
   const submissions = db
