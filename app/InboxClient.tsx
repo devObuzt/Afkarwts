@@ -2079,8 +2079,14 @@ function BulkModal({ groups, onClose, onDone }: { groups: Group[]; onClose: () =
     // keeps a running total, because «sent 250» over a group of 3,746
     // would read like a failure.
     const running = { sent: 0, failed: 0, skipped: 0, remaining: 0, results: [] as BulkResult[] };
+    // 🔴 The only thing that moves the server to the *next* slice is the
+    // skip: each trip re-reads the group and takes the first 250 who have
+    // not had this message. With the skip off there is no cursor, so every
+    // trip would take the same 250 and send to them again — sixty times.
+    // One trip then, exactly as before.
+    const mayLoop = skipAlreadySent;
     try {
-      for (let trip = 0; trip < 60; trip++) {
+      for (let trip = 0; trip < (mayLoop ? 60 : 1); trip++) {
         const response = await fetch("/api/messages/bulk", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -2117,7 +2123,10 @@ function BulkModal({ groups, onClose, onDone }: { groups: Group[]; onClose: () =
         setResults({ ...running, inFlight: running.remaining > 0 });
 
         const budgetLeft = maxRecipients - running.sent - running.failed;
-        if (!running.remaining || budgetLeft <= 0 || (!payload.sent && !payload.failed)) {
+        // A trip that accepted nobody made no progress: the same people
+        // will be read again next time, so going round again just repeats
+        // the same failures. Stop and show them.
+        if (!mayLoop || !running.remaining || budgetLeft <= 0 || !payload.sent) {
           break;
         }
       }
@@ -2195,7 +2204,15 @@ function BulkModal({ groups, onClose, onDone }: { groups: Group[]; onClose: () =
               </p>
             ) : null}
 
-            {(results.remaining ?? 0) > 0 && !results.inFlight ? (
+            {(results.remaining ?? 0) > 0 && !results.inFlight && !skipAlreadySent ? (
+              <p className="hint warning">
+                Only one batch went out: with &laquo;skip members who already received this&raquo; off there is
+                nothing to tell the next batch where to start, so it would send to the same people again.
+                Turn it on to carry on through the group.
+              </p>
+            ) : null}
+
+            {(results.remaining ?? 0) > 0 && !results.inFlight && skipAlreadySent ? (
               <p className="hint warning">
                 {results.remaining} members still have not received this message — run Bulk send again
                 (tomorrow if you hit the daily limit) with the same template and they will be picked up automatically.
