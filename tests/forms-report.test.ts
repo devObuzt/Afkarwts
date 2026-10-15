@@ -36,7 +36,7 @@ async function register(
               ? "data:image/png;base64,iVBORw0KGgoAAAANSUhEUg=="
               : field.options[0] ?? "نعم";
   }
-  return submitForm(formToken, answers);
+  return submitForm(formToken, answers, { requirePhoneCode: false });
 }
 
 async function illnessField(formId: number) {

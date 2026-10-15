@@ -32,7 +32,7 @@ async function person() {
                 ? field.options[0]
                 : "نعم";
   }
-  const submitted = submitForm(form.token, answers) as { ok: true; id: number };
+  const submitted = submitForm(form.token, answers, { requirePhoneCode: false }) as { ok: true; id: number };
   const approved = approveSubmission(submitted.id) as { ok: true; memberId: number };
 
   const template = createTemplate({ name: `مسار ${seq}` });

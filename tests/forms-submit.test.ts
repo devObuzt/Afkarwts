@@ -46,7 +46,7 @@ test("a required question left empty is refused, and the refusal names it", asyn
   const answers = await filled(form.id);
   answers[String(fields[0].id)] = "   ";
 
-  const result = submitForm(form.token, answers);
+  const result = submitForm(form.token, answers, { requirePhoneCode: false });
   assert.equal(result.ok, false);
   assert.match((result as { error: string }).error, /الاسم الكامل/);
 });
@@ -56,7 +56,7 @@ test("an optional question left empty is fine", async () => {
   const { form } = await cohort("كلين اختياري");
 
   const answers = await filled(form.id, { "رقم الهوية": "" });
-  assert.equal(submitForm(form.token, answers).ok, true);
+  assert.equal(submitForm(form.token, answers, { requirePhoneCode: false }).ok, true);
 });
 
 test("a closed form accepts nothing", async () => {
@@ -71,7 +71,7 @@ test("a closed form accepts nothing", async () => {
 
 test("an unknown link accepts nothing", async () => {
   const { submitForm } = await import("@/app/lib/forms/store");
-  assert.equal(submitForm("nosuchtoken", {}).ok, false);
+  assert.equal(submitForm("nosuchtoken", {}, { requirePhoneCode: false }).ok, false);
 });
 
 test("an answer to a question this form does not have is ignored", async () => {
@@ -81,7 +81,7 @@ test("an answer to a question this form does not have is ignored", async () => {
   const answers = await filled(form.id);
   answers["999999"] = "حقل مش موجود";
 
-  const result = submitForm(form.token, answers) as { ok: true; id: number };
+  const result = submitForm(form.token, answers, { requirePhoneCode: false }) as { ok: true; id: number };
   assert.equal(result.ok, true);
   assert.equal(
     getSubmission(result.id)!.answers.some((answer) => answer.value === "حقل مش موجود"),
@@ -93,10 +93,9 @@ test("the phone is stored in one shape, however it was typed", async () => {
   const { submitForm, getSubmission } = await import("@/app/lib/forms/store");
   const { form } = await cohort("كلين تلفون");
 
-  const result = submitForm(form.token, await filled(form.id, { phone: "054-522-7674" })) as {
-    ok: true;
-    id: number;
-  };
+  const result = submitForm(form.token, await filled(form.id, { phone: "054-522-7674" }), {
+    requirePhoneCode: false
+  }) as { ok: true; id: number };
   assert.equal(getSubmission(result.id)!.submission.phone, "+972545227674");
 });
 
@@ -106,7 +105,8 @@ test("the name and city travel onto the submission, ready for approval", async (
 
   const result = submitForm(
     form.token,
-    await filled(form.id, { name: "سارة عوض", city: "مجد الكروم - الحارة الشرقية" })
+    await filled(form.id, { name: "سارة عوض", city: "مجد الكروم - الحارة الشرقية" }),
+    { requirePhoneCode: false }
   ) as { ok: true; id: number };
 
   const stored = getSubmission(result.id)!.submission;

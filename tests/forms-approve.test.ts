@@ -37,7 +37,7 @@ async function register(
                 : "نعم";
   }
 
-  const result = submitForm(form.token, answers);
+  const result = submitForm(form.token, answers, { requirePhoneCode: false });
   assert.equal(result.ok, true, "the registration itself should succeed");
   return (result as { id: number }).id;
 }
@@ -130,7 +130,7 @@ test("a registration with no usable phone cannot be approved", async () => {
     answers[String(field.id)] =
       field.mapsTo === "name" ? "بلا رقم" : field.kind === "date" ? "2026-10-02" : field.options.length ? field.options[0] : "نعم";
   }
-  const submitted = submitForm(form.token, answers) as { ok: true; id: number };
+  const submitted = submitForm(form.token, answers, { requirePhoneCode: false }) as { ok: true; id: number };
 
   const result = approveSubmission(submitted.id);
   assert.equal(result.ok, false);

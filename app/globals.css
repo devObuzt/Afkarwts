@@ -2757,6 +2757,103 @@ button.danger {
   line-height: 1.85;
 }
 
+/* ---- confirming the number ---- */
+
+.codeBox {
+  margin-top: 10px;
+  padding: 12px 14px;
+  border: 1px solid #e4e4dd;
+  border-radius: 12px;
+  background: #fbfaf6;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.codeHint,
+.codeNote,
+.codeDone {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.codeHint {
+  color: #5d6357;
+}
+
+.codeNote {
+  color: #9f5260;
+}
+
+.codeDone {
+  margin-top: 8px;
+  color: #2c6b3f;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.codeNum {
+  direction: ltr;
+  display: inline-block;
+  font-weight: 600;
+}
+
+.codeRow {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+.codeInput {
+  flex: 1 1 140px;
+  min-width: 120px;
+  padding: 10px 12px;
+  border: 1px solid #c9c9c0;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 20px;
+  letter-spacing: 6px;
+  text-align: center;
+  direction: ltr;
+}
+
+.codeBtn {
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 999px;
+  background: #002a0c;
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.codeBtn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.codeLink {
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: #5d6357;
+  font: inherit;
+  font-size: 13px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.codeLink:disabled {
+  opacity: 0.5;
+  cursor: default;
+  text-decoration: none;
+}
+
 .formSubmit {
   width: 100%;
   margin-top: 22px;

@@ -31,7 +31,7 @@ async function register(form: { id: number; token: string }, who: { name: string
                 ? field.options[0]
                 : "نعم";
   }
-  const result = submitForm(form.token, answers);
+  const result = submitForm(form.token, answers, { requirePhoneCode: false });
   assert.equal(result.ok, true);
   return (result as { id: number }).id;
 }
