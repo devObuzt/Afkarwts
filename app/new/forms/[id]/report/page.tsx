@@ -203,6 +203,16 @@ export default async function ReportPage({
                       collapsed to 9px with the date stacked letter by letter. */}
                   <span className="crmLtr">{row.submittedAt.slice(0, 10)}</span>
                 </td>
+                {!printing && duplicates > 0 && (
+                  <td>
+                    <DuplicateMark
+                      canReject={canReject}
+                      state={row.state}
+                      submissionId={row.submissionId}
+                      twins={row.duplicateOf}
+                    />
+                  </td>
+                )}
                 {printing ? (
                   <>
                     <td className="heCell">{row.hebrew.name || "—"}</td>
