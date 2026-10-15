@@ -231,3 +231,17 @@ test("a template with an image header goes out with the image", async () => {
   // And a name that is not a template name never reaches the filesystem.
   assert.equal(templateHeaderUrl("../../etc/passwd"), null);
 });
+
+test("the who-list runs for every bucket, with and without a step", async () => {
+  // It answered 500 with an empty body: node:sqlite throws on a named
+  // parameter the statement does not mention, and both «stepId» and the
+  // assignment filter come and go with the view.
+  const { whoOnStep } = await import("@/app/lib/journeys/report");
+  for (const bucket of ["failed", "sent", "delivered", "read", "replied", "skipped", "stuck", "enrolled"]) {
+    for (const step of [null, 1]) {
+      for (const view of [{}, { onlyAssignedTo: 7 }, { withReplyText: true }]) {
+        assert.doesNotThrow(() => whoOnStep(1, step, bucket, view), `${bucket} · step ${step}`);
+      }
+    }
+  }
+});

@@ -97,6 +97,79 @@ type Group = { id: number; name: string; memberCount: number };
 
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
+/** What each count on this screen is called when its list is open. */
+const WHO_LABEL: Record<string, string> = {
+  enrolled: "Enrolled",
+  sent: "Sent to",
+  delivered: "Reached",
+  read: "Read",
+  replied: "Replied",
+  failed: "Failed",
+  skipped: "Skipped",
+  stuck: "Stuck"
+};
+
+type WhoRow = { memberId: number; name: string; phone: string; detail: string };
+
+/** A number you can press, or a zero you cannot. */
+function StatCell({ n, onOpen }: { n: number; onOpen: () => void }) {
+  if (!n) {
+    return <>0</>;
+  }
+  return (
+    <button className="linkBtn" onClick={onOpen} type="button">
+      {n}
+    </button>
+  );
+}
+
+/**
+ * What went wrong on a step. The three that name people are buttons; the
+ * two that only describe timing are not — there is no list behind them.
+ */
+function Problems({
+  onOpen,
+  step
+}: {
+  onOpen: (bucket: string) => void;
+  step: { failed: number; skipped: number; stuck: number; deferred: number; missed: number };
+}) {
+  const parts: React.ReactNode[] = [];
+  for (const [bucket, n] of [
+    ["failed", step.failed],
+    ["skipped", step.skipped],
+    ["stuck", step.stuck]
+  ] as Array<[string, number]>) {
+    if (n > 0) {
+      parts.push(
+        <button className="linkBtn" key={bucket} onClick={() => onOpen(bucket)} type="button">
+          {n} {bucket}
+        </button>
+      );
+    }
+  }
+  if (step.deferred) {
+    parts.push(<span key="deferred">{step.deferred} deferred</span>);
+  }
+  if (step.missed) {
+    parts.push(<span key="missed">{step.missed} missed</span>);
+  }
+
+  if (!parts.length) {
+    return <>—</>;
+  }
+  return (
+    <>
+      {parts.map((node, at) => (
+        <span key={at}>
+          {at ? " · " : ""}
+          {node}
+        </span>
+      ))}
+    </>
+  );
+}
+
 const STOP_REASONS: Record<string, string> = {
   not_delivered: "never arrived",
   not_read: "arrived, unread",
@@ -806,6 +879,26 @@ function RunningView({ onError }: { onError: (message: string) => void }) {
 function JourneyReport({ journeyId }: { journeyId: number }) {
   const [funnel, setFunnel] = useState<Funnel | null>(null);
   const [steps, setSteps] = useState<StepRow[]>([]);
+  // Every count here is a question — who did not get it, who read it, who
+  // wrote back — and a number nobody can open is a number nobody can act
+  // on. The eight that failed were only reachable by reading the database.
+  const [who, setWho] = useState<{
+    bucket: string;
+    step: number | null;
+    loading: boolean;
+    rows: WhoRow[];
+  } | null>(null);
+
+  async function open(bucket: string, step: number | null) {
+    setWho({ bucket, step, loading: true, rows: [] });
+    try {
+      const query = step === null ? "" : `&step=${step}`;
+      const payload = await api(`/api/journeys/${journeyId}/who?bucket=${bucket}${query}`);
+      setWho({ bucket, step, loading: false, rows: payload.rows ?? [] });
+    } catch (error) {
+      setWho({ bucket, step, loading: false, rows: [] });
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -816,6 +909,7 @@ function JourneyReport({ journeyId }: { journeyId: number }) {
         setSteps(payload.steps);
       }
     })();
+    setWho(null);
     return () => {
       cancelled = true;
     };
@@ -829,25 +923,63 @@ function JourneyReport({ journeyId }: { journeyId: number }) {
 
   return (
     <div className="report">
+      {who ? (
+        <div className="whoPanel">
+          <div className="whoHead">
+            <strong>
+              {WHO_LABEL[who.bucket] ?? who.bucket}
+              {who.step ? " · this step" : ""} — {who.rows.length}
+            </strong>
+            <button className="linkBtn" onClick={() => setWho(null)} type="button">
+              close
+            </button>
+          </div>
+          {who.loading ? (
+            <p className="hint">Loading…</p>
+          ) : who.rows.length ? (
+            <ol className="whoList">
+              {who.rows.map((row) => (
+                <li key={`${row.memberId}-${row.phone}`}>
+                  <span className="whoName">{row.name}</span>
+                  <span className="whoPhone">{row.phone}</span>
+                  {row.detail ? <span className="whoDetail">{row.detail}</span> : null}
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p className="hint">Nobody.</p>
+          )}
+        </div>
+      ) : null}
       <div className="funnelGrid">
         <div>
-          <strong>{funnel.enrolled}</strong>
+          <button className="statBtn" onClick={() => open("enrolled", null)} type="button">
+            <strong>{funnel.enrolled}</strong>
+          </button>
           <span>enrolled</span>
         </div>
         <div>
-          <strong>{funnel.sent}</strong>
+          <button className="statBtn" onClick={() => open("sent", null)} type="button">
+            <strong>{funnel.sent}</strong>
+          </button>
           <span>sent to</span>
         </div>
         <div>
-          <strong>{funnel.reached}</strong>
+          <button className="statBtn" onClick={() => open("delivered", null)} type="button">
+            <strong>{funnel.reached}</strong>
+          </button>
           <span>reached</span>
         </div>
         <div>
-          <strong>{funnel.read}</strong>
+          <button className="statBtn" onClick={() => open("read", null)} type="button">
+            <strong>{funnel.read}</strong>
+          </button>
           <span>read</span>
         </div>
         <div>
-          <strong>{funnel.replied}</strong>
+          <button className="statBtn" onClick={() => open("replied", null)} type="button">
+            <strong>{funnel.replied}</strong>
+          </button>
           <span>replied</span>
         </div>
         <div>
@@ -886,19 +1018,17 @@ function JourneyReport({ journeyId }: { journeyId: number }) {
                   {step.sentText + step.sentTemplate}
                   {step.sentText ? ` (${step.sentText} free text)` : ""}
                 </td>
-                <td>{step.delivered}</td>
-                <td>{step.read}</td>
-                <td>{step.replied}</td>
                 <td>
-                  {[
-                    step.failed ? `${step.failed} failed` : null,
-                    step.deferred ? `${step.deferred} deferred` : null,
-                    step.missed ? `${step.missed} missed` : null,
-                    step.skipped ? `${step.skipped} skipped` : null,
-                    step.stuck ? `${step.stuck} stuck` : null
-                  ]
-                    .filter(Boolean)
-                    .join(" · ") || "—"}
+                  <StatCell n={step.delivered} onOpen={() => open("delivered", step.stepId)} />
+                </td>
+                <td>
+                  <StatCell n={step.read} onOpen={() => open("read", step.stepId)} />
+                </td>
+                <td>
+                  <StatCell n={step.replied} onOpen={() => open("replied", step.stepId)} />
+                </td>
+                <td>
+                  <Problems onOpen={(bucket) => open(bucket, step.stepId)} step={step} />
                 </td>
               </tr>
             ))}

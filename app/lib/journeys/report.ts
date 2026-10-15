@@ -235,7 +235,16 @@ export function whoOnStep(
   // The same rule the people list follows: without «people.all» a coach
   // sees the women assigned to her and nobody else.
   const mine = view.onlyAssignedTo ? "AND mem.assigned_user_id = @assigned" : "";
-  const args = { journeyId, stepId, limit: 500, assigned: view.onlyAssignedTo ?? 0 };
+  // Only the names the statement actually mentions: node:sqlite throws on
+  // a named parameter the SQL does not use, and both of these come and go
+  // with the view — which is how this returned 500 with an empty body.
+  const args: Record<string, number> = { journeyId, limit: 500 };
+  if (stepId !== null) {
+    args.stepId = stepId;
+  }
+  if (view.onlyAssignedTo) {
+    args.assigned = view.onlyAssignedTo;
+  }
 
   // Each bucket is defined exactly as the count beside it is, so the list
   // and the number can never disagree.
@@ -283,7 +292,9 @@ export function whoOnStep(
           WHERE e.journey_id = @journeyId ${mine}
           ORDER BY mem.name LIMIT @limit`
       )
-      .all(args) as WhoRow[];
+      // «enrolled» is the one bucket that knows nothing about a step, so
+      // it is the one that must not be handed @stepId.
+      .all({ journeyId, limit: 500, ...(view.onlyAssignedTo ? { assigned: view.onlyAssignedTo } : {}) }) as WhoRow[];
   }
 
   const clause = where[bucket];

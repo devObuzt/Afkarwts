@@ -2078,6 +2078,77 @@ label {
   border-top: 1px solid var(--line, #e6e6e6);
 }
 
+/* ---- opening a number on the journey report ---- */
+
+.statBtn {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.statBtn:hover strong {
+  text-decoration: underline;
+}
+
+.linkBtn {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: #1d4ed8;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.whoPanel {
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border: 1px solid #e4e4dd;
+  border-radius: 12px;
+  background: #fbfaf6;
+}
+
+.whoHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.whoList {
+  margin: 0;
+  padding-inline-start: 22px;
+  max-height: 340px;
+  overflow: auto;
+  font-size: 13px;
+  line-height: 1.9;
+}
+
+.whoList li {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: baseline;
+}
+
+.whoName {
+  font-weight: 600;
+}
+
+.whoPhone {
+  direction: ltr;
+  color: #5d6357;
+}
+
+.whoDetail {
+  color: #8a6d3b;
+  font-size: 12px;
+}
+
 .funnelGrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
