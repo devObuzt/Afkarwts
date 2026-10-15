@@ -1305,6 +1305,16 @@ export function mergeMembers(keepId: number, dropId: number) {
     // otherwise break the one-enrolment-per-journey rule. The sends made
     // on the dropped enrolment move onto the kept one, so her history on
     // that path stays whole.
+    // A step that failed under the dropped record failed on the dropped
+    // record's number — which is the very thing being corrected. Clearing
+    // the attempt is what makes the runner see it as due again, so she
+    // gets the message she never got, on the number that works.
+    db.prepare(
+      `DELETE FROM journey_sends
+        WHERE state = 'failed'
+          AND enrollment_id IN (SELECT id FROM journey_enrollments WHERE member_id = ?)`
+    ).run(dropId);
+
     const mine = db
       .prepare("SELECT id, journey_id FROM journey_enrollments WHERE member_id = ?")
       .all(keepId) as Array<{ id: number; journey_id: number }>;

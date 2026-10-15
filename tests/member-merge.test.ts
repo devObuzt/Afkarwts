@@ -161,3 +161,53 @@ test("a label she refused under the old record is still refused", async () => {
     .get(drop.id) as { n: number };
   assert.equal(orphan.n, 0);
 });
+
+test("a step that failed under the dropped record is tried again after the merge", async () => {
+  const { addMembersToGroup, createGroup, createMember, getDb, mergeMembers } = await import("@/app/lib/db");
+  const { createJourney, createStep, createTemplate, setJourneyStatus } = await import("@/app/lib/journeys/store");
+  const { runDueJourneys } = await import("@/app/lib/journeys/runner");
+  seq += 1;
+
+  // Her real number was in the list already; she registered with a digit
+  // wrong, which made the second record — and the cohort's first message
+  // was attempted on the wrong one and written off.
+  const group = createGroup(`كلين دمج ${seq}`);
+  const real = createMember({ name: "سوار", phone: "+97250888" + seq + "00", notes: "" })!;
+  const typo = createMember({ name: "siwar", phone: "+97220888" + seq + "00", notes: "" })!;
+  addMembersToGroup(group.id, [typo.id]);
+
+  const template = createTemplate({ name: `كلين دمج ${seq}`, smsText: "" });
+  createStep({
+    templateId: template.id,
+    week: 1,
+    weekday: 4,
+    sendTime: "14:00",
+    label: "ترحيب",
+    freeText: "",
+    templateName: "clean_week",
+    templateLanguage: "ar",
+    bodyParams: [],
+    templatePreview: "مراحب"
+  });
+  const journey = createJourney({ templateId: template.id, groupId: group.id, anchorDate: "2026-10-11" });
+  setJourneyStatus(journey.id, "active");
+  await runDueJourneys(new Date("2026-10-15T13:00:00.000Z"));
+
+  const send = getDb()
+    .prepare(
+      `SELECT s.id FROM journey_sends s
+         JOIN journey_enrollments e ON e.id = s.enrollment_id WHERE e.member_id = ?`
+    )
+    .get(typo.id) as { id: number };
+  getDb().prepare("UPDATE journey_sends SET state = 'failed' WHERE id = ?").run(send.id);
+
+  mergeMembers(real.id, typo.id);
+
+  const left = getDb()
+    .prepare(
+      `SELECT COUNT(*) AS n FROM journey_sends s
+         JOIN journey_enrollments e ON e.id = s.enrollment_id WHERE e.member_id = ?`
+    )
+    .get(real.id) as { n: number };
+  assert.equal(left.n, 0, "the written-off attempt is cleared, so the step is due again");
+});
