@@ -2,7 +2,12 @@ import { NextResponse } from "next/server";
 import { requireApi } from "@/app/lib/users/current";
 import { can } from "@/app/lib/users/permissions";
 import { recordAction } from "@/app/lib/users/audit";
-import { getSubmission, phoneIsUsable, updateSubmissionAnswers } from "@/app/lib/forms/store";
+import {
+  getSubmission,
+  phoneIsUsable,
+  setHebrewFields,
+  updateSubmissionAnswers
+} from "@/app/lib/forms/store";
 
 export const runtime = "nodejs";
 
@@ -29,7 +34,33 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   const id = Number((await params).id);
-  const body = (await request.json()) as { edits?: Array<{ answerId?: number; value?: string }> };
+  const body = (await request.json()) as {
+    edits?: Array<{ answerId?: number; value?: string }>;
+    hebrew?: { name?: string; city?: string };
+  };
+
+  // The Hebrew name and town are ours, not hers: they are not an answer
+  // she gave, so they are saved on their own and never touch the form.
+  if (body.hebrew) {
+    try {
+      const saved = setHebrewFields(id, body.hebrew);
+      recordAction({
+        userId: auth.user.id,
+        actor: auth.user.name,
+        action: "lead.edit",
+        subjectType: "submission",
+        subjectId: id,
+        subjectLabel: getSubmission(id)?.submission.name || `#${id}`,
+        detail: `أُكّد ${saved.join("، ")}`
+      });
+      return NextResponse.json({ ok: true, hebrew: true });
+    } catch (error) {
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : "تعذّر الحفظ." },
+        { status: 400 }
+      );
+    }
+  }
   const edits = (body.edits ?? [])
     .filter((edit) => Number.isFinite(Number(edit.answerId)))
     .map((edit) => ({ answerId: Number(edit.answerId), value: String(edit.value ?? "") }));

@@ -49,3 +49,35 @@ test("vowel marks and the tatweel are not letters", async () => {
   assert.equal(hebrewNameFor("مُحَمَّد"), hebrewNameFor("محمد"));
   assert.equal(hebrewNameFor("ســناء"), hebrewNameFor("سناء"));
 });
+
+test("a town is looked up, not guessed", async () => {
+  const { hebrewTownFor } = await import("@/app/lib/forms/hebrew-town");
+
+  // The register carries both names, so these are the towns' own names.
+  assert.equal(hebrewTownFor("عرابة"), "עראבה");
+  assert.equal(hebrewTownFor("سخنين"), "סח'נין");
+  assert.equal(hebrewTownFor("أم الفحم"), "אום אל-פחם");
+  // Fixed in the register on 2026-10-15; before that it had no Arabic name.
+  assert.equal(hebrewTownFor("دير الأسد"), "דייר אל-אסד");
+  assert.equal(hebrewTownFor("عيلبون"), "עיילבון");
+});
+
+test("a town written loosely still finds itself", async () => {
+  const { hebrewTownFor } = await import("@/app/lib/forms/hebrew-town");
+
+  // «عرابه» with a ha, «الرامة» with the article, a plain alif — the ways
+  // people actually type a town into a form.
+  assert.equal(hebrewTownFor("عرابه"), "עראבה");
+  assert.equal(hebrewTownFor(" عرابة "), "עראבה");
+  assert.equal(hebrewTownFor("ام الفحم"), "אום אל-פחם");
+});
+
+test("a town already in Hebrew, and one nobody knows", async () => {
+  const { hebrewTownFor } = await import("@/app/lib/forms/hebrew-town");
+
+  assert.equal(hebrewTownFor("עראבה"), "עראבה", "she typed it the way it is wanted");
+  // Not in the register: the letter map is better than an empty cell
+  // somebody has to fill from scratch.
+  assert.ok(hebrewTownFor("بلدة غير مسجلة").length > 0);
+  assert.equal(hebrewTownFor(""), "");
+});

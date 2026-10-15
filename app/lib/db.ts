@@ -2,7 +2,7 @@ import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { getDataDir } from "./media-store";
 import { migrateJourneyTables } from "./journeys/schema";
-import { migrateFormTables } from "./forms/schema";
+import { migrateFormTables, migrateHebrewNameColumns } from "./forms/schema";
 import { migrateUserTables } from "./users/schema";
 import { migrateLabelColumns } from "./labels/schema";
 import {
@@ -139,6 +139,7 @@ export function getDb() {
     migrateJourneyTables(db);
     migrateSendKeyColumn(db);
     migrateFormTables(db);
+    migrateHebrewNameColumns(db);
     migratePersonFileTables(db);
     migrateUserTables(db);
     migrateLabelColumns(db);

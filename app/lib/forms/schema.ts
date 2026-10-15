@@ -129,3 +129,20 @@ function addColumnIfMissing(db: DatabaseSync, table: string, column: string, def
     db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
   }
 }
+
+/**
+ * The Hebrew name and town, once somebody has checked them.
+ *
+ * Empty means «nobody has confirmed this yet» — the screen then shows a
+ * suggestion carried across from the Arabic, marked as one. Nothing is
+ * written here by the system: «سارة» is סארה or שרה depending on the
+ * woman, and Afkar's records will rely on whichever is stored.
+ */
+export function migrateHebrewNameColumns(db: DatabaseSync) {
+  const columns = db.prepare("PRAGMA table_info(form_submissions)").all() as Array<{ name: string }>;
+  for (const column of ["hebrew_name", "hebrew_city"]) {
+    if (!columns.some((existing) => existing.name === column)) {
+      db.exec(`ALTER TABLE form_submissions ADD COLUMN ${column} TEXT NOT NULL DEFAULT ''`);
+    }
+  }
+}

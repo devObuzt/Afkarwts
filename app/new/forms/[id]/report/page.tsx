@@ -5,6 +5,7 @@ import { columnWidths, headerKey, isNumeric, printHeader, submissionGrid } from 
 import { requireUser } from "@/app/lib/users/current";
 import { DuplicateMark } from "./DuplicateMark";
 import { EditableCell } from "./EditableCell";
+import { HebrewCell } from "./HebrewCell";
 import { PdfButton } from "./PdfButton";
 import { can } from "@/app/lib/users/permissions";
 
@@ -67,11 +68,21 @@ export default async function ReportPage({
   // is one short and every width lands on the cell to its left — the
   // answers shift and the id prints under the date. The 6% comes off the
   // rest proportionally rather than out of the total, which has to stay 100.
-  const shrink = (width: string) => `${Math.round(Number(width.replace("%", "")) * 0.94 * 100) / 100}%`;
-  const laidOut =
-    !printing && duplicates > 0
-      ? [shrink(widths[0]), "6%", ...widths.slice(1).map(shrink)]
-      : widths;
+  // Every column drawn outside `columnWidths` has to be paid for out of
+  // the same 100%: the duplicate mark when there is one, and the two
+  // Hebrew columns always. A colgroup that is short puts every answer
+  // under the wrong heading.
+  const extra = (duplicates > 0 && !printing ? 6 : 0) + 18;
+  const scale = (100 - extra) / 100;
+  const shrink = (width: string) => `${Math.round(Number(width.replace("%", "")) * scale * 100) / 100}%`;
+  const laidOut = [
+    shrink(widths[0]),
+    ...(duplicates > 0 && !printing ? ["6%"] : []),
+    shrink(widths[1]),
+    "9%",
+    "9%",
+    ...widths.slice(2).map(shrink)
+  ];
   const key = headerKey(grid.columns);
 
   return (
@@ -152,6 +163,8 @@ export default async function ReportPage({
               <th>#</th>
               {!printing && duplicates > 0 && <th>تكرار</th>}
               <th>التاريخ</th>
+              <th>الاسم بالعبرية</th>
+              <th>البلدة بالعبرية</th>
               {grid.columns.map((column, index) => (
                 <th key={column}>
                   {/* On screen the question is the column name. On paper a
@@ -190,6 +203,27 @@ export default async function ReportPage({
                       collapsed to 9px with the date stacked letter by letter. */}
                   <span className="crmLtr">{row.submittedAt.slice(0, 10)}</span>
                 </td>
+                {printing ? (
+                  <>
+                    <td className="heCell">{row.hebrew.name || "—"}</td>
+                    <td className="heCell">{row.hebrew.city || "—"}</td>
+                  </>
+                ) : (
+                  <>
+                    <HebrewCell
+                      confirmed={row.hebrew.nameConfirmed}
+                      field="name"
+                      submissionId={row.submissionId}
+                      value={row.hebrew.name}
+                    />
+                    <HebrewCell
+                      confirmed={row.hebrew.cityConfirmed}
+                      field="city"
+                      submissionId={row.submissionId}
+                      value={row.hebrew.city}
+                    />
+                  </>
+                )}
                 {row.cells.map((cell, cellIndex) =>
                   editable ? (
                     <EditableCell

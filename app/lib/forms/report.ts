@@ -1,4 +1,6 @@
 import { getDb } from "../db";
+import { hebrewNameFor } from "./hebrew-name";
+import { hebrewTownFor } from "./hebrew-town";
 import { getForm, listFields } from "./store";
 
 /**
@@ -101,6 +103,13 @@ export type SubmissionGrid = {
     /** Her phone as stored, so the table can group two registrations as one woman. */
     phone: string;
     /**
+     * Her name and town in Hebrew — the form of them Afkar's records end
+     * up in. `confirmed` is false while it is still only a suggestion
+     * carried across letter by letter, so a checked name and a guess
+     * never look the same on screen.
+     */
+    hebrew: { name: string; nameConfirmed: boolean; city: string; cityConfirmed: boolean };
+    /**
      * The other registrations on this form that carry the same phone.
      * Same number, same form, same woman — she filled it twice. A woman
      * who registers for two different cohorts is not a duplicate, so this
@@ -125,6 +134,24 @@ function cellValue(value: string) {
   return value;
 }
 
+/**
+ * The Hebrew name and town for one registration.
+ *
+ * A value somebody typed wins. Otherwise the name is carried across from
+ * Arabic letter by letter and the town is looked up — and either way the
+ * row says it is only a suggestion, because Afkar will rely on these.
+ */
+function hebrewFor(row: Record<string, string | number | null>) {
+  const storedName = String(row.hebrew_name ?? "").trim();
+  const storedCity = String(row.hebrew_city ?? "").trim();
+  return {
+    name: storedName || hebrewNameFor(String(row.name ?? "")),
+    nameConfirmed: storedName !== "",
+    city: storedCity || hebrewTownFor(String(row.city ?? "")),
+    cityConfirmed: storedCity !== ""
+  };
+}
+
 export function submissionGrid(formId: number, filter: { state?: string } = {}): SubmissionGrid | null {
   const form = getForm(formId);
   if (!form) {
@@ -142,7 +169,8 @@ export function submissionGrid(formId: number, filter: { state?: string } = {}):
 
   const submissions = db
     .prepare(
-      `SELECT id, state, submitted_at, member_id, phone
+      `SELECT id, state, submitted_at, member_id, phone, name, city,
+              hebrew_name, hebrew_city
          FROM form_submissions
         WHERE ${where.join(" AND ")}
         ORDER BY submitted_at, id`
@@ -199,7 +227,8 @@ export function submissionGrid(formId: number, filter: { state?: string } = {}):
       cells: columns.map((column) => given.get(column) ?? ""),
       answerIds: columns.map((column) => ids.get(column) ?? null),
       phone,
-      duplicateOf: sharing
+      duplicateOf: sharing,
+      hebrew: hebrewFor(submission)
     });
   }
 

@@ -674,6 +674,24 @@
   font-size: 11.5px;
 }
 
+/* A Hebrew name nobody has checked yet is dimmed and dotted: Afkar will
+   rely on these, so a guess must never look like a confirmed value. */
+.crm .heCell {
+  direction: rtl;
+  font-weight: 600;
+}
+
+.crm .heCell.guess {
+  color: var(--faint);
+  font-weight: 400;
+}
+
+.crm .guessDot {
+  color: var(--clay);
+  font-size: 9px;
+  vertical-align: middle;
+}
+
 /* ---- the pager ---- */
 
 .crm .crmPager {

@@ -621,6 +621,32 @@ export function updateSubmissionAnswers(
   return { changed, reached, memberId, phoneTaken, memberBlocked };
 }
 
+/**
+ * The Hebrew name or town, as somebody checked it.
+ *
+ * Storing it is the confirmation: an empty column means the screen is
+ * still showing a suggestion. Saving the suggestion unchanged is
+ * therefore a real act — it says a person read it and agreed.
+ */
+export function setHebrewFields(submissionId: number, patch: { name?: string; city?: string }) {
+  const db = getDb();
+  const exists = db.prepare("SELECT id FROM form_submissions WHERE id = ?").get(submissionId);
+  if (!exists) {
+    throw new Error("هذا التسجيل غير موجود.");
+  }
+
+  const saved: string[] = [];
+  if (patch.name !== undefined) {
+    db.prepare("UPDATE form_submissions SET hebrew_name = ? WHERE id = ?").run(patch.name.trim(), submissionId);
+    saved.push("الاسم بالعبرية");
+  }
+  if (patch.city !== undefined) {
+    db.prepare("UPDATE form_submissions SET hebrew_city = ? WHERE id = ?").run(patch.city.trim(), submissionId);
+    saved.push("البلدة بالعبرية");
+  }
+  return saved;
+}
+
 export function setSubmissionState(id: number, state: SubmissionRow["state"], memberId: number | null) {
   getDb()
     .prepare("UPDATE form_submissions SET state = ?, member_id = ?, handled_at = ? WHERE id = ?")
