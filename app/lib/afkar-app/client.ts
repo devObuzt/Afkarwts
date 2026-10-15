@@ -106,6 +106,23 @@ export async function appAdmin<T>(user: Staff, path: string, init: { method?: st
   });
 }
 
+/** Raw bytes from the app's admin API (a member's photo) — never handed to the browser with our keys. */
+export async function appAdminBytes(user: Staff, path: string): Promise<{ ok: true; bytes: ArrayBuffer; type: string } | { ok: false; status: number }> {
+  const config = appConfig();
+  if (!config) return { ok: false, status: 0 };
+  try {
+    const response = await fetch(`${config.url}${path}`, {
+      headers: { "x-service-key": config.serviceKey, "x-staff-assertion": staffAssertion(user, config.staffSecret) },
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+      cache: "no-store"
+    });
+    if (!response.ok) return { ok: false, status: response.status };
+    return { ok: true, bytes: await response.arrayBuffer(), type: response.headers.get("content-type") ?? "application/octet-stream" };
+  } catch {
+    return { ok: false, status: 0 };
+  }
+}
+
 /** Sends one signed event. The app ignores an event_id it has already seen, so a retry is safe. */
 export async function sendAppEvent<T>(event: { event_id: string }): Promise<AppResult<T>> {
   const config = appConfig();

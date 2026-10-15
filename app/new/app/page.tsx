@@ -3,6 +3,7 @@ import { requireUser } from "@/app/lib/users/current";
 import { can } from "@/app/lib/users/permissions";
 import { appAdmin, appConfig } from "@/app/lib/afkar-app/client";
 import { appPrograms, visibleAppMembers, type AppMember } from "@/app/lib/afkar-app/person";
+import { loadQueues } from "@/app/lib/afkar-app/queues";
 
 export const dynamic = "force-dynamic";
 
@@ -22,10 +23,12 @@ export default async function AppPage() {
     );
   }
 
-  const [members, programs] = await Promise.all([
+  const [members, programs, queues] = await Promise.all([
     appAdmin<{ members: Row[] }>(user, "/admin/v1/members"),
-    appPrograms(user)
+    appPrograms(user),
+    loadQueues(user)
   ]);
+  const waiting = queues.reviews.length + (queues.products?.length ?? 0);
 
   const list = members.ok ? visibleAppMembers(members.data.members, { id: user.id, seesAll: can(user, "people.all") }) : [];
 
@@ -35,6 +38,18 @@ export default async function AppPage() {
         <h1>التطبيق</h1>
         <p>من سُجّل بتطبيق أفكار، ومن دخل إليه. التسجيل بمسار يتم من صفحة الشخص.</p>
       </header>
+
+      <Link className="crmCard" data-tone={waiting ? "clay" : "sage"} href="/new/app/queues" style={{ display: "block", textDecoration: "none" }}>
+        <header>
+          <span className="crmDot" />
+          <h2>طلبات تنتظر</h2>
+          <span className="crmPill tone spacer">{waiting}</span>
+        </header>
+        <p className="crmEmpty">
+          صور من المنتسبات: {queues.reviews.length}
+          {queues.products !== null && <> · منتجات بالباركود: {queues.products.length}</>}
+        </p>
+      </Link>
 
       {!members.ok ? (
         <section className="crmCard" data-tone="clay">
