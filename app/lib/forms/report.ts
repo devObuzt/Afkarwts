@@ -152,6 +152,27 @@ function hebrewFor(row: Record<string, string | number | null>) {
   };
 }
 
+/**
+ * How many registrations on this form share a phone with another.
+ *
+ * Counted across the whole form, never within the current filter: the
+ * button says «المكررات (10)» and that has to be ten whichever view is
+ * open, or pressing it from «بانتظار المراجعة» would promise two and
+ * show ten.
+ */
+export function duplicateCount(formId: number) {
+  const row = getDb()
+    .prepare(
+      `SELECT COALESCE(SUM(n), 0) AS total FROM (
+         SELECT COUNT(*) AS n FROM form_submissions
+          WHERE form_id = ? AND TRIM(phone) <> ''
+          GROUP BY phone HAVING COUNT(*) > 1
+       )`
+    )
+    .get(formId) as { total: number };
+  return Number(row?.total ?? 0);
+}
+
 export function submissionGrid(formId: number, filter: { state?: string } = {}): SubmissionGrid | null {
   const form = getForm(formId);
   if (!form) {

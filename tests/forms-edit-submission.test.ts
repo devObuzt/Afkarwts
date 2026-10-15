@@ -344,3 +344,26 @@ test("without «تعديل البيانات» the registration is fixed and her 
   assert.equal(getSubmission(id)!.submission.name, "رنا صالح", "the registration is still corrected");
   assert.equal(getMember(approved.memberId)!.name, "رنا", "her record is untouched");
 });
+
+test("the duplicate count is the form's, not the current filter's", async () => {
+  const { duplicateCount, submissionGrid } = await import("@/app/lib/forms/report");
+  const { approveSubmission } = await import("@/app/lib/forms/approve");
+
+  const { form } = await cohort("كلين");
+  const a = await register(form, { name: "ريم", phone: "0545227730" });
+  const b = await register(form, { name: "ريم زيدات", phone: "0545227730" });
+  await register(form, { name: "وحيدة", phone: "0545227731" });
+
+  assert.equal(duplicateCount(form.id), 2, "both halves of the pair count");
+
+  // Approve one: the pair is still a pair, and the button must still say 2
+  // even while «بانتظار المراجعة» is showing only the other one.
+  approveSubmission(a);
+  assert.equal(duplicateCount(form.id), 2);
+  assert.equal(submissionGrid(form.id, { state: "new" })!.rows.length, 2, "the filtered view is smaller");
+
+  // And a form with no twins reports none.
+  const { form: clean } = await cohort("كلين بلا تكرار");
+  await register(clean, { name: "سلمى", phone: "0545227732" });
+  assert.equal(duplicateCount(clean.id), 0);
+});

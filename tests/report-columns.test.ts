@@ -63,3 +63,33 @@ test("the widths account for every column the table draws", async () => {
     assert.equal(laid.length, widths.length + (dup ? 3 : 2), "one width per column drawn");
   }
 });
+
+test("the cells come in the order their headings do", () => {
+  // The counts matched while the mark sat after the date instead of
+  // before it, so every value still read under the wrong heading. Order
+  // is the half the count cannot see.
+  const head = SOURCE.slice(SOURCE.indexOf("<thead>"), SOURCE.indexOf("</thead>"));
+  const body = SOURCE.slice(SOURCE.indexOf("<tbody>"));
+
+  const headOrder = [
+    head.indexOf("<th>#</th>"),
+    head.indexOf("تكرار"),
+    head.indexOf("<th>التاريخ</th>"),
+    head.indexOf("الاسم بالعبرية"),
+    head.indexOf("البلدة بالعبرية")
+  ];
+  const bodyOrder = [
+    body.indexOf("index + 1"),
+    body.indexOf("DuplicateMark"),
+    body.indexOf("row.submittedAt"),
+    body.indexOf("hebrew.name"),
+    body.indexOf("hebrew.city")
+  ];
+
+  assert.ok(headOrder.every((at) => at >= 0), "every heading is there");
+  assert.ok(bodyOrder.every((at) => at >= 0), "and every cell");
+
+  const rising = (list: number[]) => list.every((at, i) => i === 0 || at > list[i - 1]);
+  assert.ok(rising(headOrder), "headings in order");
+  assert.ok(rising(bodyOrder), `cells out of order — ${JSON.stringify(bodyOrder)}`);
+});

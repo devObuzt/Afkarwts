@@ -1,7 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getForm } from "@/app/lib/forms/store";
-import { columnWidths, headerKey, isNumeric, printHeader, submissionGrid } from "@/app/lib/forms/report";
+import {
+  columnWidths,
+  duplicateCount,
+  headerKey,
+  isNumeric,
+  printHeader,
+  submissionGrid
+} from "@/app/lib/forms/report";
 import { requireUser } from "@/app/lib/users/current";
 import { DuplicateMark } from "./DuplicateMark";
 import { EditableCell } from "./EditableCell";
@@ -14,7 +21,10 @@ export const dynamic = "force-dynamic";
 const STATES = [
   { key: "", label: "الكل" },
   { key: "added", label: "في المجموعة" },
-  { key: "new", label: "بانتظار المراجعة" }
+  { key: "new", label: "بانتظار المراجعة" },
+  // Not a state the registration carries — a view of the table. Kept
+  // beside the others because it is the same question: which rows now?
+  { key: "duplicates", label: "المكررات" }
 ];
 
 /**
@@ -53,7 +63,14 @@ export default async function ReportPage({
   }
 
   const state = STATES.some((option) => option.key === query.state) ? (query.state ?? "") : "";
-  const grid = submissionGrid(form.id, { state: state || undefined })!;
+  const onlyDuplicates = state === "duplicates";
+  // «المكررات» is not a state in the database: the grid is built whole and
+  // then narrowed, because a row only knows it has a twin once every row
+  // has been read.
+  const grid = submissionGrid(form.id, { state: onlyDuplicates ? undefined : state || undefined })!;
+  if (onlyDuplicates) {
+    grid.rows = grid.rows.filter((row) => row.duplicateOf.length > 0);
+  }
   const printing = query.print === "1";
   // Correcting in place needs both: the form permission and the right to
   // see the answers — the same pair the save route enforces, so a cell is
@@ -61,7 +78,8 @@ export default async function ReportPage({
   // printing: the PDF is a reading of the table, not a way into it.
   const editable = !printing && can(user, "forms.manage");
   const canReject = can(user, "leads.review");
-  const duplicates = grid.rows.filter((row) => row.duplicateOf.length > 0).length;
+  // The form's own count, not the current view's — see duplicateCount.
+  const duplicates = duplicateCount(form.id);
   // Weighted by content: a phone does not need a consent paragraph's room.
   const widths = columnWidths(grid);
   // The duplicate mark is a column too. Without its own width the colgroup
@@ -123,6 +141,7 @@ export default async function ReportPage({
                   key={option.key || "all"}
                 >
                   {option.label}
+                  {option.key === "duplicates" && duplicates > 0 ? ` (${duplicates})` : ""}
                 </Link>
               ))}
             </span>
@@ -197,12 +216,6 @@ export default async function ReportPage({
                     </Link>
                   )}
                 </td>
-                <td>
-                  {/* The class carries display:inline-block — on the cell
-                      itself it stops being a table cell, and the column
-                      collapsed to 9px with the date stacked letter by letter. */}
-                  <span className="crmLtr">{row.submittedAt.slice(0, 10)}</span>
-                </td>
                 {!printing && duplicates > 0 && (
                   <td>
                     <DuplicateMark
@@ -213,6 +226,12 @@ export default async function ReportPage({
                     />
                   </td>
                 )}
+                <td>
+                  {/* The class carries display:inline-block — on the cell
+                      itself it stops being a table cell, and the column
+                      collapsed to 9px with the date stacked letter by letter. */}
+                  <span className="crmLtr">{row.submittedAt.slice(0, 10)}</span>
+                </td>
                 {printing ? (
                   <>
                     <td className="heCell">{row.hebrew.name || "—"}</td>
