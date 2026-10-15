@@ -16,7 +16,8 @@ export async function GET(request: NextRequest) {
 
   try {
     const response = await fetch(`${ACCOUNTS}/api/locations/countries?lang=${encodeURIComponent(lang)}`, {
-      next: { revalidate: 86400 }
+      // Same reason as the towns: see ../cities/route.ts.
+      next: { revalidate: 600 }
     });
     if (!response.ok) {
       throw new Error(`accounts responded ${response.status}`);

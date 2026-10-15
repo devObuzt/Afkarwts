@@ -24,7 +24,14 @@ export async function GET(request: NextRequest) {
     const response = await fetch(
       `${ACCOUNTS}/api/locations/cities?country=${encodeURIComponent(country)}&lang=${encodeURIComponent(lang)}` +
         (q ? `&q=${encodeURIComponent(q)}` : ""),
-      { next: { revalidate: 86400 } }
+      /**
+       * Ten minutes, not a day. The register is small and rarely changes —
+       * but when it does, it is because somebody could not find her town,
+       * and a 24-hour cache means she still cannot. Fifty Arab localities
+       * were corrected on 2026-10-15 and the form went on serving the old
+       * list from cache long after the service had the new one.
+       */
+      { next: { revalidate: 600 } }
     );
     if (!response.ok) {
       throw new Error(`accounts responded ${response.status}`);
