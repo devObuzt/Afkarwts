@@ -194,3 +194,30 @@ test("once she has it, the step is no longer exempt from the window", async () =
     .get(late.enrollmentId) as { n: number };
   assert.equal(owed.n, 0, "the debt is cleared when it is paid");
 });
+
+test("a failed step given back is actually sent, window or no window", async () => {
+  const { getDb, listMessages } = await import("@/app/lib/db");
+  const { reopenFailedStep } = await import("@/app/lib/journeys/store");
+  const { runDueJourneys } = await import("@/app/lib/journeys/runner");
+  const { group, journey, early } = await cohort(1);
+
+  // Her first attempt failed — a wrong number, since corrected.
+  const send = getDb()
+    .prepare(
+      `SELECT s.id, s.step_id, s.enrollment_id, s.message_id FROM journey_sends s
+         JOIN journey_enrollments e ON e.id = s.enrollment_id WHERE e.member_id = ?`
+    )
+    .get(early.id) as { id: number; step_id: number; enrollment_id: number; message_id: number };
+  getDb().prepare("UPDATE journey_sends SET state = 'failed' WHERE id = ?").run(send.id);
+  getDb().prepare("UPDATE messages SET status = 'failed' WHERE id = ?").run(send.message_id);
+  const before = listMessages(early.id).filter((m) => m.direction === "outgoing").length;
+
+  reopenFailedStep(send.enrollment_id, send.step_id);
+  // Days later: the step's own hour is long gone, and clearing the
+  // failure alone would leave the window to drop it on the same tick.
+  await runDueJourneys(new Date("2026-10-20T09:00:00.000Z"));
+
+  const after = listMessages(early.id).filter((m) => m.direction === "outgoing").length;
+  assert.ok(after > before, "it goes out, because she is owed it");
+  assert.ok(group.id > 0 && journey.id > 0);
+});

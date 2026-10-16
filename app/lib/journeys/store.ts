@@ -444,6 +444,22 @@ export function missedOnJoin(enrollmentId: number) {
     .all(enrollmentId) as Array<{ stepId: number }>;
 }
 
+/**
+ * Give back a step that was attempted and failed.
+ *
+ * Same two halves as a missed one: clear the attempt, and record that she
+ * is owed it — the step's hour is long past and the send window drops
+ * anything outside it, which would silence the retry on the same tick.
+ */
+export function reopenFailedStep(enrollmentId: number, stepId: number) {
+  const db = getDb();
+  db.prepare("DELETE FROM journey_sends WHERE enrollment_id = ? AND step_id = ? AND state = 'failed'").run(
+    enrollmentId,
+    stepId
+  );
+  db.prepare("INSERT OR IGNORE INTO journey_owed (enrollment_id, step_id) VALUES (?, ?)").run(enrollmentId, stepId);
+}
+
 /** Clear a written-off step so the runner treats it as due again. */
 export function reopenMissedStep(enrollmentId: number, stepId: number) {
   const db = getDb();

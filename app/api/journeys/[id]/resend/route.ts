@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { recordAction } from "@/app/lib/users/audit";
 import { requireApi } from "@/app/lib/users/current";
 import { getDb } from "@/app/lib/db";
+import { reopenFailedStep } from "@/app/lib/journeys/store";
 
 export const runtime = "nodejs";
 
@@ -34,17 +35,20 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const rows = db
     .prepare(
-      `SELECT s.id, e.member_id FROM journey_sends s
+      `SELECT s.id, e.member_id, s.enrollment_id FROM journey_sends s
          JOIN journey_enrollments e ON e.id = s.enrollment_id
         WHERE e.journey_id = ? AND s.step_id = ? AND s.state = 'failed'`
     )
-    .all(journeyId, stepId) as Array<{ id: number; member_id: number }>;
+    .all(journeyId, stepId) as Array<{ id: number; member_id: number; enrollment_id: number }>;
 
   // An empty list means everyone who failed on this step.
   const target = chosen.length ? rows.filter((row) => chosen.includes(row.member_id)) : rows;
 
   for (const row of target) {
-    db.prepare("DELETE FROM journey_sends WHERE id = ?").run(row.id);
+    // Not a raw delete: clearing the failure is only half of it. The
+    // step's hour is long past, so the send window would drop it again on
+    // the very same tick — reopening also records that she is owed it.
+    reopenFailedStep(row.enrollment_id, stepId);
   }
 
   recordAction({
