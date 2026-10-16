@@ -95,6 +95,14 @@ export default async function AppPage() {
         </section>
       )}
 
+      <Link className="crmCard" data-tone="sage" href="/new/app/exercises" style={{ display: "block", textDecoration: "none" }}>
+        <header>
+          <span className="crmDot" />
+          <h2>مكتبة التمارين</h2>
+        </header>
+        <p className="crmEmpty">التمارين التي تُبنى منها خطط التدريب. الخطة نفسها تُبنى من صفحة المنتسبة.</p>
+      </Link>
+
       <section className="crmCard" data-tone="sage">
         <header>
           <span className="crmDot" />
