@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { recordAction } from "@/app/lib/users/audit";
 import { requireApi } from "@/app/lib/users/current";
+import { can } from "@/app/lib/users/permissions";
 import { getDb, getMember } from "@/app/lib/db";
 import { owedBacklog, oweStep, resumeEnrollment } from "@/app/lib/journeys/store";
 import { closeStopTaskAfterReply } from "@/app/lib/journeys/followups";
@@ -32,6 +33,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return auth.response;
   }
 
+  // Same rule the «who» list follows: running a path is not the same as
+  // being handed every woman's name and phone, and without «people.all» a
+  // coach acts on the women assigned to her and nobody else.
+  if (!can(auth.user, "people.view")) {
+    return NextResponse.json({ error: "هذه القائمة تحوي أسماء المنتسبات وأرقامهن." }, { status: 403 });
+  }
+  const mine = can(auth.user, "people.all") ? null : auth.user.id;
+
   const journeyId = Number((await params).id);
   const body = (await request.json().catch(() => ({}))) as { memberIds?: number[]; apply?: boolean };
   const chosen = (body.memberIds ?? []).map(Number).filter(Number.isInteger);
@@ -39,8 +48,19 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const now = new Date();
 
   const enrollments = getDb()
-    .prepare("SELECT id, member_id, state, stop_reason FROM journey_enrollments WHERE journey_id = ? AND state IN ('active', 'stopped')")
-    .all(journeyId) as Array<{ id: number; member_id: number; state: string; stop_reason: string | null }>;
+    .prepare(
+      `SELECT e.id, e.member_id, e.state, e.stop_reason
+         FROM journey_enrollments e
+         JOIN members mem ON mem.id = e.member_id
+        WHERE e.journey_id = ? AND e.state IN ('active', 'stopped')
+          ${mine ? "AND mem.assigned_user_id = ?" : ""}`
+    )
+    .all(...(mine ? [journeyId, mine] : [journeyId])) as Array<{
+    id: number;
+    member_id: number;
+    state: string;
+    stop_reason: string | null;
+  }>;
 
   const plan = [];
   for (const row of enrollments) {
