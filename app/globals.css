@@ -498,25 +498,41 @@ label {
 /* The dot that puts a thread back among the unread. Quiet until the
    bubble is hovered: it sits on every message she sent, and six visible
    dots down a conversation would read as status, not as an action. */
+/*
+ * Visible, and it says what it does.
+ *
+ * It used to be an 11px dot at opacity 0 that appeared on hover: nobody
+ * could find it, and on a touch screen there is no hover, so it never
+ * appeared at all. It is the one control that puts a conversation back in
+ * the queue, pressed every day — so it reads as a word, it is always on
+ * the message, and it is big enough for a thumb.
+ */
 .markUnread {
   display: inline-flex;
   align-items: center;
-  padding: 0 2px;
-  border: 0;
+  gap: 3px;
+  min-height: 24px;
+  padding: 2px 7px;
+  border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+  border-radius: 999px;
   background: none;
   color: currentColor;
-  opacity: 0;
+  font: inherit;
+  font-size: 10.5px;
+  line-height: 1;
+  opacity: 0.62;
   cursor: pointer;
-  transition: opacity 120ms ease;
+  transition: opacity 120ms ease, background 120ms ease;
 }
 
 .bubble:hover .markUnread,
 .markUnread:focus-visible {
-  opacity: 0.55;
+  opacity: 0.85;
 }
 
 .markUnread:hover {
   opacity: 1;
+  background: color-mix(in srgb, currentColor 10%, transparent);
 }
 
 .bubble footer {

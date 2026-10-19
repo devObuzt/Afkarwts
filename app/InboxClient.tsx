@@ -914,10 +914,11 @@ export function InboxClient() {
                             <button
                               className="markUnread"
                               onClick={() => void markUnread(message.id)}
-                              title="علّمها كغير مقروءة — بترجع المحادثة للي مش مقروءة من هون"
+                              title="بترجع المحادثة للي مش مقروءة من هاي الرسالة وطالع"
                               type="button"
                             >
-                              <Icon path={icons.dot} size={11} />
+                              <Icon path={icons.dot} size={9} />
+                              غير مقروءة
                             </button>
                           )}
                         </footer>
