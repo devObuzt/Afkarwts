@@ -1,6 +1,6 @@
 import { createMessage, getMember, getDb, updateMessageStatus } from "../db";
 import { contactFirstName, sendWhatsAppTemplate } from "../whatsapp";
-import { missedOnJoin, reopenMissedStep } from "./store";
+import { missedOnJoin, owedBacklog, oweStep, reopenMissedStep } from "./store";
 
 /**
  * A woman who joined after the path had already started.
@@ -128,12 +128,15 @@ export function releaseNextCatchUp(now = new Date()) {
     if (now.getTime() - new Date(row.at).getTime() < CATCH_UP_GAP_MS) {
       continue;
     }
-    const missed = missedOnJoin(row.enrollment_id);
+    // The whole backlog, not just what was written off before she joined:
+    // a woman the path had closed on has no row at all for the steps that
+    // fired while she was out, so there is nothing to clear — only a gap.
+    const missed = owedBacklog(row.enrollment_id, now);
     if (!missed.length) {
       recordCatchUp(row.enrollment_id, "done", now);
       continue;
     }
-    reopenMissedStep(row.enrollment_id, missed[0].stepId);
+    oweStep(row.enrollment_id, missed[0].stepId);
     recordCatchUp(row.enrollment_id, "accepted", now);
     released += 1;
   }

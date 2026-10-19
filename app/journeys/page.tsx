@@ -31,6 +31,7 @@ type Funnel = {
   repliedAfterStop: number;
   sms: Record<string, number>;
   manual: Record<string, number>;
+  outcomes: Record<string, number>;
 };
 
 type Journey = {
@@ -108,8 +109,22 @@ const WHO_LABEL: Record<string, string> = {
   failed: "Failed",
   skipped: "Skipped",
   stuck: "Stuck",
-  not_sent: "Never sent to"
+  not_sent: "Never sent to",
+  "outcome:never_sent": "ما بعتنا إلها ولا رسالة",
+  "outcome:not_delivered": "بعتنا وما وصلها",
+  "outcome:delivered_unread": "وصلها وما انقرأ",
+  "outcome:read_silent": "قرأت وما ردّت",
+  "outcome:replied": "ردّت"
 };
+
+/** The five outcomes, in the order a problem is worth seeing first. */
+const OUTCOME_ROWS: Array<[string, string]> = [
+  ["never_sent", "ما بعتنا إلها ولا رسالة"],
+  ["not_delivered", "بعتنا وما وصلها"],
+  ["delivered_unread", "وصلها وما انقرأ"],
+  ["read_silent", "قرأت وما ردّت"],
+  ["replied", "ردّت"]
+];
 
 type WhoRow = { memberId: number; name: string; phone: string; detail: string };
 
@@ -988,6 +1003,20 @@ function JourneyReport({ journeyId }: { journeyId: number }) {
           <strong>{stopped.reduce((sum, [, n]) => sum + n, 0)}</strong>
           <span>stopped</span>
         </div>
+      </div>
+
+      {/* Where every woman stands, one label each, adding up to the cohort.
+          The funnel above overlaps, so no row of it is «the people with a
+          problem» — and that is how 54 of 252 went unnoticed for two days. */}
+      <div className="funnelGrid" dir="rtl" style={{ marginTop: 10 }}>
+        {OUTCOME_ROWS.map(([key, label]) => (
+          <div key={key}>
+            <button className="statBtn" onClick={() => open(`outcome:${key}`, null)} type="button">
+              <strong>{funnel.outcomes?.[key] ?? 0}</strong>
+            </button>
+            <span>{label}</span>
+          </div>
+        ))}
       </div>
 
       {stopped.length ? (

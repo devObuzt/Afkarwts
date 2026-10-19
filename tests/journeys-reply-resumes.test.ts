@@ -98,3 +98,165 @@ test("a reply after a stop puts her back, and the report shows who got nothing",
   assert.equal(after.notSent, 0);
   assert.equal(stepBreakdown(journey.id).find((row) => row.stepId === first)!.sentTemplate, 1);
 });
+
+/**
+ * Giving the Clean 18/10 backlog back, as the endpoint does it.
+ *
+ * Six steps fired while 54 women were off the path. Resuming them is not
+ * enough — each step's hour is long past, and the send window drops it —
+ * and handing all six over at once would put six templates on one number
+ * in the same second.
+ */
+test("a stopped member gets her backlog one step at a time, and never twice", async () => {
+  const { createMember, createGroup, addMembersToGroup, listMessages, getDb } = await import("@/app/lib/db");
+  const { createTemplate, createStep, createJourney, setJourneyStatus, owedBacklog, oweStep, resumeEnrollment } =
+    await import("@/app/lib/journeys/store");
+  const { recordCatchUp } = await import("@/app/lib/journeys/catch-up");
+  const { runDueJourneys } = await import("@/app/lib/journeys/runner");
+
+  const group = createGroup("كلين التعويض");
+  const out = createMember({ name: "هبة", phone: "+972526800021", notes: "" })!;
+  addMembersToGroup(group.id, [out.id]);
+
+  const template = createTemplate({ name: "كلين", smsText: "" });
+  const ids = [0, 1, 2, 3].map((weekday) =>
+    createStep({
+      templateId: template.id,
+      week: 1,
+      weekday,
+      sendTime: "07:00",
+      label: `خطوة ${weekday}`,
+      freeText: "",
+      templateName: "clean_week",
+      templateLanguage: "ar",
+      bodyParams: [],
+      templatePreview: "مراحب"
+    }).id
+  );
+
+  const journey = createJourney({ templateId: template.id, groupId: group.id, anchorDate: "2026-08-30" });
+  setJourneyStatus(journey.id, "active");
+
+  // She gets the first step, then the path closes on her — the message
+  // never reached her handset — and three more steps fire without her.
+  await runDueJourneys(new Date("2026-08-30T05:00:00.000Z"));
+  await runDueJourneys(new Date("2026-09-01T06:00:00.000Z"));
+  await runDueJourneys(new Date("2026-09-02T06:00:00.000Z"));
+  await runDueJourneys(new Date("2026-09-03T06:00:00.000Z"));
+
+  const enrollment = getDb()
+    .prepare("SELECT id, state FROM journey_enrollments WHERE journey_id = ?")
+    .get(journey.id) as { id: number; state: string };
+  assert.equal(enrollment.state, "stopped");
+  const sentOnce = () => listMessages(out.id).filter((m) => m.direction === "outgoing").length;
+  assert.equal(sentOnce(), 1, "only the first step ever went out");
+
+  // What the endpoint does: resume, owe the oldest gap, hand the rest to
+  // the one-a-minute release.
+  const at = new Date("2026-09-03T07:00:00.000Z");
+  const backlog = owedBacklog(enrollment.id, at);
+  assert.deepEqual(
+    backlog.map((row) => row.stepId),
+    [ids[1], ids[2], ids[3]],
+    "the step she received is not in the backlog"
+  );
+  resumeEnrollment(enrollment.id);
+  oweStep(enrollment.id, backlog[0].stepId);
+  recordCatchUp(enrollment.id, "accepted", at);
+
+  await runDueJourneys(at);
+  assert.equal(sentOnce(), 2, "one owed step, not three");
+
+  // A minute later the next one is let through, and so on.
+  await runDueJourneys(new Date(at.getTime() + 61 * 1000));
+  assert.equal(sentOnce(), 3);
+  await runDueJourneys(new Date(at.getTime() + 122 * 1000));
+  assert.equal(sentOnce(), 4);
+
+  // And then it stops on its own — nothing is owed twice.
+  await runDueJourneys(new Date(at.getTime() + 183 * 1000));
+  assert.equal(sentOnce(), 4, "the backlog is empty, so nothing more goes out");
+  assert.deepEqual(owedBacklog(enrollment.id, new Date(at.getTime() + 183 * 1000)), []);
+});
+
+/** The five outcomes add up to the cohort, and each one opens into names. */
+test("every woman carries exactly one outcome, and they sum to the cohort", async () => {
+  const { createMember, createGroup, addMembersToGroup, listMessages, getDb } = await import("@/app/lib/db");
+  const { createTemplate, createStep, createJourney, setJourneyStatus } = await import("@/app/lib/journeys/store");
+  const { runDueJourneys } = await import("@/app/lib/journeys/runner");
+  const { buildIncomingPayload, buildStatusPayload, handleWebhookPayload } = await import(
+    "@/app/lib/whatsapp-webhook"
+  );
+  const { journeyFunnel, whoOnStep, OUTCOMES } = await import("@/app/lib/journeys/report");
+
+  const group = createGroup("كلين الاحتمالات");
+  const talker = createMember({ name: "ردّت", phone: "+972526800031", notes: "" })!;
+  const reader = createMember({ name: "قرأت", phone: "+972526800032", notes: "" })!;
+  const quiet = createMember({ name: "وصلها", phone: "+972526800033", notes: "" })!;
+  const lost = createMember({ name: "ما وصلها", phone: "+972526800034", notes: "" })!;
+  addMembersToGroup(group.id, [talker.id, reader.id, quiet.id, lost.id]);
+
+  const template = createTemplate({ name: "كلين", smsText: "" });
+  createStep({
+    templateId: template.id,
+    week: 1,
+    weekday: 0,
+    sendTime: "07:00",
+    label: "ترحيب",
+    freeText: "",
+    templateName: "clean_week",
+    templateLanguage: "ar",
+    bodyParams: [],
+    templatePreview: "مراحب"
+  });
+
+  const journey = createJourney({ templateId: template.id, groupId: group.id, anchorDate: "2026-08-30" });
+  setJourneyStatus(journey.id, "active");
+  await runDueJourneys(new Date("2026-08-30T05:00:00.000Z"));
+
+  const whatsappId = (memberId: number) =>
+    listMessages(memberId).find((m) => m.direction === "outgoing")!.whatsappMessageId!;
+  for (const member of [talker, reader]) {
+    await handleWebhookPayload(buildStatusPayload({ whatsappMessageId: whatsappId(member.id), status: "read" }));
+  }
+  await handleWebhookPayload(buildStatusPayload({ whatsappMessageId: whatsappId(quiet.id), status: "delivered" }));
+  await handleWebhookPayload(buildIncomingPayload({ phone: talker.phone, text: "وصلتني" }));
+  // لولا هيك الردّ بينحسب بوقت الساعة الحقيقية مش بعد الإرسال
+  getDb()
+    .prepare("UPDATE messages SET created_at = ? WHERE member_id = ? AND direction = 'incoming'")
+    .run("2026-08-30 06:00:00", talker.id);
+
+  // وواحدة خامسة انضافت للمجموعة بعد ما الخطوة فاتت — ما بعتنا إلها ولا رسالة
+  const nobody = createMember({ name: "ولا رسالة", phone: "+972526800035", notes: "" })!;
+  addMembersToGroup(group.id, [nobody.id]);
+  const { syncEnrollments } = await import("@/app/lib/journeys/store");
+  syncEnrollments(journey.id, new Date("2026-08-30T05:30:00.000Z"));
+
+  const funnel = journeyFunnel(journey.id);
+  assert.deepEqual(funnel.outcomes, {
+    never_sent: 1,
+    not_delivered: 1,
+    delivered_unread: 1,
+    read_silent: 1,
+    replied: 1
+  });
+  assert.equal(
+    OUTCOMES.reduce((sum, name) => sum + funnel.outcomes[name], 0),
+    funnel.enrolled,
+    "nobody is counted twice and nobody is missing"
+  );
+
+  for (const [name, member] of [
+    ["never_sent", nobody],
+    ["not_delivered", lost],
+    ["delivered_unread", quiet],
+    ["read_silent", reader],
+    ["replied", talker]
+  ] as const) {
+    assert.deepEqual(
+      whoOnStep(journey.id, null, `outcome:${name}`).map((row) => row.memberId),
+      [member.id],
+      name
+    );
+  }
+});

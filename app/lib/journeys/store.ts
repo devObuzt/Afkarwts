@@ -460,6 +460,76 @@ export function reopenFailedStep(enrollmentId: number, stepId: number) {
   db.prepare("INSERT OR IGNORE INTO journey_owed (enrollment_id, step_id) VALUES (?, ?)").run(enrollmentId, stepId);
 }
 
+/**
+ * Every step whose hour has passed that she simply has no send for.
+ *
+ * Wider than `missedOnJoin` on purpose. That one answers «what was already
+ * running before she joined», and reads the write-off the runner leaves
+ * behind. This one answers «what does she not have», which is the question
+ * after the Clean 18/10 stop: a woman who left the path has no row at all
+ * for the six steps that fired while she was out — nothing was written off
+ * because nothing was ever attempted.
+ *
+ * A step she actually received is never in here: only rows that are not a
+ * send count as a gap, so this can never ask for a second copy.
+ */
+export function owedBacklog(enrollmentId: number, now: Date) {
+  const db = getDb();
+  const row = db
+    .prepare("SELECT journey_id FROM journey_enrollments WHERE id = ?")
+    .get(enrollmentId) as { journey_id: number } | undefined;
+  const journey = row ? getJourney(row.journey_id) : null;
+  if (!journey) {
+    return [] as Array<{ stepId: number; dueAt: string }>;
+  }
+
+  const held = new Map(
+    (
+      db
+        .prepare("SELECT step_id, state FROM journey_sends WHERE enrollment_id = ?")
+        .all(enrollmentId) as Array<{ step_id: number; state: string }>
+    ).map((row) => [row.step_id, row.state])
+  );
+
+  // A step already recorded as owed and not yet sent is in flight, not a
+  // gap: counting it would make the one-a-minute release hand out the same
+  // step forever and never reach the next one.
+  const inFlight = new Set(
+    (
+      db
+        .prepare("SELECT step_id FROM journey_owed WHERE enrollment_id = ?")
+        .all(enrollmentId) as Array<{ step_id: number }>
+    ).map((owed) => owed.step_id)
+  );
+
+  return listSteps(journey.templateId)
+    .map((step) => ({ stepId: step.id, dueAt: stepDueAt(journey.anchorDate, step) }))
+    .filter(({ stepId, dueAt }) => {
+      if (dueAt.getTime() > now.getTime() || inFlight.has(stepId)) {
+        return false;
+      }
+      const state = held.get(stepId);
+      return state === undefined || state === "missed" || state === "skipped" || state === "deferred";
+    })
+    .sort((a, b) => a.dueAt.getTime() - b.dueAt.getTime())
+    .map(({ stepId, dueAt }) => ({ stepId, dueAt: dueAt.toISOString() }));
+}
+
+/**
+ * Record that she is owed a step, whatever stands in its place.
+ *
+ * A write-off is cleared; a send is not. Deleting a 'sent' row here would
+ * hand somebody a second copy of a message she already read, so the delete
+ * names the states it may remove instead of naming the ones it may not.
+ */
+export function oweStep(enrollmentId: number, stepId: number) {
+  const db = getDb();
+  db.prepare(
+    "DELETE FROM journey_sends WHERE enrollment_id = ? AND step_id = ? AND state IN ('missed', 'skipped', 'deferred')"
+  ).run(enrollmentId, stepId);
+  db.prepare("INSERT OR IGNORE INTO journey_owed (enrollment_id, step_id) VALUES (?, ?)").run(enrollmentId, stepId);
+}
+
 /** Clear a written-off step so the runner treats it as due again. */
 export function reopenMissedStep(enrollmentId: number, stepId: number) {
   const db = getDb();

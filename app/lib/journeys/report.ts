@@ -3,6 +3,33 @@ import { getGroup } from "../db";
 import { getJourney, getTemplate, listSteps } from "./store";
 import { stepDueAt } from "./schedule";
 
+/**
+ * Where each woman actually stands — one label each, and they add up to
+ * everyone enrolled.
+ *
+ * The funnel answers «how many got this far», which is the right shape for
+ * a chart and the wrong one for a question like «who is not hearing from
+ * us». Those overlap, so no row of the funnel is the set of people with a
+ * problem. On 2026-10-19 that cost two days: 54 of 252 women were getting
+ * nothing and every number on the screen looked healthy.
+ *
+ * - never_sent       nothing ever left our side for her
+ * - not_delivered    we sent, and it never reached her handset
+ * - delivered_unread it is on her phone, no read receipt came back
+ * - read_silent      she read it and said nothing
+ * - replied          she wrote back
+ */
+export const OUTCOMES = ["never_sent", "not_delivered", "delivered_unread", "read_silent", "replied"] as const;
+export type Outcome = (typeof OUTCOMES)[number];
+
+export const OUTCOME_LABEL: Record<Outcome, string> = {
+  never_sent: "ما بعتنا إلها ولا رسالة",
+  not_delivered: "بعتنا وما وصلها",
+  delivered_unread: "وصلها وما انقرأ",
+  read_silent: "قرأت وما ردّت",
+  replied: "ردّت"
+};
+
 export type JourneyFunnel = {
   enrolled: number;
   sent: number;
@@ -13,6 +40,7 @@ export type JourneyFunnel = {
   repliedAfterStop: number;
   sms: Record<string, number>;
   manual: Record<string, number>;
+  outcomes: Record<Outcome, number>;
 };
 
 export type StepRow = {
@@ -44,6 +72,46 @@ function countBy(sql: string, params: unknown[]) {
     if (row.key) {
       out[row.key] = row.n;
     }
+  }
+  return out;
+}
+
+
+/**
+ * The one label per enrollment, in SQL, so the counts and the lists can
+ * never disagree — each is this same expression.
+ */
+const OUTCOME_SQL = `CASE
+  WHEN NOT EXISTS (SELECT 1 FROM journey_sends s WHERE s.enrollment_id = e.id AND s.state = 'sent')
+    THEN 'never_sent'
+  WHEN EXISTS (
+    SELECT 1 FROM journey_sends s
+      JOIN messages i ON i.member_id = e.member_id AND i.direction = 'incoming' AND i.created_at >= s.attempted_at
+     WHERE s.enrollment_id = e.id AND s.state = 'sent'
+  ) THEN 'replied'
+  WHEN EXISTS (
+    SELECT 1 FROM journey_sends s JOIN messages m ON m.id = s.message_id
+     WHERE s.enrollment_id = e.id AND m.status = 'read'
+  ) THEN 'read_silent'
+  WHEN EXISTS (
+    SELECT 1 FROM journey_sends s JOIN messages m ON m.id = s.message_id
+     WHERE s.enrollment_id = e.id AND m.status IN ('delivered', 'read')
+  ) THEN 'delivered_unread'
+  ELSE 'not_delivered'
+END`;
+
+/** Everyone enrolled, split so the five numbers add up to the whole cohort. */
+export function outcomeCounts(journeyId: number): Record<Outcome, number> {
+  const rows = getDb()
+    .prepare(
+      `SELECT ${OUTCOME_SQL} AS key, COUNT(*) AS n
+         FROM journey_enrollments e WHERE e.journey_id = ? GROUP BY key`
+    )
+    .all(journeyId) as Array<{ key: Outcome; n: number }>;
+
+  const out = Object.fromEntries(OUTCOMES.map((name) => [name, 0])) as Record<Outcome, number>;
+  for (const row of rows) {
+    out[row.key] = row.n;
   }
   return out;
 }
@@ -117,7 +185,8 @@ export function journeyFunnel(journeyId: number): JourneyFunnel {
     stopped,
     repliedAfterStop,
     sms: followupCounts("sms"),
-    manual: followupCounts("manual")
+    manual: followupCounts("manual"),
+    outcomes: outcomeCounts(journeyId)
   };
 }
 
@@ -279,6 +348,23 @@ export function whoOnStep(
     skipped: `s.state = 'skipped'`,
     stuck: `s.state = 'sent' AND m.status = 'pending'`
   };
+
+  // One of the five outcomes, by the same expression that counted it.
+  // Prefixed, because «replied» is also a per-step bucket with its own
+  // 48-hour window and a different list behind the same word.
+  const outcome = bucket.startsWith("outcome:") ? bucket.slice("outcome:".length) : "";
+  if ((OUTCOMES as readonly string[]).includes(outcome)) {
+    return db
+      .prepare(
+        `SELECT mem.id AS memberId, mem.name, mem.phone,
+                COALESCE(e.stop_reason, e.state) AS detail
+           FROM journey_enrollments e
+           JOIN members mem ON mem.id = e.member_id
+          WHERE e.journey_id = @journeyId ${mine} AND ${OUTCOME_SQL} = '${outcome}'
+          ORDER BY mem.name LIMIT @limit`
+      )
+      .all(args) as WhoRow[];
+  }
 
   // The women this step has no row for — the ones every other bucket is
   // blind to, because each of them reads a row that was never written.
