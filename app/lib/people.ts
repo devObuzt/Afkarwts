@@ -395,7 +395,14 @@ export function listPeople(
          LEFT JOIN messages last
            ON last.id = (SELECT id FROM messages WHERE member_id = members.id ORDER BY created_at DESC, id DESC LIMIT 1)
          ${clause}
-         ORDER BY COALESCE(last.created_at, members.created_at) DESC, members.id DESC
+         -- Anyone waiting on an answer comes first, and among them the one
+         -- who has waited since longest ago is simply the newest message
+         -- at the top, the way the inbox has always ordered. Sorting by
+         -- time alone buried a woman who wrote two days ago under forty
+         -- threads we had already read, and marking a message unread did
+         -- nothing visible on this screen at all.
+         ORDER BY (unread > 0) DESC,
+                  COALESCE(last.created_at, members.created_at) DESC, members.id DESC
          LIMIT ? OFFSET ?`
     )
     .all(...args, limit, offset) as Array<Record<string, string | number | null>>;

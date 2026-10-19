@@ -51,3 +51,51 @@ test("an unread reply is counted on the row", async () => {
   markMemberMessagesRead(member.id);
   assert.equal(listPeople({ query: "سارة قارئة" }).people[0].unread, 0);
 });
+
+/**
+ * Whoever is waiting on an answer is at the top.
+ *
+ * The list used to sort by the last message alone, so a woman who wrote
+ * two days ago sat under every thread we had already read — and marking a
+ * message unread, which exists precisely to put her back in the queue,
+ * changed nothing you could see on this screen.
+ */
+test("unread threads come first, and among them the newest message", async () => {
+  const { createMember, createMessage, markMessageUnread, getDb } = await import("@/app/lib/db");
+  const { listPeople } = await import("@/app/lib/people");
+
+  const waited = createMember({ name: "مستنية من امبارح", phone: "+972521110001" });
+  const answered = createMember({ name: "ردّينا عليها اليوم", phone: "+972521110002" });
+  const alsoWaiting = createMember({ name: "مستنية من اليوم", phone: "+972521110003" });
+
+  const say = (memberId: number, at: string) => {
+    const message = createMessage({
+      memberId,
+      direction: "incoming",
+      body: "مرحبا",
+      status: "received"
+    });
+    getDb().prepare("UPDATE messages SET created_at = ? WHERE id = ?").run(at, message.id);
+    return message.id;
+  };
+
+  const old = say(waited.id, "2026-10-17 09:00:00");
+  say(alsoWaiting.id, "2026-10-19 09:00:00");
+  const seen = say(answered.id, "2026-10-19 18:00:00");
+  // Read: her thread drops below the two still waiting, however recent.
+  getDb().prepare("UPDATE members SET last_read_message_id = ? WHERE id = ?").run(seen, answered.id);
+
+  const order = () => listPeople({ query: "مستنية" }).people.map((p) => p.name);
+  assert.deepEqual(listPeople({}).people.slice(0, 3).map((p) => p.name), [
+    "مستنية من اليوم",
+    "مستنية من امبارح",
+    "ردّينا عليها اليوم"
+  ]);
+
+  // And marking a read message unread puts that thread straight back up.
+  getDb().prepare("UPDATE members SET last_read_message_id = ? WHERE id = ?").run(old, waited.id);
+  assert.equal(listPeople({}).people[0].name, "مستنية من اليوم", "the other one is still waiting");
+  markMessageUnread(answered.id, seen);
+  assert.equal(listPeople({}).people[0].name, "ردّينا عليها اليوم", "her message is the newest unread");
+  assert.deepEqual(order(), ["مستنية من اليوم", "مستنية من امبارح"]);
+});
