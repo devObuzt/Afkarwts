@@ -108,6 +108,8 @@ const WHO_LABEL: Record<string, string> = {
   replied: "Replied",
   failed: "Failed",
   skipped: "Skipped",
+  missed: "Missed — the window shut on them",
+  deferred: "Deferred — the day's ceiling was full",
   stuck: "Stuck",
   not_sent: "Never sent to",
   "outcome:never_sent": "ما بعتنا إلها ولا رسالة",
@@ -152,10 +154,16 @@ function Problems({
   step: { failed: number; skipped: number; stuck: number; deferred: number; missed: number };
 }) {
   const parts: React.ReactNode[] = [];
+  // Every one of them opens into names. «deferred» and «missed» used to be
+  // plain text here, on the grounds that they describe timing rather than
+  // people — but a step the window shut on is a woman who did not get it,
+  // and she was the one number on this screen nobody could press.
   for (const [bucket, n] of [
     ["failed", step.failed],
     ["skipped", step.skipped],
-    ["stuck", step.stuck]
+    ["stuck", step.stuck],
+    ["deferred", step.deferred],
+    ["missed", step.missed]
   ] as Array<[string, number]>) {
     if (n > 0) {
       parts.push(
@@ -165,13 +173,6 @@ function Problems({
       );
     }
   }
-  if (step.deferred) {
-    parts.push(<span key="deferred">{step.deferred} deferred</span>);
-  }
-  if (step.missed) {
-    parts.push(<span key="missed">{step.missed} missed</span>);
-  }
-
   if (!parts.length) {
     return <>—</>;
   }

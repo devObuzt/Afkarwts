@@ -333,3 +333,94 @@ test("putting a removed member back in the group puts her back on the path", asy
     "and she is counted as behind by the two steps the cohort got without her"
   );
 });
+
+/**
+ * Every enrolled woman is in exactly one place on every step's row.
+ *
+ * Wisam read «252 enrolled» at the top and «246 sent · 0 not sent» on the
+ * first step and asked where the other six went. They were there — 5
+ * failed and 1 missed — but nothing on the screen said the six numbers
+ * were supposed to add up, and «missed» was the one of them that could
+ * not be opened. This is the arithmetic, asserted.
+ */
+test("a step's numbers account for every enrolled woman, and each opens into names", async () => {
+  const { createMember, createGroup, addMembersToGroup, getDb } = await import("@/app/lib/db");
+  const { createTemplate, createStep, createJourney, setJourneyStatus } = await import("@/app/lib/journeys/store");
+  const { runDueJourneys } = await import("@/app/lib/journeys/runner");
+  const { stepBreakdown, whoOnStep } = await import("@/app/lib/journeys/report");
+
+  const group = createGroup("كلين الحساب");
+  const stay = createMember({ name: "باقية", phone: "+972526800091", notes: "" })!;
+  const late = createMember({ name: "متأخرة", phone: "+972526800092", notes: "" })!;
+  addMembersToGroup(group.id, [stay.id]);
+
+  const template = createTemplate({ name: "كلين", smsText: "" });
+  const step = createStep({
+    templateId: template.id,
+    week: 1,
+    weekday: 0,
+    sendTime: "07:00",
+    label: "ترحيب",
+    freeText: "",
+    templateName: "clean_week",
+    templateLanguage: "ar",
+    bodyParams: [],
+    templatePreview: "مراحب"
+  }).id;
+
+  const journey = createJourney({ templateId: template.id, groupId: group.id, anchorDate: "2026-08-30" });
+  setJourneyStatus(journey.id, "active");
+  await runDueJourneys(new Date("2026-08-30T05:00:00.000Z"));
+
+  // She joins after the step's window shut, one message behind — the
+  // catch-up sends that one rather than writing her off.
+  addMembersToGroup(group.id, [late.id]);
+  await runDueJourneys(new Date("2026-09-01T05:00:00.000Z"));
+
+  // And a third, enrolled all along, whose step the window shut on — what
+  // the runner records when a step's twelve hours pass with nothing sent.
+  const gone = createMember({ name: "فاتتها", phone: "+972526800093", notes: "" })!;
+  addMembersToGroup(group.id, [gone.id]);
+  await runDueJourneys(new Date("2026-09-01T05:05:00.000Z"));
+  const goneEnrollment = (
+    getDb()
+      .prepare("SELECT id FROM journey_enrollments WHERE journey_id = ? AND member_id = ?")
+      .get(journey.id, gone.id) as { id: number }
+  ).id;
+  getDb()
+    .prepare("UPDATE journey_sends SET state = 'missed' WHERE enrollment_id = ? AND step_id = ?")
+    .run(goneEnrollment, step);
+
+  const row = stepBreakdown(journey.id).find((item) => item.stepId === step)!;
+  const enrolled = (
+    getDb().prepare("SELECT COUNT(*) AS n FROM journey_enrollments WHERE journey_id = ?").get(journey.id) as {
+      n: number;
+    }
+  ).n;
+
+  const states = getDb()
+    .prepare(
+      `SELECT s.state AS key, COUNT(*) AS n FROM journey_sends s
+         JOIN journey_enrollments e ON e.id = s.enrollment_id
+        WHERE e.journey_id = ? AND s.step_id = ? GROUP BY s.state`
+    )
+    .all(journey.id, step) as Array<{ key: string; n: number }>;
+
+  const rows = states.reduce((sum, item) => sum + item.n, 0);
+  assert.equal(rows + row.notSent, enrolled, "a row for her, or counted as having none — never neither");
+
+  assert.equal(row.missed, 1);
+  assert.deepEqual(
+    whoOnStep(journey.id, step, "missed").map((item) => item.memberId),
+    [gone.id],
+    "«missed» opens into the woman it is about"
+  );
+  // The late joiner was behind by one message, so the catch-up simply sent
+  // it — one is sent, more than one is offered.
+  assert.equal(row.sentTemplate + row.sentText, 2);
+  assert.deepEqual(
+    whoOnStep(journey.id, step, "deferred"),
+    [],
+    "and a bucket with nobody in it is an empty list, not an error"
+  );
+});

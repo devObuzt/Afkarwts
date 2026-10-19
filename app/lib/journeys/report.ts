@@ -346,6 +346,13 @@ export function whoOnStep(
     delivered: `m.status IN ('delivered', 'read')`,
     read: `m.status = 'read'`,
     skipped: `s.state = 'skipped'`,
+    // «The window shut while she was on the path» and «the day's ceiling
+    // was full» both name people, not timings. They used to be printed as
+    // plain text on the report because «there is no list behind them» —
+    // there is, and on 2026-10-19 one of them was a woman nobody could
+    // open: Sawar Faour, back on the path with a step whose hour had gone.
+    missed: `s.state = 'missed'`,
+    deferred: `s.state = 'deferred'`,
     stuck: `s.state = 'sent' AND m.status = 'pending'`
   };
 
