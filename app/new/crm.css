@@ -1453,6 +1453,35 @@
   flex-wrap: wrap;
 }
 
+/*
+ * «Mark it unread» sits in the header, next to the close button, because
+ * it is about the conversation and not about one bubble — and because
+ * opening a thread marks it read instantly, so this is the only way back.
+ * A word, not an icon: it is pressed by someone working through a queue.
+ */
+.crm .waUnread {
+  margin-inline-start: auto;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11.5px;
+  line-height: 1;
+  min-height: 26px;
+  padding: 0 10px;
+}
+
+.crm .waUnread:hover {
+  background: var(--line-soft);
+  color: var(--ink);
+}
+
+.crm .waChatHead .waClose {
+  margin-inline-start: 0;
+}
+
 .crm .waChatName {
   font-size: 14.5px;
   font-weight: 700;

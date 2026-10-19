@@ -1068,6 +1068,16 @@ export function markMemberMessagesRead(memberId: number) {
  * messages arrived, exactly as if it had just come in — no separate flag,
  * no second sort, nothing that could disagree with the rest of the inbox.
  */
+/** The last thing she said, which is what «unread again» means for a thread. */
+export function lastIncomingMessageId(memberId: number) {
+  const row = getDb()
+    .prepare(
+      "SELECT id FROM messages WHERE member_id = ? AND direction = 'incoming' ORDER BY created_at DESC, id DESC LIMIT 1"
+    )
+    .get(memberId) as { id: number } | undefined;
+  return row?.id ?? null;
+}
+
 export function markMessageUnread(memberId: number, messageId: number) {
   const db = getDb();
   const message = db

@@ -91,6 +91,35 @@ export function WhatsAppWidget({ canSend }: { canSend: boolean }) {
     bottom.current?.scrollIntoView({ block: "end" });
   }, [messages]);
 
+  /**
+   * «Treat this as if we never opened it.»
+   *
+   * Opening a thread marks it read on the spot, and until now there was no
+   * way back: a conversation you glanced at while busy was gone from the
+   * unread list for good. This puts it back where it was — no flag of its
+   * own, just the read mark moved behind her last message — and closes the
+   * panel, because leaving it open is exactly the «we opened it» this
+   * undoes.
+   */
+  async function markUnread() {
+    if (!openId) {
+      return;
+    }
+    const response = await fetch(`/api/members/${openId}/unread`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}"
+    });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      setError(payload.error ?? "ما قدرنا نعلّمها كغير مقروءة.");
+      return;
+    }
+    setOpenId(null);
+    setOpenThread(null);
+    await loadThreads();
+  }
+
   async function send() {
     if (!openId || !draft.trim()) {
       return;
@@ -186,6 +215,14 @@ export function WhatsAppWidget({ canSend }: { canSend: boolean }) {
             <span className={open.windowOpen ? "crmPill live" : "crmPill open"}>
               {open.windowOpen ? "النافذة مفتوحة" : "النافذة مغلقة"}
             </span>
+            <button
+              className="waUnread"
+              onClick={() => void markUnread()}
+              title="بترجع المحادثة لغير المقروءة، كأننا ما فتحناها"
+              type="button"
+            >
+              علّمها كغير مقروءة
+            </button>
             <button
               aria-label="إغلاق المحادثة"
               className="waClose"
