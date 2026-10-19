@@ -260,3 +260,76 @@ test("every woman carries exactly one outcome, and they sum to the cohort", asyn
     );
   }
 });
+
+/**
+ * Being put back in the group undoes the removal.
+ *
+ * This was the deepest of the three: `syncEnrollments` read «she already
+ * has a row, skip her», so a removal could never be undone. Sawar was
+ * taken out of the Clean 18/10 group on 15.10 over a mistyped number;
+ * putting her back in the group on 19.10 changed nothing at all, because
+ * the sync never looked at a removed row again.
+ */
+test("putting a removed member back in the group puts her back on the path", async () => {
+  const { createMember, createGroup, addMembersToGroup, removeMemberFromGroup, getDb } = await import("@/app/lib/db");
+  const { createTemplate, createStep, createJourney, setJourneyStatus, syncEnrollments } = await import(
+    "@/app/lib/journeys/store"
+  );
+  const { runDueJourneys } = await import("@/app/lib/journeys/runner");
+
+  const group = createGroup("كلين الرجوع");
+  const member = createMember({ name: "سوار رجعت", phone: "+972526800077", notes: "" })!;
+  // A second woman who never leaves: «behind» means behind the cohort, so
+  // there has to be a cohort that got the steps she did not.
+  const stays = createMember({ name: "رفيقتها", phone: "+972526800078", notes: "" })!;
+  addMembersToGroup(group.id, [member.id, stays.id]);
+
+  const template = createTemplate({ name: "كلين", smsText: "" });
+  for (const weekday of [0, 1, 2]) {
+    createStep({
+      templateId: template.id,
+      week: 1,
+      weekday,
+      sendTime: "07:00",
+      label: `خطوة ${weekday}`,
+      freeText: "",
+      templateName: "clean_week",
+      templateLanguage: "ar",
+      bodyParams: [],
+      templatePreview: "مراحب"
+    });
+  }
+
+  const journey = createJourney({ templateId: template.id, groupId: group.id, anchorDate: "2026-08-30" });
+  setJourneyStatus(journey.id, "active");
+  await runDueJourneys(new Date("2026-08-30T05:00:00.000Z"));
+
+  const state = () =>
+    (
+      getDb()
+        .prepare(
+          "SELECT state, stop_reason FROM journey_enrollments WHERE journey_id = ? AND member_id = ?"
+        )
+        .get(journey.id, member.id) as { state: string; stop_reason: string | null }
+    );
+
+  // Taken out of the cohort, and two steps fire without her.
+  removeMemberFromGroup(group.id, member.id);
+  await runDueJourneys(new Date("2026-08-31T05:00:00.000Z"));
+  assert.equal(state().state, "removed");
+  await runDueJourneys(new Date("2026-09-01T05:00:00.000Z"));
+
+  // Put back in the group.
+  addMembersToGroup(group.id, [member.id]);
+  const sync = syncEnrollments(journey.id, new Date("2026-09-01T06:00:00.000Z"));
+
+  assert.equal(sync.returned, 1, "the removal is undone");
+  assert.equal(sync.added, 0, "no second enrollment — her history is one record");
+  assert.equal(state().state, "active");
+  assert.equal(state().stop_reason, null);
+  assert.equal(
+    sync.joinedLate.map((row) => row.missed)[0],
+    2,
+    "and she is counted as behind by the two steps the cohort got without her"
+  );
+});

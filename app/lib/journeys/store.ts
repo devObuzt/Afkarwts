@@ -331,11 +331,20 @@ function othersGot(journeyId: number, stepId: number) {
   return Number(row?.n ?? 0) > 0;
 }
 
+/** Does this enrollment already hold a row for that step, whatever its state? */
+function hasSend(enrollmentId: number, stepId: number) {
+  return Boolean(
+    getDb()
+      .prepare("SELECT 1 FROM journey_sends WHERE enrollment_id = ? AND step_id = ?")
+      .get(enrollmentId, stepId)
+  );
+}
+
 export function syncEnrollments(journeyId: number, now: Date) {
   const db = getDb();
   const journey = getJourney(journeyId);
   if (!journey) {
-    return { added: 0, removed: 0, joinedLate: [] };
+    return { added: 0, removed: 0, returned: 0, joinedLate: [] };
   }
 
   // Only a دفعة is a cohort. A مسار is a record of what somebody bought,
@@ -349,7 +358,7 @@ export function syncEnrollments(journeyId: number, now: Date) {
     | { kind: string }
     | undefined;
   if (kind?.kind !== "batch") {
-    return { added: 0, removed: 0, joinedLate: [] };
+    return { added: 0, removed: 0, returned: 0, joinedLate: [] };
   }
 
   const steps = listSteps(journey.templateId);
@@ -372,8 +381,39 @@ export function syncEnrollments(journeyId: number, now: Date) {
   let added = 0;
   /** Who arrived after something had already gone out, and how much. */
   const joinedLate: Array<{ enrollmentId: number; memberId: number; missed: number }> = [];
+  let returned = 0;
   for (const memberId of memberIds) {
-    if (enrolled.has(memberId)) {
+    const existing = enrolled.get(memberId);
+
+    // Back in the group after being taken out of it.
+    //
+    // This used to be «she has a row, skip her», which quietly meant a
+    // removal could never be undone: Sawar Faour was taken out of the
+    // Clean 18/10 group on 15.10 because her number was typed wrong, the
+    // number was corrected ten minutes later, somebody put her back in the
+    // group — and the path never looked at her again. «removed» is the one
+    // state whose whole reason is «she is not in this group», so being in
+    // it again is the answer to it. A stopped or completed enrollment is a
+    // different decision and is left alone.
+    if (existing?.state === "removed") {
+      db.prepare(
+        "UPDATE journey_enrollments SET state = 'active', stop_reason = NULL, stopped_at = NULL, resumed_at = ? WHERE id = ?"
+      ).run(new Date().toISOString(), existing.id);
+      returned += 1;
+
+      const behind = listSteps(journey.templateId).filter(
+        (step) =>
+          now.getTime() >= stepDueAt(journey.anchorDate, step).getTime() &&
+          othersGot(journeyId, step.id) &&
+          !hasSend(existing.id, step.id)
+      ).length;
+      if (behind > 0) {
+        joinedLate.push({ enrollmentId: existing.id, memberId, missed: behind });
+      }
+      continue;
+    }
+
+    if (existing) {
       continue;
     }
 
@@ -424,7 +464,7 @@ export function syncEnrollments(journeyId: number, now: Date) {
     }
   }
 
-  return { added, removed, joinedLate };
+  return { added, removed, returned, joinedLate };
 }
 
 /**
