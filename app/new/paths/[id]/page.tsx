@@ -143,6 +143,7 @@ export default async function CohortPage({
                     <span className="crmRowDetail" style={{ display: "block" }}>
                       {day(step.dueAt)} {clock(step.dueAt)} · {step.sentText + step.sentTemplate} أُرسلت ·{" "}
                       {step.read} قُرئت
+                      {step.notSent ? ` · ${step.notSent} ما انبعتلها` : ""}
                       {step.failed ? ` · ${step.failed} فشلت` : ""}
                       {step.stuck ? ` · ${step.stuck} عالقة` : ""}
                     </span>

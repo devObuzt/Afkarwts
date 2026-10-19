@@ -3,7 +3,7 @@ import { createMessage, getMember, updateMessageStatus } from "../db";
 import { sendTelegramMessage } from "../telegram";
 import { fillNameInText, fillNameToken, renderTemplateBody, sendWhatsAppTemplate, sendWhatsAppText } from "../whatsapp";
 import { planTick } from "./engine";
-import { drainSmsQueue, openFollowupsForStop, queueStepSms } from "./followups";
+import { closeStopTaskAfterReply, drainSmsQueue, openFollowupsForStop, queueStepSms } from "./followups";
 import { formatTickReport, journeyLabel } from "./report";
 import {
   claimSend,
@@ -11,12 +11,13 @@ import {
   getStep,
   getTemplate,
   listActiveJourneys,
-  loadTickState,
-  recordSend,
   listLateFailures,
+  loadTickState,
   markSendFailed,
+  recordSend,
   recordSendState,
   remainingAllowance,
+  resumeRepliedAfterStop,
   stepSmsBody,
   stopEnrollment,
   syncEnrollments
@@ -97,6 +98,12 @@ export async function runDueJourneys(now = new Date()) {
     const allowance = await remainingAllowance(now);
 
     for (const journey of listActiveJourneys()) {
+      // Before anything is planned: anyone who wrote to us after being
+      // stopped is back on the path, and her task is closed.
+      for (const woken of resumeRepliedAfterStop(journey.id)) {
+        closeStopTaskAfterReply(woken.enrollmentId);
+      }
+
       const sync = syncEnrollments(journey.id, now);
 
       // Whoever arrived after something had already gone out. One missed

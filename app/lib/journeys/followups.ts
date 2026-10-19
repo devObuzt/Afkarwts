@@ -196,6 +196,16 @@ export function resolveManual(id: number, note: string) {
 }
 
 /** After a person got through, the member can carry on from the next step. */
+/** Closes the chase-her task for somebody who answered on her own. */
+export function closeStopTaskAfterReply(enrollmentId: number) {
+  getDb()
+    .prepare(
+      `UPDATE followups SET state = 'done', note = 'ردّت فرجعت للمسار لحالها', resolved_at = CURRENT_TIMESTAMP
+        WHERE enrollment_id = ? AND kind = 'manual' AND state = 'open'`
+    )
+    .run(enrollmentId);
+}
+
 export function resumeFromFollowup(id: number) {
   const row = getDb().prepare("SELECT enrollment_id FROM followups WHERE id = ?").get(id) as
     | { enrollment_id: number | null }

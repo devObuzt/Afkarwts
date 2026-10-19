@@ -26,6 +26,7 @@ export type StepRow = {
   missed: number;
   skipped: number;
   stuck: number;
+  notSent: number;
   delivered: number;
   read: number;
   replied: number;
@@ -182,6 +183,22 @@ export function stepBreakdown(journeyId: number): StepRow[] {
           .get(journeyId, step.id) as { n: number }
       ).n;
 
+      // Every enrolled woman this step has no row for at all. This is the
+      // one number that was missing: on 2026-10-19 the Clean 18/10 report
+      // read «failed 0 · missed 0 · skipped 0 · stuck 0» on every step
+      // while fifty-four of its 252 women were getting nothing, because
+      // a woman the runner never reached leaves no row to count.
+      const notSent = (
+        db
+          .prepare(
+            `SELECT COUNT(*) AS n FROM journey_enrollments e
+              WHERE e.journey_id = ?
+                AND NOT EXISTS (SELECT 1 FROM journey_sends s
+                                 WHERE s.enrollment_id = e.id AND s.step_id = ?)`
+          )
+          .get(journeyId, step.id) as { n: number }
+      ).n;
+
       // A row still pending long after it was claimed means a process died
       // between claiming a step and recording it. It is never resent.
       const stuck = (
@@ -195,10 +212,12 @@ export function stepBreakdown(journeyId: number): StepRow[] {
           .get(journeyId, step.id) as { n: number }
       ).n;
 
+      const dueAt = stepDueAt(journey.anchorDate, step);
+
       return {
         stepId: step.id,
         label: step.label || `أسبوع ${step.week}`,
-        dueAt: stepDueAt(journey.anchorDate, step).toISOString(),
+        dueAt: dueAt.toISOString(),
         sentText: channels.text ?? 0,
         sentTemplate: channels.template ?? 0,
         failed,
@@ -206,6 +225,9 @@ export function stepBreakdown(journeyId: number): StepRow[] {
         missed: counts.missed ?? 0,
         skipped: counts.skipped ?? 0,
         stuck,
+        // A step whose hour has not come has reached nobody yet, and
+        // «252 لم تُرسل» on tomorrow's row is noise, not a warning.
+        notSent: dueAt.getTime() > Date.now() ? 0 : notSent,
         delivered: (statuses.delivered ?? 0) + (statuses.read ?? 0),
         read: statuses.read ?? 0,
         replied
@@ -257,6 +279,23 @@ export function whoOnStep(
     skipped: `s.state = 'skipped'`,
     stuck: `s.state = 'sent' AND m.status = 'pending'`
   };
+
+  // The women this step has no row for — the ones every other bucket is
+  // blind to, because each of them reads a row that was never written.
+  if (bucket === "not_sent" && stepId !== null) {
+    return db
+      .prepare(
+        `SELECT mem.id AS memberId, mem.name, mem.phone,
+                COALESCE(e.stop_reason, e.state) AS detail
+           FROM journey_enrollments e
+           JOIN members mem ON mem.id = e.member_id
+          WHERE e.journey_id = @journeyId ${mine}
+            AND NOT EXISTS (SELECT 1 FROM journey_sends s
+                             WHERE s.enrollment_id = e.id AND s.step_id = @stepId)
+          ORDER BY mem.name LIMIT @limit`
+      )
+      .all(args) as WhoRow[];
+  }
 
   if (bucket === "replied") {
     return db

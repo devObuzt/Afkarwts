@@ -53,6 +53,16 @@ function stopFor(enrollment: EnrollmentState, now: Date): Action | null {
     return null;
   }
 
+  // The message reached her phone, and that is the whole job. Whether she
+  // replied, and whether a read receipt came back, say nothing about her:
+  // «read» is a privacy setting she may simply have turned off, and silence
+  // is how most people take a daily message. Reading either as disengagement
+  // stopped 47 women of the Clean 18/10 cohort in one tick on 2026-10-17 —
+  // twenty of them were writing back while the path stayed shut.
+  if (last.messageStatus === "delivered" || last.messageStatus === "read") {
+    return null;
+  }
+
   const silentFor = now.getTime() - new Date(last.attemptedAt).getTime();
   const repliedAfter =
     enrollment.lastIncomingAt !== null &&
@@ -66,16 +76,17 @@ function stopFor(enrollment: EnrollmentState, now: Date): Action | null {
     enrollment.resumedAt !== null &&
     new Date(enrollment.resumedAt).getTime() > new Date(last.attemptedAt).getTime();
 
-  // Someone who read it and said nothing was reached, which is what the path
-  // is for. Only the unreached leave it.
-  if (silentFor < SILENCE_MS || repliedAfter || resumedAfter || last.messageStatus === "read") {
+  if (silentFor < SILENCE_MS || repliedAfter || resumedAfter) {
     return null;
   }
 
+  // Two days and it never reached the handset: the number is dead, blocked
+  // or wrong. Every further step would burn a send nobody receives, so the
+  // path ends and a person is asked to fix the number.
   return {
     kind: "stop",
     enrollmentId: enrollment.enrollmentId,
-    reason: last.messageStatus === "delivered" ? "not_read" : "not_delivered"
+    reason: "not_delivered"
   };
 }
 

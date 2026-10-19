@@ -55,6 +55,7 @@ type StepRow = {
   missed: number;
   skipped: number;
   stuck: number;
+  notSent: number;
   delivered: number;
   read: number;
   replied: number;
@@ -106,7 +107,8 @@ const WHO_LABEL: Record<string, string> = {
   replied: "Replied",
   failed: "Failed",
   skipped: "Skipped",
-  stuck: "Stuck"
+  stuck: "Stuck",
+  not_sent: "Never sent to"
 };
 
 type WhoRow = { memberId: number; name: string; phone: string; detail: string };
@@ -1003,6 +1005,7 @@ function JourneyReport({ journeyId }: { journeyId: number }) {
               <th>Step</th>
               <th>Due</th>
               <th>Sent</th>
+              <th>Not sent</th>
               <th>Delivered</th>
               <th>Read</th>
               <th>Replied</th>
@@ -1017,6 +1020,13 @@ function JourneyReport({ journeyId }: { journeyId: number }) {
                 <td>
                   {step.sentText + step.sentTemplate}
                   {step.sentText ? ` (${step.sentText} free text)` : ""}
+                </td>
+                <td>
+                  {/* Its own column, never folded into Problems: a woman
+                      nobody sent to is the one failure that leaves no row
+                      behind, so every other count reads clean while she
+                      gets nothing. Fifty-four did, for two days. */}
+                  <StatCell n={step.notSent} onOpen={() => open("not_sent", step.stepId)} />
                 </td>
                 <td>
                   <StatCell n={step.delivered} onOpen={() => open("delivered", step.stepId)} />

@@ -653,6 +653,39 @@ export function completeEnrollment(enrollmentId: number) {
   getDb().prepare("UPDATE journey_enrollments SET state = 'completed' WHERE id = ?").run(enrollmentId);
 }
 
+/**
+ * A reply puts her back on the path, with nobody pressing anything.
+ *
+ * Stopping already yields to a reply — but only before the fact. Once an
+ * enrollment was stopped, writing back did nothing: twenty women of the
+ * Clean 18/10 cohort answered after their stop, one of them twenty-six
+ * times, and the path stayed shut for all of them. A message from her is
+ * the clearest possible statement that the number works and she is here.
+ *
+ * Returns the enrollments it woke, so the caller can close the manual task
+ * that was opened to chase them.
+ */
+export function resumeRepliedAfterStop(journeyId: number): Array<{ enrollmentId: number; memberId: number }> {
+  const db = getDb();
+  const rows = db
+    .prepare(
+      `SELECT e.id AS id, e.member_id AS member_id FROM journey_enrollments e
+        WHERE e.journey_id = ? AND e.state = 'stopped' AND e.stopped_at IS NOT NULL
+          AND EXISTS (
+            SELECT 1 FROM messages i
+             WHERE i.member_id = e.member_id AND i.direction = 'incoming'
+               AND i.created_at > e.stopped_at
+          )`
+    )
+    .all(journeyId) as Array<{ id: number; member_id: number }>;
+
+  for (const row of rows) {
+    resumeEnrollment(row.id);
+  }
+
+  return rows.map((row) => ({ enrollmentId: row.id, memberId: row.member_id }));
+}
+
 export function resumeEnrollment(enrollmentId: number) {
   getDb()
     .prepare(

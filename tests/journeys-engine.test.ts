@@ -89,14 +89,29 @@ test("47 hours of silence is not yet a stop", () => {
   assert.deepEqual(actions, []);
 });
 
-test("49 hours of silence on a delivered message stops for not_read", () => {
+test("silence on a message that arrived never ends the path", () => {
+  // The old rule stopped her here, and on 2026-10-17 it stopped 47 women of
+  // the Clean 18/10 cohort in one tick — all of them had the message on
+  // their phone. A read receipt is a setting, not a signal.
+  for (const messageStatus of ["delivered", "read"] as const) {
+    const actions = planTick({
+      now: NOW,
+      allowance: 100,
+      enrollments: [enrollment({ lastSend: sent({ attemptedAt: ago(49 * HOUR), messageStatus }) })]
+    });
+
+    assert.deepEqual(actions, [], messageStatus);
+  }
+});
+
+test("a week of silence on a message that arrived still never ends the path", () => {
   const actions = planTick({
     now: NOW,
     allowance: 100,
-    enrollments: [enrollment({ lastSend: sent({ attemptedAt: ago(49 * HOUR) }) })]
+    enrollments: [enrollment({ lastSend: sent({ attemptedAt: ago(7 * 24 * HOUR) }) })]
   });
 
-  assert.deepEqual(actions, [{ kind: "stop", enrollmentId: 1, reason: "not_read" }]);
+  assert.deepEqual(actions, []);
 });
 
 test("a message that never arrived stops for not_delivered", () => {
@@ -186,13 +201,14 @@ test("a stopped member is never sent to in the same tick", () => {
     allowance: 100,
     enrollments: [
       enrollment({
-        lastSend: sent({ attemptedAt: ago(49 * HOUR) }),
+        // Never reached the handset — the one thing that still stops a path.
+        lastSend: sent({ attemptedAt: ago(49 * HOUR), messageStatus: "sent" }),
         dueSteps: [{ stepId: 8, dueAt: ago(HOUR), hasFreeText: false }]
       })
     ]
   });
 
-  assert.deepEqual(actions, [{ kind: "stop", enrollmentId: 1, reason: "not_read" }]);
+  assert.deepEqual(actions, [{ kind: "stop", enrollmentId: 1, reason: "not_delivered" }]);
 });
 
 test("sends beyond the allowance are deferred, not dropped", () => {
@@ -280,7 +296,7 @@ test("a resume older than the last message does not hold the path open forever",
   const actions = planTick({
     now: NOW,
     allowance: 10,
-    enrollments: [enrollment({ lastSend: sent(), resumedAt: ago(60 * HOUR) })]
+    enrollments: [enrollment({ lastSend: sent({ messageStatus: "sent" }), resumedAt: ago(60 * HOUR) })]
   });
 
   assert.deepEqual(actions.map((action) => action.kind), ["stop"]);
