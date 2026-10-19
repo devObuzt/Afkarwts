@@ -3,6 +3,7 @@ import { requireApi } from "@/app/lib/users/current";
 import { NextResponse } from "next/server";
 import { deleteMember, getMember, updateMemberPhone, updateMemberProfile } from "@/app/lib/db";
 import { carryPhoneToSubmissions } from "@/app/lib/forms/store";
+import { reviveAfterPhoneFix } from "@/app/lib/journeys/phone-fix";
 
 export const runtime = "nodejs";
 
@@ -41,6 +42,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   // here corrects it everywhere they look. The one place that keeps its
   // own copy is her registration, and that is corrected with it — Wisam
   // asked for one number, not a number per screen.
+  let revived: { resumed: number; owed: number; sms: number } | null = null;
   if (typeof body.phone === "string" && body.phone.trim()) {
     const before = getMember(id);
     let moved;
@@ -58,6 +60,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (before) {
       carryPhoneToSubmissions(id, before.phone, moved.phone);
     }
+    // Everything the old number was refused is asked again. Without this a
+    // typo takes her off the path for good: the number is corrected, her
+    // free text works, and the course runs without her.
+    revived = reviveAfterPhoneFix(id);
     recordAction({
       userId: auth.user.id,
       actor: auth.user.name,
@@ -87,7 +93,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ error: "Member not found." }, { status: 404 });
   }
 
-  return NextResponse.json({ member });
+  return NextResponse.json(revived ? { member, revived } : { member });
 }
 
 /**

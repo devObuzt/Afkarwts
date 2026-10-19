@@ -2,6 +2,7 @@ import { requireApi } from "@/app/lib/users/current";
 import { NextResponse } from "next/server";
 import { getMember, updateMemberPhone } from "@/app/lib/db";
 import { alternateCountryCode } from "@/app/lib/whatsapp-errors";
+import { reviveAfterPhoneFix } from "@/app/lib/journeys/phone-fix";
 
 export const runtime = "nodejs";
 
@@ -31,5 +32,10 @@ export async function POST(request: Request) {
     );
   }
 
-  return NextResponse.json({ memberId: member.id, phone: result.phone });
+  // This route exists because the number was wrong, so the same rule
+  // applies as on the member's own file: ask again for everything the old
+  // number was refused.
+  const revived = reviveAfterPhoneFix(member.id);
+
+  return NextResponse.json({ memberId: member.id, phone: result.phone, revived });
 }
