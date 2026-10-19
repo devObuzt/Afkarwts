@@ -40,22 +40,36 @@ export function morningConfigured() {
   return Boolean(process.env.MORNING_KEY_ID && process.env.MORNING_KEY_SECRET);
 }
 
+/**
+ * Authentication moved hosts on 18.10.2026. The old `${MORNING}/account/token`
+ * was switched off and now answers 404 with an empty body — not a credentials
+ * error, the path itself is gone, so the old code failed in a way that read
+ * like a revoked key. The existing keys still work; only the shape changed, to
+ * standard OAuth 2.0 client_credentials, and only for the token: every other
+ * call stays on `MORNING`.
+ */
+const MORNING_IDP = "https://api.morning.co/idp/v1/oauth/token";
+
 async function token() {
-  const response = await fetch(`${MORNING}/account/token`, {
+  const response = await fetch(MORNING_IDP, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ id: process.env.MORNING_KEY_ID, secret: process.env.MORNING_KEY_SECRET })
+    body: JSON.stringify({
+      grant_type: "client_credentials",
+      client_id: process.env.MORNING_KEY_ID,
+      client_secret: process.env.MORNING_KEY_SECRET
+    })
   });
 
   if (!response.ok) {
     throw new Error(`Morning refused the key (${response.status}).`);
   }
 
-  const payload = (await response.json()) as { token?: string };
-  if (!payload.token) {
+  const payload = (await response.json()) as { accessToken?: string };
+  if (!payload.accessToken) {
     throw new Error("Morning returned no token.");
   }
-  return payload.token;
+  return payload.accessToken;
 }
 
 /** A store order id, when the document says which one it came from. */
