@@ -39,6 +39,46 @@ for (const [arabic, hebrew] of Object.entries(BY_ARABIC)) {
   }
 }
 
+/**
+ * The short names people type for a town the register writes in full.
+ *
+ * Only where the short form is unambiguous: «أم» for أم الفحم is not
+ * here, because أم القطف answers to it too. The dash pass below handles
+ * «تل أبيب - يافا» and its kind on its own.
+ */
+const SHORT: Record<string, string> = {
+  "معالوت": "معالوت ترشيحا",
+  "يهود": "يهود مونوسون"
+};
+
+/**
+ * The short name of a double-barrelled town, as a second pass.
+ *
+ * The register says «تل أبيب - يافا» and «معالوت ترشيحا» and «يهود
+ * مونوسون»; nobody types the second half. The pass runs after the exact
+ * names are all in, so a short name that is itself a town keeps its own
+ * town: «الطيبة (المرج)» never takes «الطيبة» away from الطيبة.
+ */
+for (const [arabic, hebrew] of Object.entries(BY_ARABIC)) {
+  for (const part of arabic.split(/[-–(]/)) {
+    const k = key(part);
+    if (k && k.length > 2 && !INDEX.has(k)) {
+      INDEX.set(k, hebrew);
+    }
+  }
+}
+
+for (const [short, full] of Object.entries(SHORT)) {
+  const hebrew = BY_ARABIC[full];
+  if (!hebrew) {
+    throw new Error(`«${full}» مش بسجل البلدات — الاسم القصير «${short}» بيشير لولا شي`);
+  }
+  const k = key(short);
+  if (!INDEX.has(k)) {
+    INDEX.set(k, hebrew);
+  }
+}
+
 export function hebrewTownFor(city: string) {
   const trimmed = city.trim().replace(/\s+/g, " ");
   if (!trimmed) {
