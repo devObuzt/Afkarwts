@@ -145,6 +145,9 @@ export default async function CohortPage({
                       {step.read} قُرئت
                       {step.notSent ? ` · ${step.notSent} ما انبعتلها` : ""}
                       {step.undelivered ? ` · ${step.undelivered} ما وصلها` : ""}
+                      {step.smsSent ? ` · ${step.smsSent} SMS` : ""}
+                      {step.smsFailed ? ` · ${step.smsFailed} SMS فشل` : ""}
+                      {step.noneReached ? ` · ${step.noneReached} ولا وصلها إشي` : ""}
                       {step.failed ? ` · ${step.failed} فشلت` : ""}
                       {step.stuck ? ` · ${step.stuck} عالقة` : ""}
                     </span>

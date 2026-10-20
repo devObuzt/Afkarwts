@@ -485,3 +485,82 @@ test("the gap between sent and delivered is its own number, and it opens", async
   // Sent accounts for itself exactly: landed, never landed, or failed.
   assert.equal(row.delivered + row.undelivered + row.failed, row.sentText + row.sentTemplate);
 });
+
+/**
+ * «فشل بالواتساب 50 · SMS انبعث لـ45 · فشل لـ5 — هدول الخمسة ولا وصلهن إشي.»
+ *
+ * That last number was the one nobody could read off the row: WhatsApp
+ * lives in `messages` and SMS lives in `followups`, so «who got nothing
+ * at all» meant subtracting two tables by hand.
+ */
+test("the row says who the SMS caught, and who neither channel reached", async () => {
+  const { createMember, createGroup, addMembersToGroup, listMessages, getDb } = await import("@/app/lib/db");
+  const { createTemplate, createStep, createJourney, setJourneyStatus } = await import("@/app/lib/journeys/store");
+  const { runDueJourneys } = await import("@/app/lib/journeys/runner");
+  const { buildStatusPayload, handleWebhookPayload } = await import("@/app/lib/whatsapp-webhook");
+  const { stepBreakdown, whoOnStep } = await import("@/app/lib/journeys/report");
+  const { listFollowups } = await import("@/app/lib/journeys/followups");
+
+  const group = createGroup("كلين القنوات");
+  const onWhatsApp = createMember({ name: "وصلها واتساب", phone: "+972526800111", notes: "" })!;
+  const onSms = createMember({ name: "لحقها SMS", phone: "+972526800112", notes: "" })!;
+  const nobody = createMember({ name: "ولا وصلها إشي", phone: "+972526800113", notes: "" })!;
+  addMembersToGroup(group.id, [onWhatsApp.id, onSms.id, nobody.id]);
+
+  const template = createTemplate({ name: "كلين", smsText: "حاولنا نوصلك" });
+  const step = createStep({
+    templateId: template.id,
+    week: 1,
+    weekday: 0,
+    sendTime: "07:00",
+    label: "ترحيب",
+    freeText: "",
+    templateName: "clean_week",
+    templateLanguage: "ar",
+    bodyParams: [],
+    templatePreview: "مراحب",
+    smsText: "أهلا {{name}}"
+  }).id;
+
+  const journey = createJourney({ templateId: template.id, groupId: group.id, anchorDate: "2026-08-30" });
+  setJourneyStatus(journey.id, "active");
+  await runDueJourneys(new Date("2026-08-30T05:00:00.000Z"));
+
+  // One receipt comes back; the other two messages never land.
+  const whatsappId = listMessages(onWhatsApp.id).find((m) => m.direction === "outgoing")!.whatsappMessageId!;
+  await handleWebhookPayload(buildStatusPayload({ whatsappMessageId: whatsappId, status: "delivered" }));
+
+  // An SMS catches one of the two; the other one's fails.
+  const db = getDb();
+  for (const [member, state] of [
+    [onSms, "sent"],
+    [nobody, "failed"]
+  ] as const) {
+    const enrollment = (
+      db
+        .prepare("SELECT id FROM journey_enrollments WHERE journey_id = ? AND member_id = ?")
+        .get(journey.id, member.id) as { id: number }
+    ).id;
+    db.prepare(
+      `INSERT INTO followups (member_id, enrollment_id, step_id, kind, reason, state, body)
+       VALUES (?, ?, ?, 'sms', 'الواتساب ما وصل', ?, 'أهلا')`
+    ).run(member.id, enrollment, step, state);
+  }
+  assert.equal(listFollowups({ kind: "sms" }).length, 2);
+
+  const row = stepBreakdown(journey.id).find((item) => item.stepId === step)!;
+  assert.equal(row.delivered, 1, "WhatsApp got through to one");
+  assert.equal(row.smsSent, 1, "the SMS caught one of the rest");
+  assert.equal(row.smsFailed, 1);
+  assert.equal(row.noneReached, 1, "and one is left with nothing");
+
+  assert.deepEqual(whoOnStep(journey.id, step, "sms_sent").map((r) => r.name), ["لحقها SMS"]);
+  assert.deepEqual(
+    whoOnStep(journey.id, step, "none_reached").map((r) => r.name),
+    ["ولا وصلها إشي"],
+    "the number at the end of the row opens into the woman it is about"
+  );
+
+  // Reached by either channel, or counted as reached by neither.
+  assert.equal(row.delivered + row.smsSent + row.noneReached, 3);
+});

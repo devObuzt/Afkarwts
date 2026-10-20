@@ -56,6 +56,10 @@ export type StepRow = {
   stuck: number;
   notSent: number;
   undelivered: number;
+  smsSent: number;
+  smsFailed: number;
+  smsQueued: number;
+  noneReached: number;
   delivered: number;
   read: number;
   replied: number;
@@ -285,6 +289,39 @@ export function stepBreakdown(journeyId: number): StepRow[] {
           .get(journeyId, step.id) as { n: number }
       ).n;
 
+      // The step's own SMS, which only exists where WhatsApp did not land.
+      const sms = countBy(
+        `SELECT f.state AS key, COUNT(*) AS n FROM followups f
+           JOIN journey_enrollments e ON e.id = f.enrollment_id
+          WHERE e.journey_id = ? AND f.step_id = ? AND f.kind = 'sms' GROUP BY f.state`,
+        [journeyId, step.id]
+      );
+
+      /**
+       * Nobody reached her — not WhatsApp, not SMS.
+       *
+       * The one number worth acting on, and the only one that could not be
+       * read off the row: «50 failed on WhatsApp, 45 went out as SMS» left
+       * five women who got nothing, and finding them meant subtracting two
+       * numbers from two different tables.
+       */
+      const noneReached = (
+        db
+          .prepare(
+            `SELECT COUNT(*) AS n FROM journey_enrollments e
+              WHERE e.journey_id = @journeyId
+                AND NOT EXISTS (
+                  SELECT 1 FROM journey_sends s JOIN messages m ON m.id = s.message_id
+                   WHERE s.enrollment_id = e.id AND s.step_id = @stepId
+                     AND m.status IN ('delivered', 'read'))
+                AND NOT EXISTS (
+                  SELECT 1 FROM followups f
+                   WHERE f.enrollment_id = e.id AND f.step_id = @stepId
+                     AND f.kind = 'sms' AND f.state = 'sent')`
+          )
+          .get({ journeyId, stepId: step.id }) as { n: number }
+      ).n;
+
       // A row still pending long after it was claimed means a process died
       // between claiming a step and recording it. It is never resent.
       const stuck = (
@@ -315,6 +352,11 @@ export function stepBreakdown(journeyId: number): StepRow[] {
         // «252 لم تُرسل» on tomorrow's row is noise, not a warning.
         notSent: dueAt.getTime() > Date.now() ? 0 : notSent,
         undelivered,
+        smsSent: sms.sent ?? 0,
+        smsFailed: sms.failed ?? 0,
+        smsQueued: sms.queued ?? 0,
+        // Tomorrow's step has reached nobody yet, which is not a warning.
+        noneReached: dueAt.getTime() > Date.now() ? 0 : noneReached,
         delivered: (statuses.delivered ?? 0) + (statuses.read ?? 0),
         read: statuses.read ?? 0,
         replied
@@ -387,6 +429,43 @@ export function whoOnStep(
            FROM journey_enrollments e
            JOIN members mem ON mem.id = e.member_id
           WHERE e.journey_id = @journeyId ${mine} AND ${OUTCOME_SQL} = '${outcome}'
+          ORDER BY mem.name LIMIT @limit`
+      )
+      .all(args) as WhoRow[];
+  }
+
+  // The step's SMS, by its state, and the women nobody reached at all.
+  if (bucket === "sms_sent" || bucket === "sms_failed" || bucket === "sms_queued") {
+    const state = bucket.slice("sms_".length);
+    return db
+      .prepare(
+        `SELECT DISTINCT mem.id AS memberId, mem.name, mem.phone, COALESCE(f.error, f.state) AS detail
+           FROM followups f
+           JOIN journey_enrollments e ON e.id = f.enrollment_id
+           JOIN members mem ON mem.id = e.member_id
+          WHERE e.journey_id = @journeyId ${onStep ? "AND f.step_id = @stepId" : ""} ${mine}
+            AND f.kind = 'sms' AND f.state = '${state}'
+          ORDER BY mem.name LIMIT @limit`
+      )
+      .all(args) as WhoRow[];
+  }
+
+  if (bucket === "none_reached" && stepId !== null) {
+    return db
+      .prepare(
+        `SELECT mem.id AS memberId, mem.name, mem.phone,
+                COALESCE(e.stop_reason, e.state) AS detail
+           FROM journey_enrollments e
+           JOIN members mem ON mem.id = e.member_id
+          WHERE e.journey_id = @journeyId ${mine}
+            AND NOT EXISTS (
+              SELECT 1 FROM journey_sends s JOIN messages m ON m.id = s.message_id
+               WHERE s.enrollment_id = e.id AND s.step_id = @stepId
+                 AND m.status IN ('delivered', 'read'))
+            AND NOT EXISTS (
+              SELECT 1 FROM followups f
+               WHERE f.enrollment_id = e.id AND f.step_id = @stepId
+                 AND f.kind = 'sms' AND f.state = 'sent')
           ORDER BY mem.name LIMIT @limit`
       )
       .all(args) as WhoRow[];

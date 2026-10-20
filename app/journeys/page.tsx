@@ -58,6 +58,10 @@ type StepRow = {
   stuck: number;
   notSent: number;
   undelivered: number;
+  smsSent: number;
+  smsFailed: number;
+  smsQueued: number;
+  noneReached: number;
   delivered: number;
   read: number;
   replied: number;
@@ -114,6 +118,10 @@ const WHO_LABEL: Record<string, string> = {
   stuck: "Stuck",
   not_sent: "Never sent to",
   undelivered: "Sent, never landed on the handset",
+  sms_sent: "SMS went out instead",
+  sms_failed: "SMS failed too",
+  sms_queued: "SMS still queued",
+  none_reached: "Nothing reached her — not WhatsApp, not SMS",
   "outcome:never_sent": "ما بعتنا إلها ولا رسالة",
   "outcome:not_delivered": "بعتنا وما وصلها",
   "outcome:delivered_unread": "وصلها وما انقرأ",
@@ -1042,6 +1050,8 @@ function JourneyReport({ journeyId }: { journeyId: number }) {
               <th>Not delivered</th>
               <th>Read</th>
               <th>Replied</th>
+              <th>SMS</th>
+              <th>ولا وصلها إشي</th>
               <th>Problems</th>
             </tr>
           </thead>
@@ -1075,6 +1085,37 @@ function JourneyReport({ journeyId }: { journeyId: number }) {
                 </td>
                 <td>
                   <StatCell n={step.replied} onOpen={() => open("replied", step.stepId)} />
+                </td>
+                <td>
+                  {/* The step's SMS, which only exists where WhatsApp did
+                      not land: «50 failed · 45 SMS» is readable, «50
+                      failed» alone is not. */}
+                  {step.smsSent || step.smsFailed || step.smsQueued ? (
+                    <>
+                      <StatCell n={step.smsSent} onOpen={() => open("sms_sent", step.stepId)} />
+                      {step.smsFailed ? (
+                        <>
+                          {" · "}
+                          <StatCell n={step.smsFailed} onOpen={() => open("sms_failed", step.stepId)} />
+                          {" failed"}
+                        </>
+                      ) : null}
+                      {step.smsQueued ? (
+                        <>
+                          {" · "}
+                          <StatCell n={step.smsQueued} onOpen={() => open("sms_queued", step.stepId)} />
+                          {" queued"}
+                        </>
+                      ) : null}
+                    </>
+                  ) : (
+                    "—"
+                  )}
+                </td>
+                <td>
+                  {/* The end of the row, and the only number worth acting
+                      on: neither channel got through to her. */}
+                  <StatCell n={step.noneReached} onOpen={() => open("none_reached", step.stepId)} />
                 </td>
                 <td>
                   <Problems onOpen={(bucket) => open(bucket, step.stepId)} step={step} />
