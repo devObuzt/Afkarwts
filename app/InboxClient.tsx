@@ -926,21 +926,7 @@ export function InboxClient() {
                         {renderMessageContent(message)}
                         <footer>
                           <span>{timeLabel(message.createdAt)}</span>
-                          {message.direction === "outgoing" ? (
-                            <StatusTicks status={message.status} />
-                          ) : (
-                            // Putting a thread back among the unread, from
-                            // this message on. Nobody is waiting on a
-                            // message we sent, so ours do not offer it.
-                            <button
-                              className="markUnread"
-                              onClick={() => void markUnread(message.id)}
-                              title="من هاي الرسالة وطالع — للمحادثة كلها استعمل الشريط اللي تحت الاسم"
-                              type="button"
-                            >
-                              <Icon path={icons.dot} size={10} />
-                            </button>
-                          )}
+                          {message.direction === "outgoing" ? <StatusTicks status={message.status} /> : null}
                         </footer>
                         {message.error ? <small className="bubbleError">{message.error}</small> : null}
                       </article>

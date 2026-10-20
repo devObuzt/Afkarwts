@@ -1,4 +1,4 @@
-import { getDb, getMember } from "../db";
+import { getDb, getMember, toIso } from "../db";
 import { sendSms } from "../sms";
 import { isIsraeliMobile } from "../sms-format";
 import { contactFirstName, NAME_TOKEN } from "../whatsapp";
@@ -64,8 +64,8 @@ function mapFollowup(row: DbFollowup): Followup {
     attempts: row.attempts,
     error: row.error,
     note: row.note,
-    createdAt: row.created_at,
-    resolvedAt: row.resolved_at
+    createdAt: toIso(row.created_at),
+    resolvedAt: row.resolved_at ? toIso(row.resolved_at) : null
   };
 }
 

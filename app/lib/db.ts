@@ -238,7 +238,7 @@ function mapMember(row: DbMember, groupIds?: number[]): Member {
     lastReadMessageId: row.last_read_message_id ?? null,
     unreadCount: row.unread_count ?? 0,
     groupIds: groupIds ?? memberGroupIds(row.id),
-    createdAt: row.created_at
+    createdAt: toIso(row.created_at)
   };
 }
 
@@ -247,6 +247,21 @@ function memberGroupIds(memberId: number) {
     .prepare("SELECT group_id FROM member_groups WHERE member_id = ?")
     .all(memberId) as Array<{ group_id: number }>;
   return rows.map((row) => row.group_id);
+}
+
+/**
+ * A stored timestamp, as an instant the browser cannot misread.
+ *
+ * SQLite keeps «2026-10-20 11:12:49» — UTC, with nothing saying so. A
+ * browser parses a string in that shape as **local** time, so every hour
+ * of the viewer's own offset was silently subtracted: a message that
+ * arrived at 14:12 in Jerusalem read 11:12 on the screen. The inbox list
+ * and the people list already marked the zone; the messages themselves
+ * did not, which is why the thread said «منذ دقيقتين» above a bubble
+ * stamped three hours ago.
+ */
+export function toIso(value: string) {
+  return value.includes("T") ? value : `${value.replace(" ", "T")}Z`;
 }
 
 function mapMessage(row: DbMessage): Message {
@@ -262,7 +277,7 @@ function mapMessage(row: DbMessage): Message {
     mediaUrl: row.media_url,
     mediaMimeType: row.media_mime_type,
     mediaFilename: row.media_filename,
-    createdAt: row.created_at
+    createdAt: toIso(row.created_at)
   };
 }
 
@@ -672,7 +687,7 @@ function mapCampaign(row: DbCampaign): Campaign {
     lastRunAt: row.last_run_at,
     startsAt: row.starts_at,
     repeatMode: row.repeat_mode ?? "daily",
-    createdAt: row.created_at
+    createdAt: toIso(row.created_at)
   };
 }
 
@@ -884,8 +899,8 @@ export function listDevices(): Device[] {
     platform: row.platform,
     label: row.label,
     enabled: Boolean(row.enabled),
-    lastSeenAt: row.last_seen_at,
-    createdAt: row.created_at
+    lastSeenAt: row.last_seen_at ? toIso(String(row.last_seen_at)) : row.last_seen_at,
+    createdAt: toIso(row.created_at)
   }));
 }
 
@@ -957,7 +972,7 @@ export function listGroupSendBodies(groupId: number, minRecipients = 5): GroupSe
     sent: row.sent,
     failed: row.failed,
     firstAt: row.first_at,
-    lastAt: row.last_at
+    lastAt: row.last_at ? toIso(String(row.last_at)) : row.last_at
   }));
 }
 
@@ -1001,7 +1016,7 @@ export function listCampaignRecipients(groupId: number, body: string): Recipient
     phone: row.phone,
     status: row.status,
     error: row.error,
-    sentAt: row.created_at
+    sentAt: row.created_at ? toIso(String(row.created_at)) : row.created_at
   }));
 }
 
@@ -1207,7 +1222,7 @@ export function listGroups(): Group[] {
     id: row.id,
     name: row.name,
     memberCount: row.member_count,
-    createdAt: row.created_at
+    createdAt: toIso(row.created_at)
   }));
 }
 
@@ -1250,7 +1265,7 @@ export function getGroup(id: number) {
   const row = getDb().prepare("SELECT * FROM groups WHERE id = ?").get(id) as
     | { id: number; name: string; created_at: string }
     | undefined;
-  return row ? { id: row.id, name: row.name, createdAt: row.created_at } : null;
+  return row ? { id: row.id, name: row.name, createdAt: toIso(row.created_at) } : null;
 }
 
 export function addMembersToGroup(groupId: number, memberIds: number[]) {
