@@ -57,6 +57,7 @@ type StepRow = {
   skipped: number;
   stuck: number;
   notSent: number;
+  undelivered: number;
   delivered: number;
   read: number;
   replied: number;
@@ -112,6 +113,7 @@ const WHO_LABEL: Record<string, string> = {
   deferred: "Deferred — the day's ceiling was full",
   stuck: "Stuck",
   not_sent: "Never sent to",
+  undelivered: "Sent, never landed on the handset",
   "outcome:never_sent": "ما بعتنا إلها ولا رسالة",
   "outcome:not_delivered": "بعتنا وما وصلها",
   "outcome:delivered_unread": "وصلها وما انقرأ",
@@ -1037,6 +1039,7 @@ function JourneyReport({ journeyId }: { journeyId: number }) {
               <th>Sent</th>
               <th>Not sent</th>
               <th>Delivered</th>
+              <th>Not delivered</th>
               <th>Read</th>
               <th>Replied</th>
               <th>Problems</th>
@@ -1060,6 +1063,12 @@ function JourneyReport({ journeyId }: { journeyId: number }) {
                 </td>
                 <td>
                   <StatCell n={step.delivered} onOpen={() => open("delivered", step.stepId)} />
+                </td>
+                <td>
+                  {/* Sent minus delivered minus failed. It used to be a
+                      number you could only get by subtracting two others,
+                      so the woman in the gap had nowhere to appear. */}
+                  <StatCell n={step.undelivered} onOpen={() => open("undelivered", step.stepId)} />
                 </td>
                 <td>
                   <StatCell n={step.read} onOpen={() => open("read", step.stepId)} />

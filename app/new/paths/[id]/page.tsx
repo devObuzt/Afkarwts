@@ -144,6 +144,7 @@ export default async function CohortPage({
                       {day(step.dueAt)} {clock(step.dueAt)} · {step.sentText + step.sentTemplate} أُرسلت ·{" "}
                       {step.read} قُرئت
                       {step.notSent ? ` · ${step.notSent} ما انبعتلها` : ""}
+                      {step.undelivered ? ` · ${step.undelivered} ما وصلها` : ""}
                       {step.failed ? ` · ${step.failed} فشلت` : ""}
                       {step.stuck ? ` · ${step.stuck} عالقة` : ""}
                     </span>

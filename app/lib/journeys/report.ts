@@ -55,6 +55,7 @@ export type StepRow = {
   skipped: number;
   stuck: number;
   notSent: number;
+  undelivered: number;
   delivered: number;
   read: number;
   replied: number;
@@ -268,6 +269,22 @@ export function stepBreakdown(journeyId: number): StepRow[] {
           .get(journeyId, step.id) as { n: number }
       ).n;
 
+      // Left our side and never landed on a handset: not failed, not
+      // pending in our own queue — Meta took it and no delivery receipt
+      // came back. Without this the row said «249 sent · 248 delivered»
+      // and the one woman in the gap had nowhere on the screen to appear.
+      const undelivered = (
+        db
+          .prepare(
+            `SELECT COUNT(*) AS n FROM journey_sends s
+             JOIN journey_enrollments e ON e.id = s.enrollment_id
+             LEFT JOIN messages m ON m.id = s.message_id
+             WHERE e.journey_id = ? AND s.step_id = ? AND s.state = 'sent'
+               AND (m.status IS NULL OR m.status NOT IN ('delivered', 'read', 'failed'))`
+          )
+          .get(journeyId, step.id) as { n: number }
+      ).n;
+
       // A row still pending long after it was claimed means a process died
       // between claiming a step and recording it. It is never resent.
       const stuck = (
@@ -297,6 +314,7 @@ export function stepBreakdown(journeyId: number): StepRow[] {
         // A step whose hour has not come has reached nobody yet, and
         // «252 لم تُرسل» on tomorrow's row is noise, not a warning.
         notSent: dueAt.getTime() > Date.now() ? 0 : notSent,
+        undelivered,
         delivered: (statuses.delivered ?? 0) + (statuses.read ?? 0),
         read: statuses.read ?? 0,
         replied
@@ -353,6 +371,7 @@ export function whoOnStep(
     // open: Sawar Faour, back on the path with a step whose hour had gone.
     missed: `s.state = 'missed'`,
     deferred: `s.state = 'deferred'`,
+    undelivered: `s.state = 'sent' AND (m.status IS NULL OR m.status NOT IN ('delivered', 'read', 'failed'))`,
     stuck: `s.state = 'sent' AND m.status = 'pending'`
   };
 

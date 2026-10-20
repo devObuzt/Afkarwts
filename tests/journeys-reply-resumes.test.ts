@@ -424,3 +424,64 @@ test("a step's numbers account for every enrolled woman, and each opens into nam
     "and a bucket with nobody in it is an empty list, not an error"
   );
 });
+
+
+/**
+ * «انبعتت 249 · وصلت 248» — ومين الوحدة؟
+ *
+ * Wisam had to ask, every time, because the gap between those two numbers
+ * was the one thing on the row that was not a column: delivered was a
+ * link, failed was a link, and the woman whose message simply never
+ * landed appeared in neither.
+ */
+test("the gap between sent and delivered is its own number, and it opens", async () => {
+  const { createMember, createGroup, addMembersToGroup, listMessages } = await import("@/app/lib/db");
+  const { createTemplate, createStep, createJourney, setJourneyStatus } = await import("@/app/lib/journeys/store");
+  const { runDueJourneys } = await import("@/app/lib/journeys/runner");
+  const { buildStatusPayload, handleWebhookPayload } = await import("@/app/lib/whatsapp-webhook");
+  const { stepBreakdown, whoOnStep } = await import("@/app/lib/journeys/report");
+
+  const group = createGroup("كلين الوصول");
+  const landed = createMember({ name: "وصلتها", phone: "+972526800101", notes: "" })!;
+  const inFlight = createMember({ name: "لمار", phone: "+972526800102", notes: "" })!;
+  addMembersToGroup(group.id, [landed.id, inFlight.id]);
+
+  const template = createTemplate({ name: "كلين", smsText: "" });
+  const step = createStep({
+    templateId: template.id,
+    week: 1,
+    weekday: 0,
+    sendTime: "07:00",
+    label: "ترحيب",
+    freeText: "",
+    templateName: "clean_week",
+    templateLanguage: "ar",
+    bodyParams: [],
+    templatePreview: "مراحب"
+  }).id;
+
+  const journey = createJourney({ templateId: template.id, groupId: group.id, anchorDate: "2026-08-30" });
+  setJourneyStatus(journey.id, "active");
+  await runDueJourneys(new Date("2026-08-30T05:00:00.000Z"));
+
+  // One receipt comes back. The other message stays «sent» — Meta took it
+  // and nothing more was heard, which is a phone that is off, not a
+  // failure and not a queue of ours.
+  const whatsappId = listMessages(landed.id).find((m) => m.direction === "outgoing")!.whatsappMessageId!;
+  await handleWebhookPayload(buildStatusPayload({ whatsappMessageId: whatsappId, status: "delivered" }));
+
+  const row = stepBreakdown(journey.id).find((item) => item.stepId === step)!;
+  assert.equal(row.sentText + row.sentTemplate, 2);
+  assert.equal(row.delivered, 1);
+  assert.equal(row.undelivered, 1, "the gap is a number of its own");
+  assert.equal(row.failed, 0, "it did not fail — nothing came back at all");
+
+  assert.deepEqual(
+    whoOnStep(journey.id, step, "undelivered").map((item) => item.name),
+    ["لمار"],
+    "and it opens into her name without anybody asking"
+  );
+
+  // Sent accounts for itself exactly: landed, never landed, or failed.
+  assert.equal(row.delivered + row.undelivered + row.failed, row.sentText + row.sentTemplate);
+});
