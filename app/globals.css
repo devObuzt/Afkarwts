@@ -374,6 +374,51 @@ label {
   padding: max(12px, env(safe-area-inset-top)) 20px 12px;
 }
 
+/*
+ * A shelf under the name, translucent so the conversation shows through:
+ * things you do to this conversation, kept off the header, which is who
+ * the conversation is with. One button today; «أضف لمنتسب» and the rest
+ * sit beside it, so it is a scrolling row from the start.
+ */
+.conversationActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 20px;
+  background: color-mix(in srgb, var(--panel) 72%, transparent);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.conversationActions::-webkit-scrollbar {
+  display: none;
+}
+
+.convAction {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: 0 0 auto;
+  min-height: 28px;
+  padding: 0 11px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.convAction:hover {
+  border-color: color-mix(in srgb, currentColor 35%, var(--line));
+  color: var(--text, inherit);
+}
+
 .headerMeta h2 {
   font-size: 16px;
   margin: 0;

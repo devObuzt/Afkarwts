@@ -85,17 +85,24 @@ test("unread threads come first, and among them the newest message", async () =>
   // Read: her thread drops below the two still waiting, however recent.
   getDb().prepare("UPDATE members SET last_read_message_id = ? WHERE id = ?").run(seen, answered.id);
 
-  const order = () => listPeople({ query: "مستنية" }).people.map((p) => p.name);
-  assert.deepEqual(listPeople({}).people.slice(0, 3).map((p) => p.name), [
-    "مستنية من اليوم",
-    "مستنية من امبارح",
-    "ردّينا عليها اليوم"
-  ]);
+  // Only these three: the file shares one database, so the list also holds
+  // whoever the other tests made.
+  const mine = new Set([waited.id, answered.id, alsoWaiting.id]);
+  const order = () =>
+    listPeople({ limit: 200 })
+      .people.filter((p) => mine.has(p.id))
+      .map((p) => p.name);
+
+  assert.deepEqual(order(), ["مستنية من اليوم", "مستنية من امبارح", "ردّينا عليها اليوم"]);
 
   // And marking a read message unread puts that thread straight back up.
   getDb().prepare("UPDATE members SET last_read_message_id = ? WHERE id = ?").run(old, waited.id);
-  assert.equal(listPeople({}).people[0].name, "مستنية من اليوم", "the other one is still waiting");
+  assert.deepEqual(order(), ["مستنية من اليوم", "ردّينا عليها اليوم", "مستنية من امبارح"], "she is read now");
+
   markMessageUnread(answered.id, seen);
-  assert.equal(listPeople({}).people[0].name, "ردّينا عليها اليوم", "her message is the newest unread");
-  assert.deepEqual(order(), ["مستنية من اليوم", "مستنية من امبارح"]);
+  assert.deepEqual(
+    order(),
+    ["ردّينا عليها اليوم", "مستنية من اليوم", "مستنية من امبارح"],
+    "marking it unread puts her back on top — hers is the newest unread"
+  );
 });

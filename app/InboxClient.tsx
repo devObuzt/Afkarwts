@@ -531,14 +531,20 @@ export function InboxClient() {
    * «unread» here is the same count the inbox already orders by — not a
    * second flag that could disagree with it.
    */
-  async function markUnread(messageId: number) {
+  /**
+   * Put the thread back among the unread — from one message, or from the
+   * whole conversation when none is named. The bar under the name is the
+   * second case: «treat this as if we never opened it» is about the
+   * conversation, so the screen does not pick a message for it.
+   */
+  async function markUnread(messageId?: number) {
     if (!selectedMember) {
       return;
     }
     const response = await fetch(`/api/members/${selectedMember.id}/unread`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ messageId })
+      body: JSON.stringify(messageId === undefined ? {} : { messageId })
     });
     if (!response.ok) {
       return;
@@ -888,6 +894,21 @@ export function InboxClient() {
           </header>
         ) : null}
 
+        {/*
+          A shelf of its own under the name, not another row inside the
+          header: these are things you do to the conversation, and the
+          header is who the conversation is with. «أضف لمنتسب» and the
+          rest land here next, so it is built as a row from the start.
+        */}
+        {selectedMember ? (
+          <div className="conversationActions">
+            <button className="convAction" onClick={() => void markUnread()} type="button">
+              <Icon path={icons.dot} size={10} />
+              علّمها كغير مقروءة
+            </button>
+          </div>
+        ) : null}
+
         {notice ? <div className="notice floating">{notice}</div> : null}
 
         <div className="messages">
@@ -914,11 +935,10 @@ export function InboxClient() {
                             <button
                               className="markUnread"
                               onClick={() => void markUnread(message.id)}
-                              title="بترجع المحادثة للي مش مقروءة من هاي الرسالة وطالع"
+                              title="من هاي الرسالة وطالع — للمحادثة كلها استعمل الشريط اللي تحت الاسم"
                               type="button"
                             >
-                              <Icon path={icons.dot} size={9} />
-                              غير مقروءة
+                              <Icon path={icons.dot} size={10} />
                             </button>
                           )}
                         </footer>
