@@ -22,6 +22,10 @@ const publicPrefixes = [
   "/api/dev/simulate",
   "/api/journeys/tick",
   "/api/journeys/digest",
+  // The file a WhatsApp message points at. Public by necessity — the
+  // women opening it are not logged in — and narrow by design: the route
+  // serves one named slug's file and nothing a caller can name itself.
+  "/f",
   "/password",
   "/api/auth/password",
   "/_next",

@@ -456,7 +456,102 @@ function migrateGroupTables(db: DatabaseSync) {
     );
 
     CREATE INDEX IF NOT EXISTS idx_member_groups_group ON member_groups(group_id);
+
+    /*
+     * A link we own, that outlives whatever is behind it.
+     *
+     * The Clean programme went out to 243 women on 2026-10-15 as
+     * «l5k.me/qcuwR_lrRnX» — a landing-page service nobody here has an
+     * account on. It stopped serving the file, nothing told us, and we
+     * found out when the women started writing. A slug here points at a
+     * file we hold: swap the file, the link in every message already sent
+     * keeps working.
+     */
+    CREATE TABLE IF NOT EXISTS public_files (
+      slug TEXT PRIMARY KEY,
+      filename TEXT NOT NULL,
+      label TEXT NOT NULL DEFAULT '',
+      mime_type TEXT NOT NULL DEFAULT 'application/octet-stream',
+      download_name TEXT NOT NULL DEFAULT '',
+      hits INTEGER NOT NULL DEFAULT 0,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
   `);
+}
+
+export type PublicFile = {
+  slug: string;
+  filename: string;
+  label: string;
+  mimeType: string;
+  downloadName: string;
+  hits: number;
+  updatedAt: string;
+};
+
+function mapPublicFile(row: Record<string, unknown>): PublicFile {
+  return {
+    slug: String(row.slug),
+    filename: String(row.filename),
+    label: String(row.label ?? ""),
+    mimeType: String(row.mime_type ?? "application/octet-stream"),
+    downloadName: String(row.download_name ?? ""),
+    hits: Number(row.hits ?? 0),
+    updatedAt: toIso(String(row.updated_at))
+  };
+}
+
+export function listPublicFiles(): PublicFile[] {
+  return (getDb().prepare("SELECT * FROM public_files ORDER BY slug").all() as Array<Record<string, unknown>>).map(
+    mapPublicFile
+  );
+}
+
+export function getPublicFile(slug: string) {
+  const row = getDb().prepare("SELECT * FROM public_files WHERE slug = ?").get(slug) as
+    | Record<string, unknown>
+    | undefined;
+  return row ? mapPublicFile(row) : null;
+}
+
+/** Point a slug at a file. The slug is the promise; the file behind it may change. */
+export function setPublicFile(input: {
+  slug: string;
+  filename: string;
+  label?: string;
+  mimeType?: string;
+  downloadName?: string;
+}) {
+  const slug = input.slug.trim().toLowerCase();
+  if (!/^[a-z0-9][a-z0-9-]{1,48}$/.test(slug)) {
+    return { ok: false as const, error: "الاسم المختصر بيكون حروف لاتينية وأرقام وشحطات." };
+  }
+
+  getDb()
+    .prepare(
+      `INSERT INTO public_files (slug, filename, label, mime_type, download_name, updated_at)
+       VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+       ON CONFLICT (slug) DO UPDATE SET
+         filename = excluded.filename,
+         label = excluded.label,
+         mime_type = excluded.mime_type,
+         download_name = excluded.download_name,
+         updated_at = CURRENT_TIMESTAMP`
+    )
+    .run(
+      slug,
+      input.filename,
+      input.label ?? "",
+      input.mimeType ?? "application/octet-stream",
+      input.downloadName ?? ""
+    );
+
+  return { ok: true as const, file: getPublicFile(slug)! };
+}
+
+/** Counted so a dead link shows up as «nobody opened it» before anybody writes in. */
+export function countPublicFileHit(slug: string) {
+  getDb().prepare("UPDATE public_files SET hits = hits + 1 WHERE slug = ?").run(slug);
 }
 
 function memberGroupIdMap() {
