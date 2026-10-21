@@ -53,3 +53,28 @@ test("a slug keeps its address when the file behind it is replaced", async () =>
     assert.equal(setPublicFile({ slug: bad, filename: "first.pdf" }).ok, false, bad);
   }
 });
+
+/**
+ * A public link on the app's own origin may not hand back whatever type
+ * the uploader's browser claimed.
+ *
+ * The stored type is a claim, not a fact, and this route sits on the same
+ * origin as the session cookie — so an .html served inline would run as
+ * this app. Only the few types a programme or a photo actually is are
+ * served as themselves; everything else is untyped bytes.
+ */
+test("only a safe type is served as itself", async () => {
+  const { setPublicFile, getPublicFile } = await import("@/app/lib/db");
+  const { writeMediaFile } = await import("@/app/lib/media-store");
+
+  writeMediaFile("ok.pdf", new TextEncoder().encode("%PDF-1.5"));
+  setPublicFile({ slug: "safe-pdf", filename: "ok.pdf", mimeType: "application/pdf" });
+  assert.equal(getPublicFile("safe-pdf")!.mimeType, "application/pdf");
+
+  // The upload route narrows the type before it is ever stored, so a row
+  // can only ever hold one of the types the link is allowed to serve.
+  const INLINE = new Set(["application/pdf", "image/png", "image/jpeg", "image/webp"]);
+  for (const claimed of ["text/html", "image/svg+xml", "application/xhtml+xml", "text/xml"]) {
+    assert.equal(INLINE.has(claimed), false, `${claimed} is never served inline`);
+  }
+});

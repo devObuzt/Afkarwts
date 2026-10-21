@@ -1,13 +1,22 @@
 import { NextResponse } from "next/server";
 import { requireApi } from "@/app/lib/users/current";
 import { recordAction } from "@/app/lib/users/audit";
-import { listPublicFiles, setPublicFile } from "@/app/lib/db";
+import { getPublicFile, listPublicFiles, setPublicFile } from "@/app/lib/db";
 import { MAX_MEDIA_BYTES, MAX_MEDIA_LABEL, createStoredMediaFilename, writeMediaFile } from "@/app/lib/media-store";
 
 export const runtime = "nodejs";
 
+const ALLOWED_TYPES = new Set([
+  "application/pdf",
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "video/mp4",
+  "audio/mpeg"
+]);
+
 export async function GET() {
-  const auth = await requireApi("messages.send");
+  const auth = await requireApi("files.view");
   if (!auth.ok) {
     return auth.response;
   }
@@ -22,7 +31,10 @@ export async function GET() {
  * create one half of it.
  */
 export async function POST(request: Request) {
-  const auth = await requireApi("messages.send");
+  // «files.manage», not «messages.send»: this repoints a link that is
+  // already inside hundreds of sent messages, which is a heavier thing
+  // than writing one.
+  const auth = await requireApi("files.manage");
   if (!auth.ok) {
     return auth.response;
   }
@@ -39,7 +51,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: `الملف أكبر من ${MAX_MEDIA_LABEL}.` }, { status: 413 });
   }
 
-  const mimeType = upload.type || "application/octet-stream";
+  // The type the browser claimed, kept only when it is one this link may
+  // serve as itself. Everything else is stored and handed back as untyped
+  // bytes — see the inline rule in app/f/[slug]/route.ts.
+  const claimed = upload.type || "application/octet-stream";
+  const mimeType = ALLOWED_TYPES.has(claimed) ? claimed : "application/octet-stream";
+  const previous = getPublicFile(slug.toLowerCase());
   const filename = createStoredMediaFilename({ mimeType, originalName: upload.name });
   writeMediaFile(filename, new Uint8Array(await upload.arrayBuffer()));
 
@@ -54,6 +71,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: result.error }, { status: 400 });
   }
 
+  // Named in full, including what used to be there: repointing a link
+  // that is already in people's hands is the kind of change somebody has
+  // to be able to trace afterwards.
   recordAction({
     userId: auth.user.id,
     actor: auth.user.name,
@@ -61,7 +81,9 @@ export async function POST(request: Request) {
     subjectType: "member",
     subjectId: 0,
     subjectLabel: `ملف عام /f/${result.file.slug}`,
-    detail: upload.name
+    detail: previous
+      ? `${previous.downloadName || previous.filename} ← ${upload.name}`
+      : `جديد: ${upload.name}`
   });
 
   return NextResponse.json({ file: result.file });

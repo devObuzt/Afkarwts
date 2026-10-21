@@ -5,6 +5,17 @@ import { readMediaFile } from "@/app/lib/media-store";
 export const runtime = "nodejs";
 
 /**
+ * The only types this link ever hands back as themselves.
+ *
+ * Everything else downloads as untyped bytes. The stored type is whatever
+ * the uploader's browser claimed, and this route is public and sits on
+ * the same origin as the session cookie — so an .html served inline here
+ * would run as this app. The members' own file route has carried that
+ * rule since it was written; this one has to as well.
+ */
+const INLINE_TYPES = new Set(["application/pdf", "image/png", "image/jpeg", "image/webp"]);
+
+/**
  * A link we own, handed to hundreds of women inside a WhatsApp message.
  *
  * Public on purpose: the people opening it are not logged in and never
@@ -43,12 +54,20 @@ export async function GET(_request: Request, context: { params: Promise<{ slug: 
 
   countPublicFileHit(file.slug);
 
-  const name = encodeURIComponent(file.downloadName || `${file.slug}.pdf`);
+  const name = encodeURIComponent(file.downloadName || file.slug);
+  const inline = INLINE_TYPES.has(file.mimeType);
+
   return new NextResponse(new Uint8Array(bytes), {
     headers: {
-      "content-type": file.mimeType,
-      // Inline: WhatsApp's own browser shows a PDF rather than downloading it.
-      "content-disposition": `inline; filename*=UTF-8''${name}`,
+      // Inline only for the handful of types that are safe to render, so
+      // WhatsApp's own browser shows the programme instead of downloading
+      // it; anything else is untyped bytes the browser will not run.
+      "content-type": inline ? file.mimeType : "application/octet-stream",
+      "content-disposition": `${inline ? "inline" : "attachment"}; filename*=UTF-8''${name}`,
+      // The declared type is the whole protection, so no sniffing past it,
+      // and nothing served here gets an origin of its own to act from.
+      "x-content-type-options": "nosniff",
+      "content-security-policy": "sandbox; default-src 'none'",
       // Short, because the whole point is that the file behind the slug
       // can be replaced and everyone sees the new one.
       "cache-control": "public, max-age=300"
