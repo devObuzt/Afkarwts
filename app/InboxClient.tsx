@@ -180,6 +180,11 @@ function avatarColor(name: string) {
   return avatarPalette[hash % avatarPalette.length];
 }
 
+/** Her name when she has one, her number when she does not. */
+function shown(member: { name: string; phone: string }) {
+  return member.name.trim() || member.phone;
+}
+
 function initials(name: string) {
   const parts = name.trim().split(/\s+/).slice(0, 2);
   return parts.map((part) => [...part][0] ?? "").join("").toUpperCase() || "?";
@@ -840,11 +845,11 @@ export function InboxClient() {
               onClick={() => openMember(member.id)}
               type="button"
             >
-              <span className="avatar" style={{ background: avatarColor(member.name) }}>
-                {initials(member.name)}
+              <span className="avatar" style={{ background: avatarColor(shown(member)) }}>
+                {initials(shown(member))}
               </span>
               <span className="memberMeta">
-                <strong dir="auto">{member.name}</strong>
+                <strong dir="auto">{shown(member)}</strong>
                 <span className="memberPhone">{member.phone}</span>
               </span>
               {member.unreadCount > 0 ? <span className="unreadBadge">{member.unreadCount}</span> : null}
@@ -864,11 +869,11 @@ export function InboxClient() {
             <button className="iconButton backButton" onClick={() => setMobileChatOpen(false)} type="button">
               <Icon path={icons.back} />
             </button>
-            <span className="avatar large" style={{ background: avatarColor(selectedMember.name) }}>
-              {initials(selectedMember.name)}
+            <span className="avatar large" style={{ background: avatarColor(shown(selectedMember)) }}>
+              {initials(shown(selectedMember))}
             </span>
             <div className="headerMeta">
-              <h2 dir="auto">{selectedMember.name}</h2>
+              <h2 dir="auto">{shown(selectedMember)}</h2>
               <p>
                 {[selectedMember.phone, selectedMember.city, selectedMember.service, selectedMember.joined]
                   .filter(Boolean)
@@ -1168,7 +1173,7 @@ function AddMemberModal({ groups, onClose, onDone }: { groups: Group[]; onClose:
     <Modal onClose={onClose} title="Add member">
       <form className="modalBody" onSubmit={submit}>
         <label>
-          Name
+          الاسم (اختياري)
           <input autoFocus onChange={(event) => setForm({ ...form, name: event.target.value })} value={form.name} />
         </label>
         <label>
@@ -1193,7 +1198,9 @@ function AddMemberModal({ groups, onClose, onDone }: { groups: Group[]; onClose:
         {error ? <div className="notice">{error}</div> : null}
         <div className="modalActions">
           <button className="secondary" onClick={onClose} type="button">Cancel</button>
-          <button disabled={busy || !form.name.trim() || !form.phone.trim()} type="submit">
+          {/* The number is what makes a contact reachable; the name is
+              something somebody fills in later, or never. */}
+          <button disabled={busy || !form.phone.trim()} type="submit">
             {busy ? "Adding…" : "Add member"}
           </button>
         </div>

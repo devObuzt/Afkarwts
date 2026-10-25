@@ -688,6 +688,15 @@ export function listMembers() {
   return rows.map((row) => mapMember(row, groupMap.get(row.id) ?? []));
 }
 
+/**
+ * What to put on screen for a contact. Her name when she has one, her
+ * number when she does not — never an empty row nobody can click.
+ */
+export function displayName(member: Pick<Member, "name" | "phone">) {
+  const name = (member.name ?? "").trim();
+  return name || member.phone || "بلا رقم";
+}
+
 export function createMember(input: {
   name: string;
   phone: string;
@@ -700,10 +709,13 @@ export function createMember(input: {
   const phone = normalizePhone(input.phone);
   const notes = input.notes?.trim() ?? "";
 
-  if (!name) {
-    throw new Error("Member name is required.");
-  }
-
+  // The name is optional, the number is not (Wisam, 2026-10-25). A contact
+  // arrives as a number far more often than as a name — from an ad, a
+  // forwarded message, a list — and refusing to store her until somebody
+  // types a name is how numbers end up in a notebook instead of here. The
+  // places that show a name already handle an empty one: «displayName»
+  // falls back to the number on screen, and a message addressed to her
+  // uses the neutral greeting rather than an empty space.
   if (!phone || phone.length < 8) {
     throw new Error("A valid WhatsApp phone number is required.");
   }

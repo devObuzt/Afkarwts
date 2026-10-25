@@ -112,11 +112,11 @@ export default async function PeoplePage({
           people.map((person) => (
             <Link className="crmRow" href={`/new/people/${person.id}`} key={person.id}>
               <span className="crmAvatar" data-hue={hueOf(person.name)}>
-                {initials(person.name)}
+                {initials(person.name.trim() || person.phone)}
               </span>
               <span className="grow">
                 <span className="crmRowTitle" style={{ display: "block" }}>
-                  {person.name}
+                  {person.name.trim() || person.phone}
                   {person.unread > 0 && (
                     <span className="crmPill alert" style={{ marginInlineStart: 8 }}>
                       {person.unread} جديد

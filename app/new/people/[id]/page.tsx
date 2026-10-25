@@ -53,10 +53,10 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
         style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}
       >
         <span className="crmAvatar big" data-hue={hueOf(member.name)}>
-          {initials(member.name)}
+          {initials(member.name.trim() || member.phone)}
         </span>
         <div style={{ flex: "999 1 240px", minWidth: 0 }}>
-          <h1 style={{ margin: "0 0 5px", fontSize: 24, fontWeight: 700 }}>{member.name}</h1>
+          <h1 style={{ margin: "0 0 5px", fontSize: 24, fontWeight: 700 }}>{member.name.trim() || member.phone}</h1>
           <div className="crmRowDetail">
             <span className="crmLtr">{member.phone}</span>
             {member.city ? ` · ${member.city}` : ""}
