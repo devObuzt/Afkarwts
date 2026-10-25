@@ -9,6 +9,7 @@ const AREAS = [
   { href: "/new/people", area: "people", label: "المنتسبون" },
   { href: "/new/paths", area: "paths", label: "المسارات" },
   { href: "/new/campaigns", area: "campaigns", label: "الحملات" },
+  { href: "/new/bulk", area: "bulk", label: "إرسال جماعي" },
   { href: "/new/labels", area: "labels", label: "الملصقات" },
   { href: "/new/library", area: "library", label: "المكتبة" },
   { href: "/new/app", area: "app", label: "التطبيق" },
