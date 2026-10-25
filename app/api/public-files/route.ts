@@ -53,7 +53,7 @@ export async function POST(request: Request) {
 
   // The type the browser claimed, kept only when it is one this link may
   // serve as itself. Everything else is stored and handed back as untyped
-  // bytes — see the inline rule in app/f/[slug]/route.ts.
+  // bytes — see the inline rule in app/d/[slug]/route.ts.
   const claimed = upload.type || "application/octet-stream";
   const mimeType = ALLOWED_TYPES.has(claimed) ? claimed : "application/octet-stream";
   const previous = getPublicFile(slug.toLowerCase());
@@ -80,7 +80,7 @@ export async function POST(request: Request) {
     action: "member.update",
     subjectType: "member",
     subjectId: 0,
-    subjectLabel: `ملف عام /f/${result.file.slug}`,
+    subjectLabel: `ملف عام /d/${result.file.slug}`,
     detail: previous
       ? `${previous.downloadName || previous.filename} ← ${upload.name}`
       : `جديد: ${upload.name}`

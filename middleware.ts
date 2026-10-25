@@ -25,7 +25,12 @@ const publicPrefixes = [
   // The file a WhatsApp message points at. Public by necessity — the
   // women opening it are not logged in — and narrow by design: the route
   // serves one named slug's file and nothing a caller can name itself.
-  "/f",
+  //
+  // «/d», not «/f»: the registration form already owns «/f/[token]», and
+  // Next refuses two different parameter names on one path — it builds,
+  // then every request on the whole app throws at runtime. It took the
+  // site down on 2026-10-25 for four minutes.
+  "/d",
   "/password",
   "/api/auth/password",
   "/_next",
