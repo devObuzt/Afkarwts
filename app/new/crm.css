@@ -2174,3 +2174,30 @@ body.resizingCol {
 .crm .crmLink:hover {
   text-decoration-thickness: 2px;
 }
+
+
+/* ملصق بلونه. اللون من اسمه، إلا إذا حدا اختارله لون. */
+.crm .labelChip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 3px 11px;
+  font-size: 12px;
+  line-height: 1.5;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.crm .swatch {
+  width: 18px;
+  height: 18px;
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  border-radius: 50%;
+  cursor: pointer;
+  padding: 0;
+}
+
+.crm .swatch:hover {
+  outline: 2px solid var(--ink);
+  outline-offset: 1px;
+}
