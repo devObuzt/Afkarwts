@@ -2156,3 +2156,21 @@ body.resizingCol {
   border-color: var(--ink);
   color: var(--ink);
 }
+
+
+/* رقم بتكبسه. ورقم ما حدا بيقدر يكبسه هو رقم ما حدا بيقدر يشتغل عليه. */
+.crm .crmLink {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: var(--ink);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+
+.crm .crmLink:hover {
+  text-decoration-thickness: 2px;
+}

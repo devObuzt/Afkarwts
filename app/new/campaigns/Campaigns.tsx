@@ -110,6 +110,7 @@ export function Campaigns({ canSend }: { canSend: boolean }) {
       ) : null}
 
       {campaigns.map((campaign) => {
+        const done = campaign.status === "done";
         const percent = campaign.progress.total
           ? Math.round((campaign.progress.delivered / campaign.progress.total) * 100)
           : 0;
@@ -122,18 +123,35 @@ export function Campaigns({ canSend }: { canSend: boolean }) {
             </header>
 
             <div className="crmPad">
-              <div className="crmBar" title={`${percent}%`}>
-                <span style={{ width: `${percent}%` }} />
-              </div>
-              <p className="crmNote" style={{ marginTop: 8 }}>
-                {campaign.progress.delivered} من {campaign.progress.total} وصلتهن
-                {campaign.progress.remaining > 0
-                  ? ` · باقي ${campaign.progress.remaining} (~${campaign.progress.daysLeft} يوم)`
-                  : ""}
-                {" · "}
-                {campaign.dailyLimit}/يوم
-                {campaign.lastRunAt ? ` · آخر دفعة ${when(campaign.lastRunAt)}` : ""}
-              </p>
+              {/*
+                A finished campaign has no «remaining» and no «days left» —
+                it is over. Showing them anyway is how a screen ends up
+                saying something untrue: 385 historical campaigns each read
+                «باقي 215 · ~0 يوم» for a send that will never happen.
+              */}
+              {done ? (
+                <p className="crmNote" style={{ margin: 0 }}>
+                  انبعتت لـ{campaign.progress.delivered} من {campaign.progress.total}
+                  {campaign.lastRunAt ? ` · ${when(campaign.lastRunAt)}` : ""}
+                </p>
+              ) : (
+                <>
+                  <div className="crmBar" title={`${percent}%`}>
+                    <span style={{ width: `${percent}%` }} />
+                  </div>
+                  <p className="crmNote" style={{ marginTop: 8 }}>
+                    {campaign.progress.delivered} من {campaign.progress.total} وصلتهن
+                    {campaign.progress.remaining > 0
+                      ? ` · باقي ${campaign.progress.remaining}${
+                          campaign.progress.daysLeft > 0 ? ` (~${campaign.progress.daysLeft} يوم)` : ""
+                        }`
+                      : ""}
+                    {" · "}
+                    {campaign.dailyLimit}/يوم
+                    {campaign.lastRunAt ? ` · آخر دفعة ${when(campaign.lastRunAt)}` : ""}
+                  </p>
+                </>
+              )}
 
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
                 <button

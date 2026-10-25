@@ -5,7 +5,8 @@ import { getDb } from "@/app/lib/db";
 import { journeyFunnel, journeyLabel, stepBreakdown } from "@/app/lib/journeys/report";
 import { listForms } from "@/app/lib/forms/store";
 import { getJourney } from "@/app/lib/journeys/store";
-import { clock, day, hueOf, initials, members as memberCount } from "../../format";
+import { day, hueOf, initials, members as memberCount } from "../../format";
+import { Report } from "./Report";
 
 export const dynamic = "force-dynamic";
 
@@ -126,37 +127,6 @@ export default async function CohortPage({
         </div>
 
         <div className="side">
-          <section className="crmCard" data-tone="sage">
-            <header>
-              <span className="crmDot" />
-              <h2>خطوات المسار</h2>
-            </header>
-            {steps.length === 0 ? (
-              <p className="crmEmpty">ولا خطوة.</p>
-            ) : (
-              steps.map((step) => (
-                <div className="crmRow" key={step.stepId}>
-                  <span className="grow">
-                    <span className="crmRowTitle" style={{ display: "block" }}>
-                      {step.label}
-                    </span>
-                    <span className="crmRowDetail" style={{ display: "block" }}>
-                      {day(step.dueAt)} {clock(step.dueAt)} · {step.sentText + step.sentTemplate} أُرسلت ·{" "}
-                      {step.read} قُرئت
-                      {step.notSent ? ` · ${step.notSent} ما انبعتلها` : ""}
-                      {step.undelivered ? ` · ${step.undelivered} ما وصلها` : ""}
-                      {step.smsSent ? ` · ${step.smsSent} SMS` : ""}
-                      {step.smsFailed ? ` · ${step.smsFailed} SMS فشل` : ""}
-                      {step.noneReached ? ` · ${step.noneReached} ولا وصلها إشي` : ""}
-                      {step.failed ? ` · ${step.failed} فشلت` : ""}
-                      {step.stuck ? ` · ${step.stuck} عالقة` : ""}
-                    </span>
-                  </span>
-                </div>
-              ))
-            )}
-          </section>
-
           {Object.keys(funnel.stopped).length > 0 && (
             <dl className="crmCard crmPad crmFacts">
               {Object.entries(funnel.stopped).map(([reason, count]) => (
@@ -169,15 +139,15 @@ export default async function CohortPage({
           )}
 
           <div className="crmCard crmPad">
-            <p className="crmNote">
-              تشغيل ووقف المسار وتعديل الخطوات لسّه بالواجهة السابقة.
-            </p>
+            <p className="crmNote">تشغيل ووقف المسار وتعديل خطواته لسّه بالواجهة السابقة.</p>
             <a className="crmBtn" href="/journeys" style={{ marginTop: 10 }}>
               فتح المسارات
             </a>
           </div>
         </div>
       </div>
+
+      <Report funnel={funnel} journeyId={journeyId} steps={steps} />
     </div>
   );
 }
