@@ -12,6 +12,10 @@ export async function GET(request: Request) {
 
   const url = new URL(request.url);
   return NextResponse.json(
-    listThreads({ query: url.searchParams.get("q") ?? "", limit: Number(url.searchParams.get("limit")) || 40 })
+    listThreads({
+      query: url.searchParams.get("q") ?? "",
+      limit: Number(url.searchParams.get("limit")) || 40,
+      labelId: Number(url.searchParams.get("label")) || undefined
+    })
   );
 }

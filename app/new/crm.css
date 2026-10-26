@@ -1276,15 +1276,20 @@
   flex: 0 0 40%;
   display: flex;
   min-width: 0;
-  border-inline-start: 1px solid var(--line);
+  /* الواتساب على اليمين والشغل على اليسار (قرار وسام 2026-10-26).
+     بالعربي الصف بيبلّش من اليمين، فـ«أول عنصر» يعني يمين. */
+  order: -1;
+  border-inline-end: 1px solid var(--line);
   background: var(--card);
   position: sticky;
   top: 58px;
   height: calc(100vh - 58px);
 }
 
+/* مسكّر: اللوحة ما بتضيق لـ15% — عمود المحادثة بيصير عمود ملصقات،
+   وقائمة المحادثات بتاخد طولها كامل بدل ما تنضغط. */
 .crm .waPane[data-open="no"] {
-  flex: 0 0 15%;
+  flex: 0 0 32%;
 }
 
 .crm .waChat {
@@ -1305,8 +1310,43 @@
 }
 
 .crm .waPane[data-open="no"] .waRail {
-  flex: 1 1 auto;
+  flex: 0 0 56%;
   border-inline-start: 0;
+}
+
+.crm .waLabels {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border-inline-end: 1px solid var(--line-soft);
+  background: var(--paper);
+}
+
+/* بتمرّر لحالها: الملصقات بتكتر، والقائمة ما بتاكل من المحادثات. */
+.crm .waLabelList {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 6px;
+  padding: 0 12px 12px;
+}
+
+.crm .waLabels .labelChip {
+  cursor: pointer;
+  border: 2px solid transparent;
+  gap: 6px;
+}
+
+.crm .waLabels .labelChip.chosen {
+  border-color: var(--ink);
+}
+
+.crm .labelCount {
+  opacity: 0.75;
+  font-size: 11px;
 }
 
 /* Closing the conversation: a plain × at the end of its header row. */

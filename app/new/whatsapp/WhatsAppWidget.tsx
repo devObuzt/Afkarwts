@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { colourForLabel, inkOnLabel } from "@/app/lib/labels/colours";
 import { ago, hueOf, initials } from "../format";
 
 type Thread = {
@@ -45,19 +46,23 @@ export function WhatsAppWidget({ canSend }: { canSend: boolean }) {
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
+  const [labels, setLabels] = useState<Array<{ id: number; name: string; colour: string; memberCount: number }>>([]);
+  const [labelId, setLabelId] = useState<number | null>(null);
   const bottom = useRef<HTMLDivElement>(null);
 
   const open = threads.find((thread) => thread.memberId === openId) ?? openThread;
 
   const loadThreads = useCallback(async () => {
-    const response = await fetch(`/api/inbox/threads?q=${encodeURIComponent(query)}&limit=40`);
+    const response = await fetch(
+      `/api/inbox/threads?q=${encodeURIComponent(query)}&limit=40${labelId ? `&label=${labelId}` : ""}`
+    );
     if (!response.ok) {
       return;
     }
     const payload = (await response.json()) as { threads: Thread[]; unreadTotal: number };
     setThreads(payload.threads);
     setUnreadTotal(payload.unreadTotal);
-  }, [query]);
+  }, [query, labelId]);
 
   const loadMessages = useCallback(async (memberId: number) => {
     const response = await fetch(`/api/members/${memberId}/messages`);
@@ -66,6 +71,18 @@ export function WhatsAppWidget({ canSend }: { canSend: boolean }) {
     }
     const payload = (await response.json()) as { messages: Message[] };
     setMessages(payload.messages ?? []);
+  }, []);
+
+  // The labels are the lists Afkar already works in — the دفعة, the مسار,
+  // the حالة. They are read once: a label is not something that changes
+  // while she reads a conversation.
+  useEffect(() => {
+    void (async () => {
+      const response = await fetch("/api/labels");
+      if (response.ok) {
+        setLabels(((await response.json()).labels ?? []).filter((label: { memberCount: number }) => label.memberCount));
+      }
+    })();
   }, []);
 
   // The rail refreshes on its own; a reply that lands while Afkar is in the
@@ -204,6 +221,48 @@ export function WhatsAppWidget({ canSend }: { canSend: boolean }) {
           الواجهة الكاملة
         </a>
       </div>
+
+      {/*
+        With no conversation open, the column the conversation would have
+        filled shows the labels instead of nothing: the دفعة, the مسار,
+        the حالة — the lists Afkar already works in. Pressing one narrows
+        the rail to it, so the space is a way of working rather than a
+        decoration.
+      */}
+      {!open && labels.length ? (
+        <div className="waLabels">
+          <div className="waRailHead">
+            <span className="waTitle">الملصقات</span>
+            {labelId ? (
+              <button className="crmBtn" onClick={() => setLabelId(null)} type="button">
+                الكل
+              </button>
+            ) : null}
+          </div>
+          <div className="waLabelList">
+            {labels.map((label) => {
+              const background = colourForLabel(label);
+              const chosen = labelId === label.id;
+              return (
+                <button
+                  className={chosen ? "labelChip chosen" : "labelChip"}
+                  key={label.id}
+                  onClick={() => setLabelId(chosen ? null : label.id)}
+                  style={{ background, color: inkOnLabel(background) }}
+                  title={`${label.memberCount} منتسبة`}
+                  type="button"
+                >
+                  {label.name}
+                  <span className="labelCount">{label.memberCount}</span>
+                </button>
+              );
+            })}
+          </div>
+          <Link className="waOld" href="/new/labels">
+            إدارة الملصقات
+          </Link>
+        </div>
+      ) : null}
 
       {/* The conversation, only once there is one. */}
       {open && (

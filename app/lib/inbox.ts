@@ -25,12 +25,20 @@ function toIso(value: string) {
   return value.includes("T") ? value : `${value.replace(" ", "T")}Z`;
 }
 
-export function listThreads(filter: { query?: string; limit?: number } = {}) {
+export function listThreads(filter: { query?: string; limit?: number; labelId?: number } = {}) {
   const db = getDb();
   const limit = Math.min(Math.max(filter.limit ?? 40, 1), 200);
 
   const where: string[] = ["last.id IS NOT NULL"];
   const args: Array<string | number> = [];
+
+  // One label at a time: the rail is for working through a list, and the
+  // label is which list. Filtering on the membership row rather than on a
+  // name means a renamed label keeps its conversations.
+  if (filter.labelId) {
+    where.push("EXISTS (SELECT 1 FROM member_groups mg WHERE mg.member_id = m.id AND mg.group_id = ?)");
+    args.push(filter.labelId);
+  }
 
   const query = (filter.query ?? "").trim();
   if (query) {
