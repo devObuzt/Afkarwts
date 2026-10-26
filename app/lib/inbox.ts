@@ -29,7 +29,10 @@ function toIso(value: string) {
 
 export function listThreads(filter: { query?: string; limit?: number; labelId?: number } = {}) {
   const db = getDb();
-  const limit = Math.min(Math.max(filter.limit ?? 40, 1), 200);
+  // 40 fills the rail; «حمّلي أكثر» walks up from there. The ceiling is
+  // high enough to reach the end of a real inbox and low enough that a
+  // bad number cannot ask for every conversation at once.
+  const limit = Math.min(Math.max(filter.limit ?? 40, 1), 500);
 
   const where: string[] = ["last.id IS NOT NULL"];
   const args: Array<string | number> = [];
@@ -123,5 +126,7 @@ export function listThreads(filter: { query?: string; limit?: number; labelId?: 
     ).n
   );
 
-  return { threads, unreadTotal };
+  // A full page means there is probably another: cheaper than counting
+  // every conversation on every poll just to draw one button.
+  return { threads, unreadTotal, hasMore: rows.length >= limit };
 }

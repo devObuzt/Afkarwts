@@ -47,19 +47,22 @@ export function WhatsAppWidget({ canSend }: { canSend: boolean }) {
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
+  const [limit, setLimit] = useState(40);
+  const [hasMore, setHasMore] = useState(false);
   const bottom = useRef<HTMLDivElement>(null);
 
   const open = threads.find((thread) => thread.memberId === openId) ?? openThread;
 
   const loadThreads = useCallback(async () => {
-    const response = await fetch(`/api/inbox/threads?q=${encodeURIComponent(query)}&limit=40`);
+    const response = await fetch(`/api/inbox/threads?q=${encodeURIComponent(query)}&limit=${limit}`);
     if (!response.ok) {
       return;
     }
-    const payload = (await response.json()) as { threads: Thread[]; unreadTotal: number };
+    const payload = (await response.json()) as { threads: Thread[]; unreadTotal: number; hasMore?: boolean };
     setThreads(payload.threads);
     setUnreadTotal(payload.unreadTotal);
-  }, [query]);
+    setHasMore(Boolean(payload.hasMore));
+  }, [query, limit]);
 
   const loadMessages = useCallback(async (memberId: number) => {
     const response = await fetch(`/api/members/${memberId}/messages`);
@@ -161,7 +164,10 @@ export function WhatsAppWidget({ canSend }: { canSend: boolean }) {
 
         <input
           className="waSearch"
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setLimit(40);
+          }}
           placeholder="بحث"
           type="search"
           value={query}
@@ -223,6 +229,17 @@ export function WhatsAppWidget({ canSend }: { canSend: boolean }) {
             ))
           )}
         </div>
+
+        {/*
+          The rail holds the newest forty; the rest are a press away. A
+          button rather than an endless scroll: the list is something you
+          work down, and knowing where the end is matters.
+        */}
+        {hasMore ? (
+          <button className="waMore" onClick={() => setLimit((current) => current + 40)} type="button">
+            حمّلي محادثات أكثر
+          </button>
+        ) : null}
 
         <a className="waOld" href="/">
           الواجهة الكاملة

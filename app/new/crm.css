@@ -1300,13 +1300,15 @@
   background: var(--paper);
 }
 
+/* القائمة بتضل على الحافة — يمين — والمحادثة بتنفتح على شمالها.
+   كان فيها `order: 2` فبتنزاح لآخر الصف، يعني بتقفز لليسار أول ما
+   تنفتح محادثة وبترجع يمين لما تسكّرها. القائمة ما بتتحرّك. */
 .crm .waRail {
   flex: 0 0 37.5%; /* 15% of the screen */
   display: flex;
   flex-direction: column;
   min-width: 0;
   border-inline-start: 1px solid var(--line-soft);
-  order: 2;
 }
 
 .crm .waPane[data-open="no"] .waRail {
@@ -1458,6 +1460,26 @@
 .crm .waThreadWhen {
   color: var(--faint);
   font-size: 11px;
+}
+
+/* فوق «الواجهة الكاملة»: بتكبسها بتزيد أربعين محادثة. */
+.crm .waMore {
+  display: block;
+  width: calc(100% - 24px);
+  margin: 0 12px 6px;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+}
+
+.crm .waMore:hover {
+  background: var(--line-soft);
+  color: var(--ink);
 }
 
 .crm .waOld {
