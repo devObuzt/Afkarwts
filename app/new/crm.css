@@ -1322,10 +1322,13 @@
   margin: 3px 0 1px;
 }
 
+/* صغير بالمقصود: الملصق بيتقرا بالطرف مش بالتركيز — الاسم والرسالة
+   هنّي اللي بتقراهن، والملصق بيقول «أي قائمة» من غير ما ياخد الصف. */
 .crm .labelChip.tiny {
-  padding: 1px 7px;
-  font-size: 10.5px;
+  padding: 1px 6px;
+  font-size: 9.5px;
   font-weight: 600;
+  letter-spacing: 0.1px;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
