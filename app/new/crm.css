@@ -1286,10 +1286,10 @@
   height: calc(100vh - 58px);
 }
 
-/* مسكّر: اللوحة ما بتضيق لـ15% — عمود المحادثة بيصير عمود ملصقات،
-   وقائمة المحادثات بتاخد طولها كامل بدل ما تنضغط. */
+/* مسكّر: المحادثة ما بتنرسم، والقائمة بتاخد اللوحة كلها — وأعرض من
+   قبل عشان ملصقات كل محادثة يبين منهن شي على سطرها. */
 .crm .waPane[data-open="no"] {
-  flex: 0 0 32%;
+  flex: 0 0 22%;
 }
 
 .crm .waChat {
@@ -1310,43 +1310,26 @@
 }
 
 .crm .waPane[data-open="no"] .waRail {
-  flex: 0 0 56%;
+  flex: 1 1 auto;
   border-inline-start: 0;
 }
 
-.crm .waLabels {
-  flex: 1 1 auto;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  border-inline-end: 1px solid var(--line-soft);
-  background: var(--paper);
-}
-
-/* بتمرّر لحالها: الملصقات بتكتر، والقائمة ما بتاكل من المحادثات. */
-.crm .waLabelList {
-  flex: 1 1 auto;
-  overflow-y: auto;
+/* ملصقات المحادثة على سطرها: صف بيلف، وبيختفي كلياً لما ما يكون فيه ولا ملصق. */
+.crm .waThreadLabels {
   display: flex;
   flex-wrap: wrap;
-  align-content: flex-start;
-  gap: 6px;
-  padding: 0 12px 12px;
+  gap: 4px;
+  margin: 3px 0 1px;
 }
 
-.crm .waLabels .labelChip {
-  cursor: pointer;
-  border: 2px solid transparent;
-  gap: 6px;
-}
-
-.crm .waLabels .labelChip.chosen {
-  border-color: var(--ink);
-}
-
-.crm .labelCount {
-  opacity: 0.75;
-  font-size: 11px;
+.crm .labelChip.tiny {
+  padding: 1px 7px;
+  font-size: 10.5px;
+  font-weight: 600;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: inline-block;
 }
 
 /* Closing the conversation: a plain × at the end of its header row. */

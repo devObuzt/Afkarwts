@@ -19,6 +19,8 @@ export type Thread = {
   lastDirection: "incoming" | "outgoing";
   /** True while a free-text reply is still allowed. */
   windowOpen: boolean;
+  /** The lists she is on, drawn on her row. Empty is empty — no placeholder. */
+  labels: Array<{ id: number; name: string; colour: string }>;
 };
 
 function toIso(value: string) {
@@ -69,6 +71,30 @@ export function listThreads(filter: { query?: string; limit?: number; labelId?: 
     )
     .all(...args, limit) as Array<Record<string, string | number | null>>;
 
+  /*
+   * The labels for the rows on screen, in one query rather than one per
+   * row. A conversation wears the دفعة, the مسار, the حالة — the same
+   * lists Afkar keeps in her own WhatsApp — and reading them beside the
+   * name is how she knows who she is answering before she opens it.
+   */
+  const ids = rows.map((row) => Number(row.id));
+  const byMember = new Map<number, Array<{ id: number; name: string; colour: string }>>();
+  if (ids.length) {
+    const marks = ids.map(() => "?").join(", ");
+    for (const mark of db
+      .prepare(
+        `SELECT mg.member_id AS member_id, g.id, g.name, g.colour
+           FROM member_groups mg JOIN groups g ON g.id = mg.group_id
+          WHERE mg.member_id IN (${marks})
+          ORDER BY g.kind, g.name`
+      )
+      .all(...ids) as Array<{ member_id: number; id: number; name: string; colour: string | null }>) {
+      const list = byMember.get(mark.member_id) ?? [];
+      list.push({ id: mark.id, name: mark.name, colour: String(mark.colour ?? "") });
+      byMember.set(mark.member_id, list);
+    }
+  }
+
   const threads: Thread[] = rows.map((row) => {
     const lastIn = row.last_in ? new Date(toIso(String(row.last_in))).getTime() : 0;
     return {
@@ -79,7 +105,8 @@ export function listThreads(filter: { query?: string; limit?: number; labelId?: 
       lastAt: toIso(String(row.created_at)),
       lastBody: String(row.body ?? ""),
       lastDirection: (row.direction as "incoming" | "outgoing") ?? "outgoing",
-      windowOpen: lastIn > 0 && Date.now() - lastIn < 24 * 60 * 60 * 1000
+      windowOpen: lastIn > 0 && Date.now() - lastIn < 24 * 60 * 60 * 1000,
+      labels: byMember.get(Number(row.id)) ?? []
     };
   });
 
