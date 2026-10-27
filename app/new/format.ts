@@ -171,3 +171,39 @@ export function choices(total: number) {
     many: "خياراً"
   });
 }
+
+const MEDIA_PREVIEW: Record<string, string> = {
+  audio: "🎙️ رسالة صوتية",
+  image: "📷 صورة",
+  video: "🎬 فيديو",
+  document: "📎 ملف",
+  sticker: "😊 ملصق"
+};
+
+/**
+ * One line saying what arrived, for a list that has no room to show it.
+ *
+ * A picture with no caption is stored under the name of the file behind
+ * it, so a preview printed straight from `body` read
+ * «wamid.HBgMOTcy…jpg» — the identifier, in the row, where the message
+ * should have been. A caption is the message and is shown after the kind;
+ * the file name is not, because it is ours and not hers.
+ */
+export function preview(message: { type?: string | null; body: string; filename?: string | null }) {
+  const label = MEDIA_PREVIEW[message.type ?? "text"];
+  const body = (message.body ?? "").trim();
+
+  if (!label) {
+    return body;
+  }
+
+  // What is not a caption: the stored file name, and the English stand-ins
+  // the webhook writes when a file has no text of its own. A voice note
+  // never carries one at all.
+  const placeholder =
+    body === (message.filename ?? "") ||
+    /^(voice message|audio message|incoming (image|video|audio|document))$/i.test(body);
+  const caption = message.type === "audio" || placeholder ? "" : body;
+
+  return caption ? `${label} · ${caption}` : label;
+}

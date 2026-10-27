@@ -1273,7 +1273,8 @@
    nothing open the conversation is not drawn at all and the pane is the
    rail alone — 85% of the screen for the work. */
 .crm .waPane {
-  flex: 0 0 40%;
+  flex: 0 0 var(--wa-pane, 40%);
+  position: relative;
   display: flex;
   min-width: 0;
   /* الواتساب على اليمين والشغل على اليسار (قرار وسام 2026-10-26).
@@ -1289,11 +1290,11 @@
 /* مسكّر: المحادثة ما بتنرسم، والقائمة بتاخد اللوحة كلها — وأعرض من
    قبل عشان ملصقات كل محادثة يبين منهن شي على سطرها. */
 .crm .waPane[data-open="no"] {
-  flex: 0 0 22%;
+  flex: 0 0 var(--wa-pane-closed, 22%);
 }
 
 .crm .waChat {
-  flex: 0 0 62.5%; /* 25% of the screen */
+  flex: 1 1 auto; /* whatever the rail leaves */
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -1304,11 +1305,63 @@
    كان فيها `order: 2` فبتنزاح لآخر الصف، يعني بتقفز لليسار أول ما
    تنفتح محادثة وبترجع يمين لما تسكّرها. القائمة ما بتتحرّك. */
 .crm .waRail {
-  flex: 0 0 37.5%; /* 15% of the screen */
+  flex: 0 0 var(--wa-rail, 37.5%); /* 15% of the screen */
   display: flex;
   flex-direction: column;
   min-width: 0;
   border-inline-start: 1px solid var(--line-soft);
+  position: relative;
+}
+
+/* ---- مقابض السحب: حفّة الفريم بتتسحب زي عمود الإكسل ----
+
+   شريط رفيع على الحافة، بيبيّن لما تقرّب عليه. ماسك الفأرة بيوسّع أو
+   بيضيّق، والدبل-كليك بيرجّعه لمكانه الأصلي. المقاس بينحفظ بالمتصفّح
+   كنسبة مئوية — فالشاشة لما تتغيّر بتضل النسبة هي هي. */
+.crm .waGrip {
+  position: absolute;
+  inset-block: 0;
+  /* `end`, not `start`: بالعربي الصف بيبلّش من اليمين، فحافة الفريم
+     اللي بتتسحب هي الشمالية — و`inline-start` بتحطّه على حافة الشاشة. */
+  inset-inline-end: -3px;
+  width: 7px;
+  z-index: 3;
+  cursor: col-resize;
+  touch-action: none;
+  background: transparent;
+  border: 0;
+  transition: background 120ms ease;
+}
+
+.crm .waGrip::after {
+  /* الخط اللي بيبيّن: رفيع بالوسط، بيتسمك لما تلمسه. */
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 3px;
+  width: 1px;
+  background: transparent;
+  transition: background 120ms ease, width 120ms ease;
+}
+
+.crm .waGrip:hover::after,
+.crm .waGrip:focus-visible::after,
+body.isResizing .crm .waGrip:active::after {
+  background: var(--tone-ink, var(--forest));
+  width: 2px;
+  inset-inline-end: 2.5px;
+}
+
+.crm .waGrip:focus-visible {
+  outline: 2px solid var(--forest);
+  outline-offset: -2px;
+}
+
+/* وقت السحب: ما في تحديد نص ولا مؤشّر بيتبدّل فوق كل عنصر بيمرّ عليه. */
+body.isResizing,
+body.isResizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
 }
 
 .crm .waPane[data-open="no"] .waRail {
@@ -1620,6 +1673,14 @@
     flex-wrap: wrap;
   }
 
+  .crm .waGrip {
+    display: none;
+  }
+
+  .crm .waPane {
+    flex: 1 1 auto;
+  }
+
   .crm .waRail {
     flex: 1 1 260px;
     order: 0;
@@ -1634,6 +1695,10 @@
   .crm .waChat {
     flex: 999 1 320px;
     min-height: 420px;
+  }
+
+  .crm .waPane[data-open="no"] {
+    flex: 1 1 auto;
   }
 }
 

@@ -16,6 +16,9 @@ export type Thread = {
   unread: number;
   lastAt: string;
   lastBody: string;
+  /** What the last message was — a picture has no text to show. */
+  lastType: string;
+  lastFilename: string;
   lastDirection: "incoming" | "outgoing";
   /** True while a free-text reply is still allowed. */
   windowOpen: boolean;
@@ -60,6 +63,7 @@ export function listThreads(filter: { query?: string; limit?: number; labelId?: 
   const rows = db
     .prepare(
       `SELECT m.id, m.name, m.phone, last.body, last.direction, last.created_at,
+              last.message_type, last.media_filename,
               (SELECT COUNT(*) FROM messages msg
                 WHERE msg.member_id = m.id AND msg.direction = 'incoming'
                   AND (m.last_read_message_id IS NULL OR msg.id > m.last_read_message_id)) AS unread,
@@ -107,6 +111,8 @@ export function listThreads(filter: { query?: string; limit?: number; labelId?: 
       unread: Number(row.unread ?? 0),
       lastAt: toIso(String(row.created_at)),
       lastBody: String(row.body ?? ""),
+      lastType: String(row.message_type ?? "text"),
+      lastFilename: String(row.media_filename ?? ""),
       lastDirection: (row.direction as "incoming" | "outgoing") ?? "outgoing",
       windowOpen: lastIn > 0 && Date.now() - lastIn < 24 * 60 * 60 * 1000,
       labels: byMember.get(Number(row.id)) ?? []

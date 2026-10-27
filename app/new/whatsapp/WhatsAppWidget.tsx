@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { colourForLabel, inkOnLabel } from "@/app/lib/labels/colours";
-import { ago, hueOf, initials } from "../format";
+import { ago, hueOf, initials, preview } from "../format";
 
 type Thread = {
   memberId: number;
@@ -12,6 +12,8 @@ type Thread = {
   unread: number;
   lastAt: string;
   lastBody: string;
+  lastType: string;
+  lastFilename: string;
   lastDirection: "incoming" | "outgoing";
   windowOpen: boolean;
   labels: Array<{ id: number; name: string; colour: string }>;
@@ -30,6 +32,115 @@ type Message = {
 };
 
 type Template = { name: string; language: string; status: string; bodyText: string; paramCount: number };
+
+/**
+ * Dragging the edge of a pane, the way a column is widened in Excel.
+ *
+ * Three regions share the row — the dashboard, the open conversation, and
+ * the rail of threads — and which one needs the room changes with the
+ * hour: reading a long reply is not the same work as scanning the list.
+ * The proportions Wisam set are the starting point, not a verdict.
+ *
+ * Widths are kept as percentages, not pixels, so a resized window keeps
+ * the proportion rather than the number, and they are remembered in this
+ * browser. Double-click a grip to put it back where it started.
+ */
+const GRIPS = {
+  /** The boundary between WhatsApp and the dashboard, while a chat is open. */
+  pane: { key: "afkar:wa:pane", fallback: 40, min: 20, max: 72, prop: "--wa-pane" },
+  /** The same boundary with no chat open: the rail alone is narrower. */
+  paneClosed: { key: "afkar:wa:paneClosed", fallback: 22, min: 12, max: 60, prop: "--wa-pane-closed" },
+  /** Inside the pane: the rail against the conversation. */
+  rail: { key: "afkar:wa:rail", fallback: 37.5, min: 18, max: 78, prop: "--wa-rail" }
+} as const;
+
+type GripName = keyof typeof GRIPS;
+
+function readWidth(name: GripName) {
+  const grip = GRIPS[name];
+  const live = parseFloat(
+    document.querySelector<HTMLElement>(".crmWork")?.style.getPropertyValue(grip.prop) ?? ""
+  );
+  if (live >= grip.min && live <= grip.max) {
+    return live;
+  }
+  try {
+    const stored = Number(localStorage.getItem(grip.key));
+    if (stored >= grip.min && stored <= grip.max) {
+      return stored;
+    }
+  } catch {
+    // Storage blocked: the defaults are perfectly usable.
+  }
+  return grip.fallback;
+}
+
+function applyWidth(name: GripName, percent: number) {
+  const grip = GRIPS[name];
+  const clamped = Math.min(grip.max, Math.max(grip.min, percent));
+  document.querySelector<HTMLElement>(".crmWork")?.style.setProperty(grip.prop, `${clamped}%`);
+  try {
+    localStorage.setItem(grip.key, String(Math.round(clamped * 10) / 10));
+  } catch {
+    // Not being able to remember it is not a reason to refuse the drag.
+  }
+  return clamped;
+}
+
+function PaneGrip({ name, label }: { name: GripName; label: string }) {
+  function drag(event: React.PointerEvent<HTMLDivElement>) {
+    const handle = event.currentTarget;
+    // The pane sits flush against the right edge in RTL, so a width is
+    // measured from that edge inwards — and the rail from the pane's own
+    // right edge, not the screen's.
+    const edge =
+      name === "rail"
+        ? handle.closest<HTMLElement>(".waPane")?.getBoundingClientRect()
+        : document.querySelector<HTMLElement>(".crmWork")?.getBoundingClientRect();
+    if (!edge || edge.width <= 0) {
+      return;
+    }
+
+    handle.setPointerCapture(event.pointerId);
+    document.body.classList.add("isResizing");
+
+    const move = (moved: PointerEvent) => {
+      applyWidth(name, ((edge.right - moved.clientX) / edge.width) * 100);
+    };
+    const done = () => {
+      document.body.classList.remove("isResizing");
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", done);
+      window.removeEventListener("pointercancel", done);
+    };
+
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", done);
+    window.addEventListener("pointercancel", done);
+  }
+
+  return (
+    <div
+      aria-label={label}
+      aria-orientation="vertical"
+      className="waGrip"
+      onDoubleClick={() => applyWidth(name, GRIPS[name].fallback)}
+      onKeyDown={(event) => {
+        // The keyboard moves it too: a pointer is not the only way to
+        // say «this needs more room».
+        const step = event.key === "ArrowLeft" ? 2 : event.key === "ArrowRight" ? -2 : 0;
+        if (!step) {
+          return;
+        }
+        event.preventDefault();
+        applyWidth(name, readWidth(name) + step);
+      }}
+      onPointerDown={drag}
+      role="separator"
+      tabIndex={0}
+    />
+  );
+}
 
 /**
  * What a message actually is, rather than the id of the file behind it.
@@ -96,6 +207,13 @@ export function WhatsAppWidget({ canSend }: { canSend: boolean }) {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [limit, setLimit] = useState(40);
+
+  // The remembered widths, put back before the first paint of the pane.
+  useEffect(() => {
+    for (const name of ["pane", "paneClosed", "rail"] as const) {
+      applyWidth(name, readWidth(name));
+    }
+  }, []);
   const [file, setFile] = useState<File | null>(null);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [picking, setPicking] = useState(false);
@@ -285,8 +403,14 @@ export function WhatsAppWidget({ canSend }: { canSend: boolean }) {
     /* The conversation is not drawn until one is chosen, and the rail
        alone leaves the system 85% of the screen instead of 60%. */
     <aside className="waPane" data-open={open ? "yes" : "no"}>
+      {/* The edge against the dashboard. Which of the two boundaries it
+          moves depends on whether a conversation is open, because the two
+          states are deliberately different widths. */}
+      <PaneGrip label="عرض الواتساب" name={open ? "pane" : "paneClosed"} />
+
       {/* The rail: search, threads, and the way out to the old screen. */}
       <div className="waRail">
+        {open ? <PaneGrip label="عرض قائمة المحادثات" name="rail" /> : null}
         <div className="waRailHead">
           <span className="waTitle">واتساب</span>
           {unreadTotal > 0 && <span className="crmPill alert">{unreadTotal}</span>}
@@ -329,7 +453,7 @@ export function WhatsAppWidget({ canSend }: { canSend: boolean }) {
                   </span>
                   <span className="waThreadLast">
                     {thread.lastDirection === "outgoing" ? "↩ " : ""}
-                    {thread.lastBody.slice(0, 40) || "—"}
+                    {preview({ type: thread.lastType, body: thread.lastBody, filename: thread.lastFilename }).slice(0, 40) || "—"}
                   </span>
                   {/*
                     The lists she is on, on her own row: the دفعة, the

@@ -38,6 +38,9 @@ export type WaitingReply = {
   name: string;
   phone: string;
   body: string;
+  /** What it was — a voice note has no text to print. */
+  type: string;
+  filename: string;
   at: string;
 };
 
@@ -184,7 +187,8 @@ export function getToday(now = new Date()): Today {
   const replies = (
     db
       .prepare(
-        `SELECT m.id AS member_id, m.name, m.phone, last.body, last.created_at
+        `SELECT m.id AS member_id, m.name, m.phone, last.body, last.created_at,
+                last.message_type, last.media_filename
            FROM members m
            JOIN messages last ON last.id = (SELECT id FROM messages WHERE member_id = m.id ORDER BY created_at DESC, id DESC LIMIT 1)
           WHERE last.direction = 'incoming'
@@ -197,6 +201,8 @@ export function getToday(now = new Date()): Today {
     name: String(row.name),
     phone: String(row.phone),
     body: String(row.body),
+    type: String(row.message_type ?? "text"),
+    filename: String(row.media_filename ?? ""),
     at: toIso(String(row.created_at))
   }));
 

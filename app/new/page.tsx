@@ -3,7 +3,7 @@ import { getToday } from "@/app/lib/today";
 import { requireUser } from "@/app/lib/users/current";
 import { can } from "@/app/lib/users/permissions";
 import { IncomeSummary } from "./IncomeSummary";
-import { ago, clock, hueOf, initials, items, members, paths as pathCount, weekdayAndDay } from "./format";
+import { ago, clock, hueOf, initials, items, members, paths as pathCount, preview, weekdayAndDay } from "./format";
 
 export const dynamic = "force-dynamic";
 
@@ -121,7 +121,7 @@ export default async function TodayPage({
                   {reply.name}
                 </span>
                 <span className="crmRowDetail" style={{ display: "block" }}>
-                  {reply.body.slice(0, 90)}
+                  {preview({ type: reply.type, body: reply.body, filename: reply.filename }).slice(0, 90)}
                 </span>
               </span>
               <span className="crmWhen">{ago(reply.at, now)}</span>
