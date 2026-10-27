@@ -1,7 +1,10 @@
 import { requireUser } from "@/app/lib/users/current";
 import Link from "next/link";
 import { getGroup } from "@/app/lib/db";
-import { listJourneys, getTemplate } from "@/app/lib/journeys/store";
+import { listJourneys, getTemplate, listTemplates } from "@/app/lib/journeys/store";
+import { listGroups } from "@/app/lib/db";
+import { RunControls } from "./RunControls";
+import { StartJourney } from "./StartJourney";
 import { listForms, listSubmissions } from "@/app/lib/forms/store";
 import { day } from "../format";
 
@@ -77,6 +80,13 @@ export default async function CohortsPage() {
           <span className="crmDot" />
           <h2>المسارات قيد التشغيل</h2>
         </header>
+
+        <div className="crmPad">
+          <StartJourney
+            groups={listGroups().map((group) => ({ id: group.id, name: group.name, memberCount: group.memberCount }))}
+            paths={listTemplates().map((template) => ({ id: template.id, name: template.name }))}
+          />
+        </div>
         {journeys.length === 0 ? (
           <p className="crmEmpty">لا توجد مسارات بعد.</p>
         ) : (

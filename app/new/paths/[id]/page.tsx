@@ -7,6 +7,7 @@ import { listForms } from "@/app/lib/forms/store";
 import { getJourney } from "@/app/lib/journeys/store";
 import { day, hueOf, initials, members as memberCount } from "../../format";
 import { Report } from "./Report";
+import { RunControls } from "../RunControls";
 
 export const dynamic = "force-dynamic";
 
@@ -139,10 +140,13 @@ export default async function CohortPage({
           )}
 
           <div className="crmCard crmPad">
-            <p className="crmNote">تشغيل ووقف المسار وتعديل خطواته لسّه بالواجهة السابقة.</p>
-            <a className="crmBtn" href="/journeys" style={{ marginTop: 10 }}>
-              فتح المسارات
-            </a>
+            <RunControls journeyId={journeyId} status={journey.status} />
+            <p className="crmNote" style={{ marginTop: 10 }}>
+              تعديل الخطوات بيغيّر كل مسار لسّه ما بعت هاي الخطوة.
+            </p>
+            <Link className="crmBtn" href={`/new/paths/edit/${journey.templateId}`} style={{ marginTop: 8 }}>
+              تحرير الخطوات
+            </Link>
           </div>
         </div>
       </div>
