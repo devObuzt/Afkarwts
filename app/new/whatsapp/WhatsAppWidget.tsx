@@ -23,8 +23,56 @@ type Message = {
   body: string;
   status: string;
   createdAt: string;
+  messageType?: string;
   mediaUrl?: string | null;
+  mediaMimeType?: string | null;
+  mediaFilename?: string | null;
 };
+
+type Template = { name: string; language: string; status: string; bodyText: string; paramCount: number };
+
+/**
+ * What a message actually is, rather than the id of the file behind it.
+ *
+ * Without this a voice note read as «wamid.HBgMOTcy…jpg» — the raw
+ * identifier, in the bubble, where the message should have been.
+ */
+function MessageBody({ message }: { message: Message }) {
+  const kind = message.messageType ?? "text";
+  const mime = message.mediaMimeType ?? "";
+
+  if (message.mediaUrl && (kind === "image" || mime.startsWith("image/"))) {
+    return (
+      <>
+        <img alt={message.mediaFilename ?? ""} className="waMedia" src={message.mediaUrl} />
+        {message.body ? <p dir="auto">{message.body}</p> : null}
+      </>
+    );
+  }
+
+  if (message.mediaUrl && (kind === "video" || mime.startsWith("video/"))) {
+    return (
+      <>
+        <video className="waMedia" controls playsInline preload="metadata" src={message.mediaUrl} />
+        {message.body ? <p dir="auto">{message.body}</p> : null}
+      </>
+    );
+  }
+
+  if (message.mediaUrl && (kind === "audio" || mime.startsWith("audio/"))) {
+    return <audio className="waAudio" controls preload="metadata" src={message.mediaUrl} />;
+  }
+
+  if (message.mediaUrl) {
+    return (
+      <a className="waFile" href={message.mediaUrl} rel="noreferrer" target="_blank">
+        📎 {message.mediaFilename || message.body || "افتحي الملف"}
+      </a>
+    );
+  }
+
+  return <p dir="auto" style={{ margin: 0, whiteSpace: "pre-wrap" }}>{message.body}</p>;
+}
 
 /**
  * WhatsApp beside the work rather than instead of it.
@@ -48,6 +96,9 @@ export function WhatsAppWidget({ canSend }: { canSend: boolean }) {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [limit, setLimit] = useState(40);
+  const [file, setFile] = useState<File | null>(null);
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [picking, setPicking] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const bottom = useRef<HTMLDivElement>(null);
 
@@ -123,6 +174,85 @@ export function WhatsAppWidget({ canSend }: { canSend: boolean }) {
     setOpenId(null);
     setOpenThread(null);
     await loadThreads();
+  }
+
+  /**
+   * A file goes up as raw bytes with its own type, not as a form field:
+   * the route reads the body as the file and takes the name and caption
+   * from the query, which is what keeps a 60 MB video off the heap.
+   */
+  async function sendFile() {
+    if (!openId || !file) {
+      return;
+    }
+    setSending(true);
+    setError("");
+    const mimeType = file.type.split(";")[0].trim() || "application/octet-stream";
+    const query = new URLSearchParams({
+      memberId: String(openId),
+      caption: draft,
+      filename: file.name,
+      mimeType
+    });
+    const response = await fetch(`/api/messages/send-media?${query}`, {
+      method: "POST",
+      headers: { "Content-Type": mimeType },
+      body: file
+    });
+    const payload = await response.json().catch(() => ({}));
+    setSending(false);
+    if (!response.ok) {
+      setError(payload.error ?? "ما زبط إرسال الملف.");
+      return;
+    }
+    setFile(null);
+    setDraft("");
+    await loadMessages(openId);
+    await loadThreads();
+  }
+
+  /**
+   * Outside the 24-hour window only an approved template reaches her —
+   * free text is accepted by Meta and then dropped, with no error.
+   */
+  async function sendTemplate(template: Template) {
+    if (!openId) {
+      return;
+    }
+    setSending(true);
+    setError("");
+    const response = await fetch("/api/messages/send-template", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        memberId: openId,
+        templateName: template.name,
+        templateLanguage: template.language,
+        bodyParams: Array.from({ length: template.paramCount }, (_, at) => (at === 0 ? "{{name}}" : "")),
+        bodyPreview: template.bodyText
+      })
+    });
+    const payload = await response.json().catch(() => ({}));
+    setSending(false);
+    setPicking(false);
+    if (!response.ok) {
+      setError(payload.error ?? "ما زبط إرسال القالب.");
+      return;
+    }
+    await loadMessages(openId);
+    await loadThreads();
+  }
+
+  async function openTemplates() {
+    setPicking(true);
+    if (templates.length) {
+      return;
+    }
+    const response = await fetch("/api/templates");
+    if (response.ok) {
+      const payload = await response.json();
+      setTemplates((payload.templates ?? []).filter((item: Template) => item.status === "APPROVED"));
+    }
   }
 
   async function send() {
@@ -281,7 +411,7 @@ export function WhatsAppWidget({ canSend }: { canSend: boolean }) {
           <div className="waMessages">
             {messages.map((message) => (
               <div className={`waBubble ${message.direction}`} key={message.id}>
-                {message.body}
+                <MessageBody message={message} />
                 <span className="waWhen">{ago(message.createdAt)}</span>
               </div>
             ))}
@@ -290,28 +420,96 @@ export function WhatsAppWidget({ canSend }: { canSend: boolean }) {
 
           {error && <p className="crmError" style={{ margin: "0 12px 8px" }}>{error}</p>}
 
-          {canSend && open.windowOpen ? (
+          {/*
+            A template reaches her whether the window is open or shut, so
+            the picker is offered in both states — it is simply the only
+            thing that works in one of them.
+          */}
+          {canSend && picking ? (
+            <div className="waTemplates">
+              <div className="waRailHead">
+                <span className="waTitle">قالب معتمد</span>
+                <button className="crmBtn" onClick={() => setPicking(false)} type="button">
+                  إلغاء
+                </button>
+              </div>
+              {templates.length ? (
+                templates.map((template) => (
+                  <button
+                    className="waTemplate"
+                    disabled={sending}
+                    key={`${template.name}:${template.language}`}
+                    onClick={() => void sendTemplate(template)}
+                    type="button"
+                  >
+                    <strong>{template.name}</strong>
+                    <span>{template.bodyText.slice(0, 90)}</span>
+                  </button>
+                ))
+              ) : (
+                <p className="crmEmpty">بنحمّل القوالب…</p>
+              )}
+            </div>
+          ) : null}
+
+          {canSend ? (
             <div className="waCompose">
-              <textarea
-                onChange={(event) => setDraft(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-                    void send();
-                  }
-                }}
-                placeholder="اكتب الرد…"
-                value={draft}
-              />
-              <button className="crmBtn primary" disabled={sending || !draft.trim()} onClick={send} type="button">
-                {sending ? "…" : "إرسال"}
-              </button>
+              {file ? (
+                <div className="waFilePicked">
+                  📎 {file.name}
+                  <button className="crmBtn" onClick={() => setFile(null)} type="button">
+                    شيلي
+                  </button>
+                </div>
+              ) : null}
+
+              {open.windowOpen ? (
+                <textarea
+                  onChange={(event) => setDraft(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+                      void (file ? sendFile() : send());
+                    }
+                  }}
+                  placeholder={file ? "تعليق على الملف (اختياري)…" : "اكتبي الرد…"}
+                  value={draft}
+                />
+              ) : (
+                <p className="crmNote waClosed">
+                  مرّ أكتر من 24 ساعة على آخر رسالة منها — الوصول هلق بدّه قالب معتمد.
+                </p>
+              )}
+
+              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                {open.windowOpen ? (
+                  <label className="crmBtn" style={{ cursor: "pointer" }} title="أرفقي ملف">
+                    📎
+                    <input
+                      hidden
+                      onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+                      type="file"
+                    />
+                  </label>
+                ) : null}
+
+                <button className="crmBtn" disabled={sending} onClick={() => void openTemplates()} type="button">
+                  قالب
+                </button>
+
+                {open.windowOpen ? (
+                  <button
+                    className="crmBtn primary"
+                    disabled={sending || (!draft.trim() && !file)}
+                    onClick={() => void (file ? sendFile() : send())}
+                    type="button"
+                  >
+                    {sending ? "…" : "إرسال"}
+                  </button>
+                ) : null}
+              </div>
             </div>
           ) : (
-            <p className="crmNote waClosed">
-              {canSend
-                ? "مضى أكثر من 24 ساعة على آخر رسالة منه. الإرسال الآن يحتاج قالباً معتمداً."
-                : "لا تملك صلاحية الإرسال."}
-            </p>
+            <p className="crmNote waClosed">ما عندك صلاحية إرسال.</p>
           )}
         </div>
       )}
