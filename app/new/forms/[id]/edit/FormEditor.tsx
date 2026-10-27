@@ -454,6 +454,49 @@ export function FormEditor({
           </span>
         </div>
       </section>
+
+      {/* Deleting a form takes its registrations with it, so it sits at the
+          very bottom, behind a confirmation that names the number. Closing
+          the form is the thing that is almost always meant instead, and it
+          is up at the top where it is reached first. */}
+      {canEdit && (
+        <section className="crmCard" data-tone="clay">
+          <header>
+            <span className="crmDot" />
+            <h2>حذف الاستمارة</h2>
+          </header>
+          <div className="crmPad">
+            <p className="crmRowDetail" style={{ marginTop: 0 }}>
+              {/* «بيروح معها لا تسجيلات» ما بتنقرا — الصفر بدّه جملته. */}
+              {submissions === 0
+                ? "ما إلها ولا تسجيل، فما في شي بيروح معها."
+                : `بيروح معها ${registrations(submissions)}. المنتسبات اللي انضافوا للمجموعة بيضلّوا.`}{" "}
+              إذا بس بدّك توقّفي التسجيل، استعملي «إغلاق التسجيل» فوق.
+            </p>
+            <button
+              className="crmBtn"
+              disabled={busy}
+              onClick={async () => {
+                if (
+                  !window.confirm(
+                    submissions === 0
+                      ? `تنحذف «${form.name}»؟ ما في رجعة.`
+                      : `تنحذف «${form.name}»؟ بيروح معها ${registrations(submissions)}، وما في رجعة.`
+                  )
+                ) {
+                  return;
+                }
+                if (await call(`/api/forms/${form.id}`, { method: "DELETE" }, "انحذفت.")) {
+                  router.push("/new/library");
+                }
+              }}
+              type="button"
+            >
+              احذفي الاستمارة
+            </button>
+          </div>
+        </section>
+      )}
     </>
   );
 }

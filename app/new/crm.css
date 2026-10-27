@@ -133,6 +133,13 @@
   --tone-wash: var(--peach);
 }
 
+/* التسجيلات بتصير منتسبين، فبتلبس نفس لون «المنتسبون». */
+.crm[data-area="leads"] {
+  --tone: var(--clay);
+  --tone-mid: var(--clay);
+  --tone-wash: var(--peach);
+}
+
 .crm[data-area="paths"] {
   --tone: var(--sage);
   --tone-mid: var(--sage);
@@ -225,6 +232,10 @@
 }
 
 .crm .crmNav nav a[data-area="people"] .tick {
+  background: var(--clay);
+}
+
+.crm .crmNav nav a[data-area="leads"] .tick {
   background: var(--clay);
 }
 
@@ -1232,6 +1243,86 @@
   border: 1px solid var(--line-strong);
   border-radius: 8px;
   background: #fff;
+}
+
+/* ---- التسجيلات: صف فيه قرار ---- */
+
+/* مربّع الاختيار: القاعدة العامة للمدخلات بتحطّ `width:100%` وارتفاع
+   42px، فالمربّع كان بياخد سطر لحاله فوق الاسم بدل ما يقعد جنبه. */
+.crm .leadPick {
+  width: 17px;
+  min-width: 17px;
+  height: 17px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  flex: none;
+  accent-color: var(--forest);
+  cursor: pointer;
+}
+
+/* الصف وأجوبته جسم واحد: الأجوبة بتنفتح تحت صفّها مش بنافذة، لأن
+   المقارنة بين تسجيل وتسجيل هي نص الشغل. */
+.crm .leadRow {
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.crm .leadRow:last-child {
+  border-bottom: 0;
+}
+
+.crm .leadRow > .crmRow {
+  border-bottom: 0;
+}
+
+/* الاسم والرقم زرّ بيفتح الأجوبة — بيضل يقرا كسطر مش كزرّ. */
+.crm .leadOpen {
+  border: 0;
+  background: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.crm .leadOpen:hover .crmRowTitle {
+  text-decoration: underline;
+}
+
+.crm .leadOpen .crmRowTitle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.crm .leadRow .crmAnswers {
+  padding: 4px 16px 18px;
+  background: var(--tone-wash, var(--paper));
+}
+
+.crm .leadSignature {
+  max-width: 220px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: #fff;
+}
+
+/* شريط «المختارين»: بيضل بالشاشة وهي بتنزل باللائحة — القرار بيتاخد
+   بعد ما تقرا الصفوف، مش قبل. */
+.crm .leadBulk {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  position: sticky;
+  top: 70px;
+  z-index: 2;
 }
 
 @media (max-width: 560px) {

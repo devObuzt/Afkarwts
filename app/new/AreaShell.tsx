@@ -10,11 +10,12 @@ import { usePathname } from "next/navigation";
  */
 export function areaOf(pathname: string) {
   if (pathname.startsWith("/new/people")) return "people";
+  if (pathname.startsWith("/new/leads")) return "leads";
   if (pathname.startsWith("/new/paths")) return "paths";
   if (pathname.startsWith("/new/campaigns")) return "campaigns";
   if (pathname.startsWith("/new/labels")) return "labels";
   if (pathname.startsWith("/new/bulk")) return "bulk";
-  if (pathname.startsWith("/new/library")) return "library";
+  if (pathname.startsWith("/new/library") || pathname.startsWith("/new/forms")) return "library";
   if (pathname.startsWith("/new/users")) return "users";
   if (pathname.startsWith("/new/app")) return "app";
   if (pathname.startsWith("/new/income")) return "income";

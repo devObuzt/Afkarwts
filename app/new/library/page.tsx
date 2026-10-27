@@ -4,6 +4,8 @@ import { listForms } from "@/app/lib/forms/store";
 import { renderTitle } from "@/app/lib/forms/clean-template";
 import { listGroups } from "@/app/lib/db";
 import { members } from "../format";
+import { can } from "@/app/lib/users/permissions";
+import { NewForm } from "./NewForm";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +15,7 @@ export const dynamic = "force-dynamic";
  * starting a new cohort are different days' work.
  */
 export default async function LibraryPage() {
-  await requireUser("journeys.view");
+  const user = await requireUser("journeys.view");
 
 
   const paths = listTemplates();
@@ -54,6 +56,15 @@ export default async function LibraryPage() {
           <span className="crmDot" />
           <h2>الاستمارات</h2>
         </header>
+        {can(user, "forms.manage") && (
+          <NewForm
+            groups={groups.map((group) => ({
+              id: group.id,
+              name: group.name,
+              memberCount: group.memberCount
+            }))}
+          />
+        )}
         {forms.map((form) => (
           <div className="crmRow" key={form.id}>
             <div className="grow">

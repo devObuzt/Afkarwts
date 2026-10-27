@@ -65,12 +65,9 @@ export default async function CohortsPage() {
             </div>
           ))}
           <div className="crmPad" style={{ borderTop: "1px solid var(--line-soft)" }}>
-            <a className="crmBtn primary" href="/leads">
+            <Link className="crmBtn primary" href="/new/leads">
               المراجعة في صفحة التسجيلات
-            </a>
-            <p className="crmNote" style={{ marginTop: 10 }}>
-              الموافقة ما زالت في الواجهة السابقة، وتنتقل إلى هنا بعد اكتمال تجربة المسار.
-            </p>
+            </Link>
           </div>
         </section>
       )}

@@ -7,6 +7,7 @@ import { areaOf } from "./AreaShell";
 const AREAS = [
   { href: "/new", area: "today", label: "اليوم" },
   { href: "/new/people", area: "people", label: "المنتسبون" },
+  { href: "/new/leads", area: "leads", label: "التسجيلات" },
   { href: "/new/paths", area: "paths", label: "المسارات" },
   { href: "/new/campaigns", area: "campaigns", label: "الحملات" },
   { href: "/new/bulk", area: "bulk", label: "إرسال جماعي" },
