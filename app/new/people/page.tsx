@@ -59,6 +59,11 @@ export default async function PeoplePage({
           {peopleCount(total)}
           {query || chosen.length ? " ضمن هذا الفلتر" : ""}.
         </p>
+        {can(user, "people.edit") && (
+          <Link className="crmBtn quiet" href="/new/people/import">
+            استيراد لائحة
+          </Link>
+        )}
       </header>
 
       {/* A plain GET form: searching is a link, so it can be shared and gone back to. */}

@@ -1,5 +1,6 @@
 "use client";
 
+import { parseImportRows, type ImportRow } from "@/app/lib/import-rows";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Mp3Encoder } from "@breezystack/lamejs";
 import { setupNativePush } from "./lib/native-push";
@@ -113,8 +114,6 @@ type BulkResult = {
   ok: boolean;
   error: string | null;
 };
-
-type ImportRow = { name: string; phone: string; notes: string; city?: string; joined?: string; service?: string };
 
 type Template = {
   name: string;
@@ -248,78 +247,6 @@ function dayLabel(date: Date) {
 
 function timeLabel(value: string) {
   return new Date(value).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
-}
-
-function parseCsv(raw: string): ImportRow[] {
-  const lines = raw.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-  if (!lines.length) {
-    return [];
-  }
-
-  const splitLine = (line: string) => {
-    const delimiter = line.includes("\t") ? "\t" : line.includes(";") ? ";" : ",";
-    return line.split(delimiter).map((cell) => cell.trim().replace(/^"|"$/g, ""));
-  };
-
-  const header = splitLine(lines[0]).map((cell) => cell.toLowerCase());
-  const isHeaderRow = header.some((cell) => /phone|name|اسم|رقم/.test(cell));
-
-  let rows: ImportRow[] = [];
-
-  if (isHeaderRow && header.some((cell) => cell.includes("phone"))) {
-    // Header-mapped format, e.g. Phone Number, First Name, Last Name, City, CT, Service
-    const col = (matcher: (cell: string) => boolean) => header.findIndex(matcher);
-    const phoneIdx = col((cell) => cell.includes("phone") || cell.includes("رقم"));
-    const firstIdx = col((cell) => cell.includes("first") || cell === "name" || cell.includes("الاسم الاول"));
-    const lastIdx = col((cell) => cell.includes("last") || cell.includes("الاسم الاخير"));
-    const cityIdx = col((cell) => cell.includes("city") || cell.includes("مدينة"));
-    const joinedIdx = col((cell) => cell === "ct" || cell.includes("join") || cell.includes("تاريخ"));
-    const serviceIdx = col((cell) => cell.includes("service") || cell.includes("خدمة"));
-    const notesIdx = col((cell) => cell.includes("note") || cell.includes("ملاحظ"));
-
-    rows = lines.slice(1).map((line) => {
-      const cells = splitLine(line);
-      const first = firstIdx >= 0 ? cells[firstIdx] ?? "" : "";
-      const last = lastIdx >= 0 ? cells[lastIdx] ?? "" : "";
-      return {
-        name: [first, last].filter(Boolean).join(" "),
-        phone: phoneIdx >= 0 ? cells[phoneIdx] ?? "" : "",
-        notes: notesIdx >= 0 ? cells[notesIdx] ?? "" : "",
-        city: cityIdx >= 0 ? cells[cityIdx] ?? "" : "",
-        joined: joinedIdx >= 0 ? cells[joinedIdx] ?? "" : "",
-        service: serviceIdx >= 0 ? cells[serviceIdx] ?? "" : ""
-      };
-    });
-  } else {
-    // Simple positional format: Name, Phone, Notes (or phone-only lines)
-    rows = lines.map((line) => {
-      const cells = splitLine(line);
-      return { name: cells[0] ?? "", phone: cells[1] ?? "", notes: cells[2] ?? "" };
-    });
-    if (rows.length && /name|phone|اسم|رقم/i.test(`${rows[0].name} ${rows[0].phone}`)) {
-      rows.shift();
-    }
-    rows = rows.map((row) => {
-      if (!row.phone && /^[+\d][\d\s()-]{6,}$/.test(row.name)) {
-        return { ...row, name: "", phone: row.name };
-      }
-      return row;
-    });
-  }
-
-  // De-duplicate inside the file by phone digits.
-  const seen = new Set<string>();
-  return rows.filter((row) => {
-    const key = row.phone.replace(/[^\d]/g, "").replace(/^0+/, "").replace(/^97[02]/, "");
-    if (!key) {
-      return Boolean(row.name);
-    }
-    if (seen.has(key)) {
-      return false;
-    }
-    seen.add(key);
-    return true;
-  });
 }
 
 /* ---------- icons ---------- */
@@ -1220,7 +1147,7 @@ function ImportModal({ groups, onClose, onDone }: { groups: Group[]; onClose: ()
   const [error, setError] = useState("");
   const [result, setResult] = useState<{ created: number; existing: number; failed: Array<{ row: ImportRow; error: string }> } | null>(null);
 
-  const rows = useMemo(() => parseCsv(raw), [raw]);
+  const rows = useMemo(() => parseImportRows(raw), [raw]);
 
   async function readFile(file: File | null) {
     if (!file) return;

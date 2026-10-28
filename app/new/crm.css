@@ -1245,6 +1245,62 @@
   background: #fff;
 }
 
+/* ---- الاستيراد ---- */
+
+/* زرّ ملف بدل حقل الملف اللي كل متصفّح بيرسمه بطريقته. */
+.crm .importFile {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 15px;
+  margin-bottom: 11px;
+  font-size: 13.5px;
+  color: var(--ink);
+  background: var(--card);
+  border: 1px dashed var(--line-strong);
+  border-radius: 11px;
+  cursor: pointer;
+}
+
+.crm .importFile:hover {
+  border-color: var(--forest);
+  border-style: solid;
+}
+
+.crm .importFile input[type="file"] {
+  display: none;
+}
+
+.crm .importPreview {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.crm .importPreview td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--line-soft);
+  vertical-align: top;
+}
+
+.crm .importPreview tr:last-child td {
+  border-bottom: 0;
+}
+
+.crm .importPreview td:first-child {
+  font-weight: 600;
+}
+
+.crm .importFailures p {
+  margin: 0 0 7px;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.crm .importFailures p:last-child {
+  margin-bottom: 0;
+}
+
 /* ---- القوالب ---- */
 
 /* «؟» جنب اسم الحقل: الشرح بيفتح بمحلّه بدل حيط تحذيرات فوق الاستمارة. */

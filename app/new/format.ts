@@ -162,6 +162,16 @@ export function registrations(total: number) {
   });
 }
 
+export function rows(total: number) {
+  return count(total, {
+    none: "ولا سطر",
+    one: "سطر واحد",
+    two: "سطرين",
+    few: "سطور",
+    many: "سطراً"
+  });
+}
+
 export function variables(total: number) {
   return count(total, {
     none: "بلا متغيّرات",
