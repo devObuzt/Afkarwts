@@ -92,7 +92,7 @@ export function PersonReply({
               مضى أكثر من 24 ساعة على آخر رسالة منه، والنص الحر لا يصل: واتساب يقبله ثم يُسقطه بلا خطأ.
               الإرسال الآن يحتاج قالباً معتمداً.
             </p>
-            <a className="crmBtn" href="/templates" style={{ marginTop: 12 }}>
+            <a className="crmBtn" href="/new/templates" style={{ marginTop: 12 }}>
               فتح القوالب
             </a>
           </>

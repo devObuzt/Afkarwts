@@ -124,7 +124,7 @@ export default async function LibraryPage() {
         <header>
           <span className="crmDot" />
           <h2>قوالب واتساب</h2>
-          <a className="crmBtn quiet spacer" href="/templates">
+          <a className="crmBtn quiet spacer" href="/new/templates">
             فتح
           </a>
         </header>

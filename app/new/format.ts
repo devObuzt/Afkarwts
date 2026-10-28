@@ -162,6 +162,16 @@ export function registrations(total: number) {
   });
 }
 
+export function variables(total: number) {
+  return count(total, {
+    none: "بلا متغيّرات",
+    one: "متغيّر واحد",
+    two: "متغيّران",
+    few: "متغيّرات",
+    many: "متغيّراً"
+  });
+}
+
 export function choices(total: number) {
   return count(total, {
     none: "بلا خيارات",
