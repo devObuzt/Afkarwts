@@ -63,7 +63,15 @@ function notifyDevices(memberName: string, type: string, body: string, memberId:
  * webhook route calls it, and so does the staging simulator, so what is tested
  * off a real Meta webhook is the same code that runs behind one.
  */
-export async function handleWebhookPayload(payload: WhatsAppWebhookPayload) {
+/**
+ * @param verified هل انثبت إنّ الحمولة من ميتا (توقيع `X-Hub-Signature-256`).
+ *   الرسائل بتنخزّن بالحالتين — بس ولا ردّ تلقائي بيطلع من حمولة مش
+ *   متحقَّق منها، لأنّ هيك بيصير رقم أفكار أداة إرسال لأي حدا بيعرف الرابط.
+ */
+export async function handleWebhookPayload(
+  payload: WhatsAppWebhookPayload,
+  { verified = false }: { verified?: boolean } = {}
+) {
   for (const entry of payload.entry ?? []) {
     for (const change of entry.changes ?? []) {
       const value = change.value;
@@ -198,8 +206,16 @@ export async function handleWebhookPayload(payload: WhatsAppWebhookPayload) {
         }
       }
 
-      for (const member of wrote.values()) {
-        await sendAutoReply(member);
+      if (verified) {
+        for (const member of wrote.values()) {
+          await sendAutoReply(member);
+        }
+      } else if (wrote.size > 0 && !process.env.WHATSAPP_APP_SECRET) {
+        // بينكتب مرة لكل حمولة فيها رسائل، عشان ما يضيع السبب: الميزة
+        // مش مكسورة — السرّ ناقص.
+        console.warn(
+          "Auto-reply skipped: WHATSAPP_APP_SECRET is not set, so the payload could not be proven to come from Meta."
+        );
       }
 
       for (const statusUpdate of value?.statuses ?? []) {

@@ -111,7 +111,7 @@ test("الويبهوك فعلاً بيبعت الردّ لما توصل رسال
   const phone = `+97255100${String(seq).padStart(4, "0")}`;
   const person = createMember({ name: `ويبهوك ${seq}`, phone, notes: "" })!;
 
-  await handleWebhookPayload(buildIncomingPayload({ phone, text: "مرحبا، بدي أعرف عن كلين" }));
+  await handleWebhookPayload(buildIncomingPayload({ phone, text: "مرحبا، بدي أعرف عن كلين" }), { verified: true });
 
   const auto = getDb()
     .prepare("SELECT send_key, body FROM messages WHERE member_id = ? AND send_key LIKE 'auto:%'")
@@ -128,8 +128,8 @@ test("رسالتين بنفس الحمولة = ردّ واحد مش ردّين",
   const phone = `+97255200${String(seq).padStart(4, "0")}`;
   const person = createMember({ name: `دفعة ${seq}`, phone, notes: "" })!;
 
-  await handleWebhookPayload(buildIncomingPayload({ phone, text: "مرحبا" }));
-  await handleWebhookPayload(buildIncomingPayload({ phone, text: "في حدا؟" }));
+  await handleWebhookPayload(buildIncomingPayload({ phone, text: "مرحبا" }), { verified: true });
+  await handleWebhookPayload(buildIncomingPayload({ phone, text: "في حدا؟" }), { verified: true });
 
   const n = (
     getDb()
@@ -160,4 +160,31 @@ test("فشل الإرسال بيبيّن بالمحادثة، ما بيضيع ب
   assert.ok(row, "لازم ينتسجّل حتى لو فشل");
   assert.equal(row!.status, "failed");
   assert.ok(row!.error, "والسبب مكتوب");
+});
+
+/**
+ * الفحص اللي بيحمي رقم أفكار. الرابط عام، فحمولة مش متحقَّق منها لازم
+ * تنخزّن بلا ما تحرّك ولا رسالة طالعة — وإلا أي حدا بيعرف العنوان بيقدر
+ * يخلّينا نبعت لأي رقم بيسمّيه.
+ */
+test("حمولة مش متحقَّق منها بتنخزّن بلا ما تبعت إشي", async () => {
+  const { buildIncomingPayload, handleWebhookPayload } = await import("@/app/lib/whatsapp-webhook");
+  const { createMember, getDb } = await import("@/app/lib/db");
+  seq += 1;
+  const phone = `+97255400${String(seq).padStart(4, "0")}`;
+  const person = createMember({ name: `مزوّر ${seq}`, phone, notes: "" })!;
+
+  await handleWebhookPayload(buildIncomingPayload({ phone, text: "مرحبا" }));
+
+  const counts = getDb()
+    .prepare(
+      `SELECT
+         SUM(CASE WHEN direction = 'incoming' THEN 1 ELSE 0 END) AS inbox,
+         SUM(CASE WHEN send_key LIKE 'auto:%' THEN 1 ELSE 0 END) AS auto
+       FROM messages WHERE member_id = ?`
+    )
+    .get(person.id) as { inbox: number; auto: number };
+
+  assert.equal(counts.inbox, 1, "الرسالة بتضل تنخزّن — ما منكسر استقبال قائم");
+  assert.equal(counts.auto ?? 0, 0, "بس ولا رسالة بتطلع");
 });
