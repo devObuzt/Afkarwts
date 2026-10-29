@@ -1,7 +1,8 @@
-import { createMessage, findOrCreateMemberByPhone, updateMessageStatusByWhatsAppId, type Message } from "./db";
+import { createMessage, findOrCreateMemberByPhone, updateMessageStatusByWhatsAppId, type Member, type Message } from "./db";
 import { createStoredMediaFilename, formatBytes, MAX_MEDIA_BYTES, MAX_MEDIA_LABEL, writeMediaFile } from "./media-store";
 import { downloadWhatsAppMedia, getWhatsAppMediaInfo } from "./whatsapp";
 import { messagePreview, sendPushToDevices } from "./push";
+import { sendAutoReply } from "./whatsapp/auto-reply";
 
 type IncomingMedia = {
   id?: string;
@@ -73,6 +74,11 @@ export async function handleWebhookPayload(payload: WhatsAppWebhookPayload) {
         ])
       );
 
+      // مين كتب بهاي الدفعة. الرد التلقائي بينحسب بعد ما تنخزّن كل
+      // الرسائل، مش جوّا كل فرع: اللي بيبعت صورة وسطر وراها بدفعة وحدة
+      // بيستاهل ردّ واحد، والقرار بدّه يشوف المحادثة كاملة.
+      const wrote = new Map<number, Member>();
+
       for (const incoming of value?.messages ?? []) {
         if (!incoming.from) {
           continue;
@@ -82,6 +88,7 @@ export async function handleWebhookPayload(payload: WhatsAppWebhookPayload) {
           phone: incoming.from,
           profileName: contactsByWaId.get(incoming.from)
         });
+        wrote.set(member.id, member);
 
         if (incoming.type === "text" && incoming.text?.body) {
           createMessage({
@@ -189,6 +196,10 @@ export async function handleWebhookPayload(payload: WhatsAppWebhookPayload) {
             });
           }
         }
+      }
+
+      for (const member of wrote.values()) {
+        await sendAutoReply(member);
       }
 
       for (const statusUpdate of value?.statuses ?? []) {

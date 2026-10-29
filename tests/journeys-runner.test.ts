@@ -52,9 +52,25 @@ async function sendStates(journeyId: number) {
     .all(journeyId) as Array<{ state: string }>;
 }
 
+/**
+ * ما بعته المسار — بلا الردود التلقائية.
+ *
+ * من لما صار الرد التلقائي يشتغل، أي رسالة واصلة بالاختبار بتجرّ وراها
+ * ردّاً: ترحيب بالنهار و«خارج الدوام» بالليل. بلا هاد الاستثناء الاختبار
+ * بيصير يمرق الصبح ويفشل بالليل — وهاد أسوأ من اختبار فاشل.
+ */
 async function outgoing(memberId: number) {
-  const { listMessages } = await import("@/app/lib/db");
-  return listMessages(memberId).filter((message) => message.direction === "outgoing");
+  const { listMessages, getDb } = await import("@/app/lib/db");
+  const auto = new Set(
+    (
+      getDb()
+        .prepare("SELECT id FROM messages WHERE member_id = ? AND send_key LIKE 'auto:%'")
+        .all(memberId) as Array<{ id: number }>
+    ).map((row) => row.id)
+  );
+  return listMessages(memberId).filter(
+    (message) => message.direction === "outgoing" && !auto.has(message.id)
+  );
 }
 
 test("a due step is sent once, however many ticks run", async () => {

@@ -11,10 +11,11 @@ test("a simulated reply lands as an incoming message", async () => {
   const member = createMember({ name: "فحص", phone: "+972500000002", notes: "" });
   await handleWebhookPayload(buildIncomingPayload({ phone: member.phone, text: "أهلين" }));
 
-  const messages = listMessages(member.id);
-  assert.equal(messages.length, 1);
-  assert.equal(messages[0].direction, "incoming");
-  assert.equal(messages[0].body, "أهلين");
+  // الواصلة نفسها هي موضوع الاختبار. من لما صار الرد التلقائي يشتغل، أي
+  // رسالة واصلة بتجرّ وراها ردّاً كمان — فعدّ الكل ما عاد يقيس اللي بدنا إياه.
+  const incoming = listMessages(member.id).filter((message) => message.direction === "incoming");
+  assert.equal(incoming.length, 1);
+  assert.equal(incoming[0].body, "أهلين");
 });
 
 test("a simulated status updates the message", async () => {
