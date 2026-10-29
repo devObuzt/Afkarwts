@@ -24,3 +24,17 @@ test("rows: a count that has to sit inside a sentence", () => {
     assert.ok(`انشال ${rows(n)} متكرّر`.startsWith("انشال "));
   }
 });
+
+test("the two letters on a conversation come from the dialling code, not a guess", async () => {
+  const { dialRegion } = await import("../app/new/format");
+
+  assert.deepEqual(dialRegion("+972521234567"), { code: "IL", known: true });
+  assert.deepEqual(dialRegion("972521234567"), { code: "IL", known: true });
+  assert.deepEqual(dialRegion("+970599123456"), { code: "PS", known: true });
+
+  // The seven odd rows measured in production: shown as they are, so the
+  // five that are really a local number missing its 972 stay visible.
+  assert.deepEqual(dialRegion("+548123456"), { code: "+548", known: false });
+  assert.deepEqual(dialRegion("+4917612345678"), { code: "+491", known: false });
+  assert.equal(dialRegion(""), null);
+});

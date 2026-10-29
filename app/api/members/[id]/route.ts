@@ -1,7 +1,8 @@
 import { recordAction } from "@/app/lib/users/audit";
 import { requireApi } from "@/app/lib/users/current";
 import { NextResponse } from "next/server";
-import { deleteMember, getMember, updateMemberPhone, updateMemberProfile } from "@/app/lib/db";
+import { getMember, updateMemberPhone, updateMemberProfile } from "@/app/lib/db";
+import { eraseMember } from "@/app/lib/members/erase";
 import { carryPhoneToSubmissions } from "@/app/lib/forms/store";
 import { reviveAfterPhoneFix } from "@/app/lib/journeys/phone-fix";
 
@@ -109,16 +110,27 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   const id = Number((await params).id);
   const confirmPhone = new URL(request.url).searchParams.get("phone") ?? "";
 
-  const result = deleteMember(id, confirmPhone);
+  const result = eraseMember(id, confirmPhone);
 
   if (result.ok) {
+    // The row is gone, so the log is the only place her name survives — and
+    // what it cost, because «حُذف منتسب» alone does not say what was lost.
     recordAction({
       userId: auth.user.id,
       actor: auth.user.name,
       action: "member.delete",
       subjectType: "member",
       subjectId: id,
-      subjectLabel: confirmPhone
+      subjectLabel: `${result.name || "بلا اسم"} · ${result.phone}`,
+      // صيغة «اسم: رقم» بالمقصود: «2 رسالة» غلط عربي و«رسالتان» بتجبر
+      // الخادم يعرف قواعد المثنى. اللوج بدّه الأرقام مش الصياغة.
+      detail: [
+        `رسائل: ${result.messages}`,
+        result.files ? `ملفات: ${result.files}` : "",
+        result.payments ? `دفعات فُكّ ربطها: ${result.payments}` : ""
+      ]
+        .filter(Boolean)
+        .join(" · ")
     });
   }
 

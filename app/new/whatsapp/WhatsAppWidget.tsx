@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { colourForLabel, inkOnLabel } from "@/app/lib/labels/colours";
-import { ago, hueOf, initials, preview } from "../format";
+import { ago, dialRegion, hueOf, initials, preview } from "../format";
 
 type Thread = {
   memberId: number;
@@ -194,7 +194,7 @@ function MessageBody({ message }: { message: Message }) {
  * It is a new component rather than the old page squeezed — a 2,400-line
  * screen built for full width does not become a sidebar by resizing.
  */
-export function WhatsAppWidget({ canSend }: { canSend: boolean }) {
+export function WhatsAppWidget({ canDelete, canSend }: { canDelete: boolean; canSend: boolean }) {
   const [threads, setThreads] = useState<Thread[]>([]);
   const [unreadTotal, setUnreadTotal] = useState(0);
   const [query, setQuery] = useState("");
@@ -207,6 +207,12 @@ export function WhatsAppWidget({ canSend }: { canSend: boolean }) {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [limit, setLimit] = useState(40);
+  // الحذف بدّه الرقم ينكتب بالإيد. القائمة بتتفلتر وبتتحرّك، والزرّ لحاله
+  // على المحادثة المفتوحة مش حاجز كافي للي ما بينرجع عنه.
+  const [erasing, setErasing] = useState(false);
+  const [erasePhone, setErasePhone] = useState("");
+  const [eraseBusy, setEraseBusy] = useState(false);
+  const [eraseError, setEraseError] = useState("");
 
   // The remembered widths, put back before the first paint of the pane.
   useEffect(() => {
@@ -399,6 +405,32 @@ export function WhatsAppWidget({ canSend }: { canSend: boolean }) {
     await loadThreads();
   }
 
+  async function erase() {
+    if (!open) {
+      return;
+    }
+    setEraseBusy(true);
+    setEraseError("");
+
+    const response = await fetch(
+      `/api/members/${open.memberId}?phone=${encodeURIComponent(erasePhone.trim())}`,
+      { method: "DELETE" }
+    );
+    const payload = await response.json().catch(() => ({}));
+    setEraseBusy(false);
+
+    if (!response.ok) {
+      setEraseError(payload.error ?? "ما زبط الحذف.");
+      return;
+    }
+
+    setErasing(false);
+    setErasePhone("");
+    setOpenId(null);
+    setOpenThread(null);
+    await loadThreads();
+  }
+
   return (
     /* The conversation is not drawn until one is chosen, and the rail
        alone leaves the system 85% of the screen instead of 60%. */
@@ -461,8 +493,21 @@ export function WhatsAppWidget({ canSend }: { canSend: boolean }) {
                     an empty row says «no label» more clearly than a
                     placeholder that has to be read first.
                   */}
-                  {thread.labels.length ? (
+                  {/* حرفَي الدولة بيقعدوا بنفس الصف مع الملصقات، لأنهن
+                      بينقروا بنفس الطريقة: «من أي قائمة» و«من وين». */}
+                  {thread.labels.length || dialRegion(thread.phone) ? (
                     <span className="waThreadLabels">
+                      {(() => {
+                        const region = dialRegion(thread.phone);
+                        return region ? (
+                          <span
+                            className={region.known ? "labelChip tiny waRegion" : "labelChip tiny waRegion odd"}
+                            title={region.known ? thread.phone : `مفتاح غير متوقّع: ${thread.phone}`}
+                          >
+                            {region.code}
+                          </span>
+                        ) : null;
+                      })()}
                       {thread.labels.map((label) => {
                         const background = colourForLabel(label);
                         return (
@@ -518,6 +563,20 @@ export function WhatsAppWidget({ canSend }: { canSend: boolean }) {
             >
               علّمها كغير مقروءة
             </button>
+            {canDelete && (
+              <button
+                className="waErase"
+                onClick={() => {
+                  setErasing(true);
+                  setErasePhone("");
+                  setEraseError("");
+                }}
+                title="حذف المنتسب ومعه كل محادثته"
+                type="button"
+              >
+                حذف
+              </button>
+            )}
             <button
               aria-label="إغلاق المحادثة"
               className="waClose"
@@ -531,6 +590,47 @@ export function WhatsAppWidget({ canSend }: { canSend: boolean }) {
               ×
             </button>
           </header>
+
+          {erasing && (
+            /* ما في «تراجع». الرقم بينكتب بالإيد لأنه هو الإشي الوحيد
+               اللي بيثبت إنك قاصدة هاي المحادثة بالذات — الاسم بينتكرر
+               والصف بيتحرّك لما توصل رسالة. */
+            <div className="waErasePanel">
+              <p className="waEraseWho">
+                بينمحي <strong>{open.name || "بلا اسم"}</strong> ومعه كل رسائله وملفاته.
+                <span className="waEraseKeep">
+                  الاستمارة اللي عبّاها والدفعات بتضل — بس بتفكّ عنه.
+                </span>
+              </p>
+              <p className="waEraseWarn">ما في رجعة عن هاي.</p>
+              <label className="waEraseField">
+                <span>
+                  اكتبي رقمه للتأكيد: <code className="crmLtr">{open.phone}</code>
+                </span>
+                <input
+                  autoFocus
+                  className="crmLtr"
+                  onChange={(event) => setErasePhone(event.target.value)}
+                  placeholder={open.phone}
+                  value={erasePhone}
+                />
+              </label>
+              {eraseError ? <p className="crmError">{eraseError}</p> : null}
+              <div className="waEraseActions">
+                <button
+                  className="crmBtn danger"
+                  disabled={eraseBusy || !erasePhone.trim()}
+                  onClick={() => void erase()}
+                  type="button"
+                >
+                  {eraseBusy ? "عم بنمحي…" : "امحيه نهائياً"}
+                </button>
+                <button className="crmBtn quiet" onClick={() => setErasing(false)} type="button">
+                  تراجع
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="waMessages">
             {messages.map((message) => (

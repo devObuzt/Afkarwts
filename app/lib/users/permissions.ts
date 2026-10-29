@@ -69,7 +69,7 @@ export const PERMISSION_INFO: PermissionInfo[] = [
   {
     key: "people.delete",
     label: "حذف منتسب",
-    detail: "يحذف المنتسب ومعه كل محادثاته وتسجيلاته. لا يمكن التراجع.",
+    detail: "يحذف المنتسب ومعه كل محادثاته وملفاته. الاستمارة التي عبّأها والدفعات تبقى. لا يمكن التراجع.",
     group: "المنتسبون",
     sensitive: true
   },

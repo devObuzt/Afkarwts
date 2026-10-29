@@ -1245,6 +1245,108 @@
   background: #fff;
 }
 
+/* ---- حرفَي الدولة على المحادثة ---- */
+
+/* نفس مقاس الملصق بس بلا لونه: الملصق بيقول «أي قائمة»، وهاد بيقول
+   «من وين» — فلازم ينقرا كنوع تاني من المعلومة مش كملصق زيادة. */
+.crm .labelChip.waRegion {
+  background: var(--line-soft);
+  color: var(--faint);
+  letter-spacing: 0.4px;
+  font-variant-numeric: tabular-nums;
+  direction: ltr;
+}
+
+/* مفتاح مش 972 ولا 970. خمسة من سبعة بالإنتاج طلعوا رقم محلي ضايع منه
+   الـ972 — فبيلفت النظر بدل ما ينخمّن له حرفين. */
+.crm .labelChip.waRegion.odd {
+  background: var(--peach);
+  color: #7a4a22;
+}
+
+/* ---- حذف منتسب من قلب المحادثة ---- */
+
+.crm .waErase {
+  border: 1px solid var(--line);
+  background: none;
+  color: var(--faint);
+  font: inherit;
+  font-size: 12px;
+  padding: 3px 9px;
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.crm .waErase:hover {
+  border-color: #a4331f;
+  background: var(--peach);
+  color: #7a2718;
+}
+
+.crm .waErasePanel {
+  padding: 13px 15px;
+  background: var(--peach);
+  border-bottom: 1px solid var(--line);
+}
+
+.crm .waEraseWho {
+  margin: 0 0 4px;
+  font-size: 13.5px;
+  line-height: 1.75;
+  color: var(--ink);
+}
+
+.crm .waEraseKeep {
+  display: block;
+  color: #7a4a22;
+  font-size: 12.5px;
+}
+
+.crm .waEraseWarn {
+  margin: 0 0 11px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #7a2718;
+}
+
+.crm .waEraseField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12.5px;
+  color: var(--ink);
+}
+
+.crm .waEraseField input {
+  min-height: 34px;
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+.crm .waEraseActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 11px;
+}
+
+/* الزرّ الوحيد بالمنظومة اللي بيمحي إنسان — بلونه لحاله. */
+.crm .crmBtn.danger {
+  background: #8c2a19;
+  border-color: #8c2a19;
+  color: #fff;
+}
+
+.crm .crmBtn.danger:hover:not(:disabled) {
+  background: #731f10;
+  border-color: #731f10;
+}
+
+.crm .crmBtn.danger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* ---- الاستيراد ---- */
 
 /* زرّ ملف بدل حقل الملف اللي كل متصفّح بيرسمه بطريقته. */

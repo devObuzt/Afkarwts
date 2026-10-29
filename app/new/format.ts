@@ -162,6 +162,30 @@ export function registrations(total: number) {
   });
 }
 
+/**
+ * حرفَي الدولة على المحادثة، زي أي ملصق.
+ *
+ * مقيس من الإنتاج 29.10: 4,359 رقم بـ‎+972‎ و283 بـ‎+970‎ — يعني الحرفين
+ * بيقولوا بلمحة مين بالبلاد ومين برام الله، وهاد بيفرق بالتوصيل وبالسعر.
+ *
+ * واللي مش هدول بينعرض بمفتاحه كما هو بدل ما ينتخمّن: نفس القياس طلّع
+ * سبع أرقام غريبة، خمسة منهن شكلهن رقم محلي ضايع منه الـ972 (`+548…`
+ * `+532…` `+523…`). الحرف المخمّن بيخبّيهن؛ المفتاح الخام بيوقّفك عندهن.
+ */
+export function dialRegion(phone: string) {
+  const digits = (phone ?? "").replace(/[^\d]/g, "");
+  if (digits.startsWith("972")) {
+    return { code: "IL", known: true };
+  }
+  if (digits.startsWith("970")) {
+    return { code: "PS", known: true };
+  }
+  if (!digits) {
+    return null;
+  }
+  return { code: `+${digits.slice(0, 3)}`, known: false };
+}
+
 export function rows(total: number) {
   return count(total, {
     none: "ولا سطر",

@@ -1564,9 +1564,41 @@ export function mergeMembers(keepId: number, dropId: number) {
 }
 
 /**
- * Removes a contact and everything hanging off them — messages, group
- * membership, journey enrolments, follow-up tasks — through the foreign keys,
- * which all cascade.
+ * Tables whose rows are hers and die with her.
+ *
+ * `member_groups` is here rather than handled apart: unlike a merge, there
+ * is no second record for her place in a group to move to.
+ */
+const DELETE_WITH_MEMBER = ["messages", "followups", "label_refusals", "member_groups"];
+
+/**
+ * Tables that keep their row and only let go of the person.
+ *
+ * `payments` are Afkar's books, not the contact's history — they came from
+ * Morning and the month's income has to still add up after a delete. The
+ * schema says `ON DELETE SET NULL` for exactly this, and that intent is
+ * honoured here because the pragma that would enforce it is off.
+ *
+ * `form_submissions` is the registration she filled: a document of what was
+ * answered and when, which outlives the contact record made from it.
+ */
+const DETACH_FROM_MEMBER = ["payments", "form_submissions"];
+
+/**
+ * Handled by the caller, before this runs: a row in `person_files` has bytes
+ * on disk behind it, and deleting the row alone would leave her files there
+ * with nothing pointing at them.
+ */
+const DELETED_BY_CALLER = ["person_files"];
+
+/**
+ * Removes a contact and everything hanging off her.
+ *
+ * ⚠️ It used to say this happened "through the foreign keys, which all
+ * cascade". They do not: the `foreign_keys` pragma is off, so every cascade
+ * declared in the schema is decoration. The deletes below were hand-written
+ * and had fallen behind the schema — her files, her label refusals and her
+ * payments were all left pointing at a row that no longer existed.
  *
  * The phone has to be passed in and match. An id is a number nobody reads, and
  * this is the one call in the app that destroys a person's whole history: the
@@ -1588,17 +1620,34 @@ export function deleteMember(memberId: number, confirmPhone: string) {
     getDb().prepare("SELECT COUNT(*) AS n FROM messages WHERE member_id = ?").get(memberId) as { n: number }
   ).n;
 
-  // Explicit rather than trusting the cascade: foreign keys are only enforced
-  // when the pragma is on, and this must leave nothing behind either way.
   const db = getDb();
-  db.prepare("DELETE FROM member_groups WHERE member_id = ?").run(memberId);
-  db.prepare("DELETE FROM messages WHERE member_id = ?").run(memberId);
-  db.prepare("DELETE FROM followups WHERE member_id = ?").run(memberId);
-  db.prepare("DELETE FROM journey_sends WHERE enrollment_id IN (SELECT id FROM journey_enrollments WHERE member_id = ?)").run(memberId);
-  db.prepare("DELETE FROM journey_enrollments WHERE member_id = ?").run(memberId);
-  db.prepare("DELETE FROM members WHERE id = ?").run(memberId);
+  const payments = (
+    db.prepare("SELECT COUNT(*) AS n FROM payments WHERE member_id = ?").get(memberId) as { n: number }
+  ).n;
 
-  return { ok: true as const, name: member.name, phone: member.phone, messages };
+  // All of it or none of it: a half-deleted contact is a row that still
+  // answers some queries and not others.
+  db.exec("BEGIN");
+  try {
+    for (const table of DELETE_WITH_MEMBER) {
+      db.prepare(`DELETE FROM ${table} WHERE member_id = ?`).run(memberId);
+    }
+    for (const table of DETACH_FROM_MEMBER) {
+      db.prepare(`UPDATE ${table} SET member_id = NULL WHERE member_id = ?`).run(memberId);
+    }
+    // Keyed by the enrolment, not by her, so it goes first.
+    db.prepare(
+      "DELETE FROM journey_sends WHERE enrollment_id IN (SELECT id FROM journey_enrollments WHERE member_id = ?)"
+    ).run(memberId);
+    db.prepare("DELETE FROM journey_enrollments WHERE member_id = ?").run(memberId);
+    db.prepare("DELETE FROM members WHERE id = ?").run(memberId);
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+
+  return { ok: true as const, name: member.name, phone: member.phone, messages, payments };
 }
 
 export function findMemberByPhone(phone: string) {
