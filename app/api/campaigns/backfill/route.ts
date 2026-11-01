@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import {
   createCampaign,
   getGroup,
-  listCampaigns,
+  listCampaignsForGroup,
   listGroups,
   listGroupSendBodies,
   recordCampaignRun,
@@ -24,7 +24,7 @@ export async function GET(request: Request) {
   if (!getGroup(groupId)) {
     return NextResponse.json({ error: "Group not found." }, { status: 404 });
   }
-  const known = new Set(listCampaigns().filter((c) => c.groupId === groupId).map(campaignSendBody));
+  const known = new Set(listCampaignsForGroup(groupId).map(campaignSendBody));
   const sends = listGroupSendBodies(groupId).map((send) => ({ ...send, logged: known.has(send.body) }));
   return NextResponse.json({ sends });
 }
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
 
 function backfillGroup(group: { id: number; name: string }, onlyBody?: string) {
   const groupId = group.id;
-  const known = new Set(listCampaigns().filter((c) => c.groupId === groupId).map(campaignSendBody));
+  const known = new Set(listCampaignsForGroup(groupId).map(campaignSendBody));
   const sends = listGroupSendBodies(groupId);
   const candidates = sends.filter(
     (send) => !known.has(send.body) && (!onlyBody || send.body === onlyBody)

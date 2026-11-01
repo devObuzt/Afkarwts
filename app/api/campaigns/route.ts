@@ -1,19 +1,23 @@
 import { requireApi } from "@/app/lib/users/current";
 import { NextResponse } from "next/server";
-import { createCampaign, getGroup, listCampaigns, listGroupMembers } from "@/app/lib/db";
+import { countCampaigns, createCampaign, getGroup, listCampaigns, listGroupMembers } from "@/app/lib/db";
 import { campaignProgress, runCampaignBatch } from "@/app/lib/campaigns";
 import { getMessagingLimit } from "@/app/lib/whatsapp";
 import { groupSendable } from "@/app/lib/labels/sendable";
 
 export const runtime = "nodejs";
 
-export async function GET() {
+const PAGE = 30;
+
+export async function GET(request: Request) {
   const auth = await requireApi("journeys.view");
   if (!auth.ok) {
     return auth.response;
   }
 
-  const campaigns = listCampaigns().map((campaign) => {
+  const offset = Math.max(Number(new URL(request.url).searchParams.get("offset")) || 0, 0);
+  const total = countCampaigns();
+  const campaigns = listCampaigns({ limit: PAGE, offset }).map((campaign) => {
     const group = getGroup(campaign.groupId);
     return {
       ...campaign,
@@ -21,7 +25,7 @@ export async function GET() {
       progress: campaignProgress(campaign)
     };
   });
-  return NextResponse.json({ campaigns });
+  return NextResponse.json({ campaigns, total, hasMore: offset + campaigns.length < total });
 }
 
 export async function POST(request: Request) {

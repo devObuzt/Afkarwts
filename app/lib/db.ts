@@ -837,9 +837,37 @@ export function getCampaign(id: number) {
   return row ? mapCampaign(row) : null;
 }
 
-export function listCampaigns(): Campaign[] {
-  const rows = getDb().prepare("SELECT * FROM campaigns ORDER BY id DESC").all() as DbCampaign[];
+/**
+ * صفحة من الحملات — مش كلهن.
+ *
+ * 🔴 كانت بترجّع الكل. عند أفكار 385 حملة (معظمها سجل مستورد)، وكل وحدة
+ * بتنحسب على الشاشة — فطلعت **6 ثواني استعلامات** لفتحة صفحة وحدة.
+ * بترجّع 30 والباقي بكبسة.
+ */
+export function listCampaigns(options: { limit?: number; offset?: number } = {}): Campaign[] {
+  const limit = Math.min(Math.max(options.limit ?? 30, 1), 200);
+  const offset = Math.max(options.offset ?? 0, 0);
+  const rows = getDb()
+    .prepare("SELECT * FROM campaigns ORDER BY id DESC LIMIT ? OFFSET ?")
+    .all(limit, offset) as DbCampaign[];
   return rows.map(mapCampaign);
+}
+
+/**
+ * كل حملات مجموعة وحدة — بلا صفحات.
+ *
+ * ⚠️ الاستيراد بيستعمله عشان يعرف شو مستورد من قبل. لو قرا صفحة بس،
+ * بيحسب القديم «غير معروف» وبيعيد إنشاءه — 385 صف بيصيروا مكرّرين.
+ */
+export function listCampaignsForGroup(groupId: number): Campaign[] {
+  const rows = getDb()
+    .prepare("SELECT * FROM campaigns WHERE group_id = ? ORDER BY id DESC")
+    .all(groupId) as DbCampaign[];
+  return rows.map(mapCampaign);
+}
+
+export function countCampaigns() {
+  return (getDb().prepare("SELECT COUNT(*) AS n FROM campaigns").get() as { n: number }).n;
 }
 
 // Due = active, past its start time, and either never run or past its cadence.

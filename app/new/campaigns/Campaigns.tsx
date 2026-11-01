@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type CampaignInfo = {
   id: number;
@@ -38,21 +38,67 @@ export function Campaigns({ canSend }: { canSend: boolean }) {
   const [campaigns, setCampaigns] = useState<CampaignInfo[]>([]);
   const [openId, setOpenId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const [total, setTotal] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const load = useCallback(async () => {
-    const response = await fetch("/api/campaigns");
-    if (response.ok) {
-      setCampaigns((await response.json()).campaigns ?? []);
+  /**
+   * بترجّع أول صفحة وبتحدّث اللي معروض.
+   *
+   * ⚠️ بتحترم اللي انجاب بالفعل: التحديث كل 15 ثانية بيعيد جيب نفس عدد
+   * اللي على الشاشة، مش 30 — وإلا كل مرة تكبس «حمّلي أكثر» بترجع تختفي
+   * بعد ثواني.
+   */
+  const load = useCallback(async (shown = 0) => {
+    const want = Math.max(shown, 30);
+    const pages: CampaignInfo[] = [];
+    let got = 0;
+    let more = false;
+    let count = 0;
+
+    while (got < want) {
+      const response = await fetch(`/api/campaigns?offset=${got}`);
+      if (!response.ok) {
+        break;
+      }
+      const payload = await response.json();
+      pages.push(...(payload.campaigns ?? []));
+      count = payload.total ?? 0;
+      more = Boolean(payload.hasMore);
+      if (!payload.campaigns?.length || !more) {
+        break;
+      }
+      got = pages.length;
     }
+
+    setCampaigns(pages);
+    setTotal(count);
+    setHasMore(more);
     setLoading(false);
   }, []);
+
+  async function loadMore() {
+    setLoadingMore(true);
+    const response = await fetch(`/api/campaigns?offset=${campaigns.length}`);
+    if (response.ok) {
+      const payload = await response.json();
+      setCampaigns((current) => [...current, ...(payload.campaigns ?? [])]);
+      setHasMore(Boolean(payload.hasMore));
+      setTotal(payload.total ?? 0);
+    }
+    setLoadingMore(false);
+  }
+
+  // كم واحدة معروضة هلق — المؤقّت بيقراها بلا ما يعيد تركيب نفسه كل مرة.
+  const shownRef = useRef(0);
+  shownRef.current = campaigns.length;
 
   // A batch lands while this is open; the page should show it without a reload.
   useEffect(() => {
     void load();
-    const timer = window.setInterval(() => void load(), 15_000);
+    const timer = window.setInterval(() => void load(shownRef.current), 15_000);
     return () => window.clearInterval(timer);
   }, [load]);
 
@@ -185,6 +231,19 @@ export function Campaigns({ canSend }: { canSend: boolean }) {
           </section>
         );
       })}
+
+      {/* 30 بالمرة. القائمة عندها 385 صف، وكل صف بيكلّف استعلامات —
+          جيبهن كلهن مرة وحدة هو اللي كان بيخلّي الصفحة تقعد ثواني. */}
+      {hasMore && (
+        <div className="crmCard crmPad" style={{ textAlign: "center" }}>
+          <button className="crmBtn" disabled={loadingMore} onClick={() => void loadMore()} type="button">
+            {loadingMore ? "عم بنجيب…" : "حمّلي المزيد"}
+          </button>
+          <p className="crmNote" style={{ marginTop: 8 }}>
+            {`${campaigns.length} من ${total}`}
+          </p>
+        </div>
+      )}
     </>
   );
 }

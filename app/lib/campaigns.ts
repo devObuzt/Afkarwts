@@ -1,19 +1,4 @@
-import {
-  campaignSentTotals,
-  createMessage,
-  getCampaign,
-  getGroup,
-  listGroupMembers,
-  failedAttempts,
-  initiatedToday,
-  listMemberIdsWithOutgoingBody,
-  listRunnableCampaigns,
-  markCampaignRun,
-  recordCampaignRun,
-  updateMessageStatus,
-  updateCampaignStatus,
-  type Campaign
-} from "./db";
+import { campaignSentTotals, createMessage, failedAttempts, getCampaign, getDb, getGroup, initiatedToday, listGroupMembers, listMemberIdsWithOutgoingBody, listRunnableCampaigns, markCampaignRun, recordCampaignRun, type Campaign, updateCampaignStatus, updateMessageStatus } from "./db";
 import {
   fillNameToken,
   getMessagingLimit,
@@ -34,13 +19,38 @@ export function campaignSendBody(campaign: Campaign) {
   return campaign.bodyPreview || (campaign.templateName ? `Template: ${campaign.templateName}` : "Template message");
 }
 
+/**
+ * ما انبعت فعلاً — من سجل التشغيل، مش من حساب جديد.
+ *
+ * 🔴 الحملة المنتهية كان بينحسب تقدّمها من **أعضاء المجموعة اليوم**: مين
+ * منهن وصلته الرسالة. وهاد بيكذب على كل حملة قديمة — 385 حملة مستوردة
+ * مجموعتها فضيت من وقتها، فالشاشة كانت تقول «انبعتت لـ0 من 0» وهي بعتت
+ * 35,504 رسالة. السجل بيعرف العدد الحقيقي، فمنقراه منه.
+ *
+ * وبيوفّر كمان: الحساب القديم بيمشي على كل الرسائل ويقارن النص، ولـ385
+ * حملة طلع **6 ثواني** استعلامات لرسم صفحة وحدة.
+ */
+export function finishedProgress(campaignId: number) {
+  const row = getDb()
+    .prepare(
+      "SELECT COALESCE(SUM(sent),0) AS sent, COALESCE(SUM(failed),0) AS failed FROM campaign_runs WHERE campaign_id = ?"
+    )
+    .get(campaignId) as { sent: number; failed: number };
+  return { total: row.sent + row.failed, delivered: row.sent, remaining: 0, daysLeft: 0, failed: row.failed };
+}
+
 export function campaignProgress(campaign: Campaign) {
+  // المنتهية ما إلها «باقي» — إلها سجل. والسجل أرخص وأصدق.
+  if (campaign.status === "done") {
+    return finishedProgress(campaign.id);
+  }
+
   const members = listGroupMembers(campaign.groupId);
   const already = listMemberIdsWithOutgoingBody(campaignSendBody(campaign));
   const delivered = members.filter((member) => already.has(member.id)).length;
   const remaining = members.length - delivered;
-  const daysLeft = campaign.status === "done" ? 0 : Math.ceil(remaining / Math.max(1, campaign.dailyLimit));
-  return { total: members.length, delivered, remaining, daysLeft };
+  const daysLeft = Math.ceil(remaining / Math.max(1, campaign.dailyLimit));
+  return { total: members.length, delivered, remaining, daysLeft, failed: 0 };
 }
 
 /** A send refused this many times for one member is not tried again. */
