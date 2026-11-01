@@ -28,7 +28,7 @@ export default async function TodayPage({
   const user = await requireUser();
   const params = await searchParams;
   const now = new Date();
-  const today = getToday(now);
+  const today = getToday(now, user.id);
 
   return (
     <div className="crmPage">

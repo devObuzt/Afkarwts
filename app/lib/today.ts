@@ -66,7 +66,7 @@ function plural(count: number, one: string, few: string) {
   return count === 1 ? one : `${count} ${few}`;
 }
 
-export function getToday(now = new Date()): Today {
+export function getToday(now = new Date(), viewerId = 0): Today {
   const db = getDb();
   const decisions: DecisionItem[] = [];
 
@@ -236,7 +236,7 @@ export function getToday(now = new Date()): Today {
   }));
 
   // المتجاهَل بينشال من شاشة اليوم وبس — المهمة بتضل بطابورها كما هي.
-  const dismissed = listDismissed();
+  const dismissed = listDismissed(viewerId);
   const shown = decisions.filter((item) => {
     const at = dismissed.get(item.key);
     return !at || item.updatedAt > at;
