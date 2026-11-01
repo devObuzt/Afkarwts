@@ -37,7 +37,7 @@ test("التحويل بيغيّر المرحلة وبيعلّق المنتجات
   const person = await clubMember("هدى صالح", "+972521230002");
 
   const result = convertToMember(
-    { memberId: person.id, name: "هدى صالح", hebrewName: "", paid: true, method: 3, paymentId: null, products: ["clean", "shaper"] },
+    { memberId: person.id, name: "هدى صالح", hebrewName: "", paid: true, method: 3, paymentId: null, products: ["clean", "shaper"], mayLinkPayment: true },
     1
   );
 
@@ -58,11 +58,11 @@ test("الاسم العبري بينقترح لما يُترك فاضي، وبي
   const { getMember } = await import("@/app/lib/db");
 
   const auto = await clubMember("سناء", "+972521230003");
-  convertToMember({ memberId: auto.id, name: "سناء", hebrewName: "", paid: false, method: null, paymentId: null, products: ["clean"] }, 1);
+  convertToMember({ memberId: auto.id, name: "سناء", hebrewName: "", paid: false, method: null, paymentId: null, products: ["clean"], mayLinkPayment: true }, 1);
   assert.ok(getMember(auto.id)!.hebrewName.length > 0, "انقترح لحاله");
 
   const typed = await clubMember("سناء", "+972521230004");
-  convertToMember({ memberId: typed.id, name: "سناء", hebrewName: "סנא", paid: false, method: null, paymentId: null, products: ["clean"] }, 1);
+  convertToMember({ memberId: typed.id, name: "سناء", hebrewName: "סנא", paid: false, method: null, paymentId: null, products: ["clean"], mayLinkPayment: true }, 1);
   assert.equal(getMember(typed.id)!.hebrewName, "סנא", "🔑 اللي كتبه البني آدم ما بينداس عليه");
 });
 
@@ -71,7 +71,7 @@ test("بلا منتَج ما في تحويل", async () => {
   const { getMember } = await import("@/app/lib/db");
   const person = await clubMember("بلا منتَج", "+972521230005");
 
-  const result = convertToMember({ memberId: person.id, name: "بلا منتَج", hebrewName: "", paid: false, method: null, paymentId: null, products: [] }, 1);
+  const result = convertToMember({ memberId: person.id, name: "بلا منتَج", hebrewName: "", paid: false, method: null, paymentId: null, products: [], mayLinkPayment: true }, 1);
 
   assert.equal(result.ok, false);
   assert.equal(getMember(person.id)!.stage, "club", "وما تغيّرت مرحلته");
@@ -135,7 +135,7 @@ test("منتَج مش من اللائحة بينرفض — ما بيصير مل�
 
   const result = convertToMember(
     { memberId: person.id, name: "محاولة", hebrewName: "", paid: false, method: null, paymentId: null,
-      products: ["clean", "بانتظار أفكار", "../admin", "منتَج مخترع"] },
+      products: ["clean", "بانتظار أفكار", "../admin", "منتَج مخترع"], mayLinkPayment: true },
     1
   );
 
@@ -155,7 +155,7 @@ test("الدفعة المربوطة بحدا تاني ما بتنسرق", async 
   linkPayment(payment, owner.id);
 
   convertToMember(
-    { memberId: thief.id, name: "صاحبتها", hebrewName: "", paid: true, method: 3, paymentId: payment, products: ["clean"] },
+    { memberId: thief.id, name: "صاحبتها", hebrewName: "", paid: true, method: 3, paymentId: payment, products: ["clean"], mayLinkPayment: true },
     1
   );
 
@@ -171,10 +171,65 @@ test("دفعة مش من احتمالاته ما بتنربط", async () => {
   const unrelated = await morningPayment({ name: "إنسان تاني تماماً", phone: "0529999999", amount: 900 });
 
   convertToMember(
-    { memberId: person.id, name: "واحدة", hebrewName: "", paid: true, method: 3, paymentId: unrelated, products: ["clean"] },
+    { memberId: person.id, name: "واحدة", hebrewName: "", paid: true, method: 3, paymentId: unrelated, products: ["clean"], mayLinkPayment: true },
     1
   );
 
   const row = getDb().prepare("SELECT member_id FROM payments WHERE id = ?").get(unrelated) as { member_id: number | null };
   assert.equal(row.member_id, null, "ما انربطت");
+});
+
+/**
+ * 🔒 الدفاتر دخل أفكار. المدرّبة إلها `people.edit` وما إلها `income.view`
+ * — بتقدر تحوّل، بس ما بتمسّ مورنينج.
+ */
+test("اللي ما إلو صلاحية الدخل بيحوّل بلا ما يربط دفعة", async () => {
+  const { convertToMember } = await import("@/app/lib/members/convert");
+  const { getDb, getMember } = await import("@/app/lib/db");
+  const person = await clubMember("بلا صلاحية", "+972521230015");
+  const payment = await morningPayment({ phone: "0521230015", amount: 120 });
+
+  const result = convertToMember(
+    { memberId: person.id, name: "بلا صلاحية", hebrewName: "", paid: true, method: 3,
+      paymentId: payment, products: ["clean"], mayLinkPayment: false },
+    1
+  );
+
+  assert.equal(result.ok, true, "التحويل بيصير");
+  assert.equal(result.ok && result.linkedPayment, false);
+  const row = getDb().prepare("SELECT member_id FROM payments WHERE id = ?").get(payment) as { member_id: number | null };
+  assert.equal(row.member_id, null, "🔑 الدفعة ما انلمست");
+  assert.equal(getMember(person.id)!.stage, "member");
+});
+
+/**
+ * 🔒 الطلب نفسه ما بيقدر يسمّي الشخص باسم صاحب دفعة تانية وبعدين
+ * «يلاقيها» — المطابقة بتصير على اللقطة قبل إعادة التسمية.
+ */
+test("إعادة التسمية بنفس الطلب ما بتفتح دفعة مش إلو", async () => {
+  const { convertToMember } = await import("@/app/lib/members/convert");
+  const { getDb } = await import("@/app/lib/db");
+  const stranger = await morningPayment({ name: "سلمى الحاج قاسم", amount: 800 });
+  const person = await clubMember("اسم ما إلو علاقة", "+972521230016");
+
+  convertToMember(
+    { memberId: person.id, name: "سلمى الحاج قاسم", hebrewName: "", paid: true, method: 3,
+      paymentId: stranger, products: ["clean"], mayLinkPayment: true },
+    1
+  );
+
+  const row = getDb().prepare("SELECT member_id FROM payments WHERE id = ?").get(stranger) as { member_id: number | null };
+  assert.equal(row.member_id, null, "🔑 التسمية الجديدة ما فتحت الدفعة");
+});
+
+/** اسم فاضي أو من مسافات كان بيطابق الكل — «أي اسم».includes("") = true. */
+test("اسم زبون فاضي ما بيطابق ولا واحد", async () => {
+  const { paymentCandidates } = await import("@/app/lib/members/payment-match");
+  const { getDb } = await import("@/app/lib/db");
+  const person = await clubMember("فلانة الفلانية", "+972521230017");
+  getDb()
+    .prepare("INSERT INTO payments (morning_id, paid_on, amount, client_name, client_phone) VALUES ('blank-1','2026-10-01',55,'   ','')")
+    .run();
+
+  assert.equal(paymentCandidates(person).length, 0, "ما في احتمالات وهمية");
 });

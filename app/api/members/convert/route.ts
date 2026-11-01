@@ -66,7 +66,9 @@ export async function POST(request: Request) {
       paid: Boolean(body.paid),
       method: body.method ?? null,
       paymentId: body.paymentId ?? null,
-      products: Array.isArray(body.products) ? body.products : []
+      products: Array.isArray(body.products) ? body.products : [],
+      // من الجلسة، مش من الحمولة.
+      mayLinkPayment: can(auth.user, "income.view")
     },
     auth.user.id
   );

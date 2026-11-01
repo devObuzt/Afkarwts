@@ -28,6 +28,11 @@ export type ConvertInput = {
   paymentId: number | null;
   /** المنتجات المختارة — بتنحفظ كملصقات. */
   products: string[];
+  /**
+   * هل بيقدر يربط دفعة أصلاً. الدفاتر دخل أفكار — المدرّبة بتحوّل، بس
+   * ما بتمسّ مورنينج. بيتقرّر بالمسار من `income.view`، مش من الطلب.
+   */
+  mayLinkPayment: boolean;
 };
 
 export type ConvertResult =
@@ -57,6 +62,19 @@ export function convertToMember(input: ConvertInput, byUserId: number): ConvertR
   // الاسم العبري: اللي كتبه الأدمن بيغلب، وإذا تركه فاضي بنقترح.
   const hebrew = input.hebrewName.trim() || hebrewNameFor(name);
 
+  /**
+   * 🔑 الربط **قبل** إعادة التسمية، وعلى اللقطة `existing`.
+   *
+   * المطابقة بالاسم بتقرا اسم المنتسب المخزّن. لو ربطنا بعد التحديث —
+   * أو حتى لو استعملنا `input.name` — بيصير الطلب نفسه بيقدر يسمّي
+   * الشخص باسم صاحب دفعة تانية وبعدين «يلاقيها». القرار بينبنى على
+   * بيانات اللي بيبعت الطلب ما بيقدر يغيّرها بنفس الطلب.
+   */
+  const linkedPayment =
+    input.mayLinkPayment && input.paymentId && isCandidateFor(existing, input.paymentId)
+      ? linkPayment(input.paymentId, input.memberId)
+      : false;
+
   const db = getDb();
   db.exec("BEGIN");
   try {
@@ -82,12 +100,6 @@ export function convertToMember(input: ConvertInput, byUserId: number): ConvertR
 
   // الربط برّا الترانزكشن: فشله ما بيستاهل يلغي التحويل كله — الدفعة
   // بتنربط بعدين، والمنتسب صار منتسب.
-  // والدفعة لازم تكون من احتمالات هاد الشخص — مش أي معرّف بيجي بالطلب.
-  const linkedPayment =
-    input.paymentId && isCandidateFor(existing, input.paymentId)
-      ? linkPayment(input.paymentId, input.memberId)
-      : false;
-
   void byUserId;
   return { ok: true, member: getMember(input.memberId)!, labels: products, linkedPayment };
 }

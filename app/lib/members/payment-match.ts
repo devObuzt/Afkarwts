@@ -109,6 +109,12 @@ export function paymentCandidates(member: Member, limit = 8): PaymentCandidate[]
               return false;
             }
             const other = flatten(String(row.client_name ?? ""));
+            // 🔴 الطرفين لازم يكونوا أسماء. بلا هاد الشرط `""` بتطابق
+            // **كل** واحد، لأنّ `"أي اسم".includes("")` بترجّع true —
+            // واسم من مسافات بيعدّي من شرط `client_name <> ''` بالاستعلام.
+            if (other.length < 4) {
+              return false;
+            }
             return other === name || other.includes(name) || name.includes(other);
           })
           .slice(0, limit)
@@ -133,7 +139,14 @@ export function linkPayment(paymentId: number, memberId: number) {
   return Number(changed) > 0;
 }
 
-/** هل هاي الدفعة أصلاً من احتمالات هاد الشخص؟ */
+/**
+ * هل هاي الدفعة من احتمالات هاد الشخص؟
+ *
+ * ⚠️ **هاي فحص معقولية، مش فحص صلاحية.** المطابقة بالاسم ضبابية بطبيعتها،
+ * والاسم المخزّن بيقدر ينتغيّر — فما بتصلح تكون الحارس لحالها. الحارس هو
+ * صلاحية `income.view` + «الدفعة غير مربوطة» + إنّ المقارنة بتصير على
+ * اللقطة **قبل** أي إعادة تسمية بنفس الطلب.
+ */
 export function isCandidateFor(member: Member, paymentId: number) {
   return paymentCandidates(member, 50).some((item) => item.id === paymentId);
 }
