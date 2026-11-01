@@ -18,7 +18,8 @@ import { getDb } from "./db";
  * ما بيلزم يكون مساعدتها شافته.
  */
 function ensureTable() {
-  getDb().exec(`
+  const db = getDb();
+  db.exec(`
     CREATE TABLE IF NOT EXISTS dismissed_decisions (
       key TEXT NOT NULL,
       user_id INTEGER NOT NULL,
@@ -26,6 +27,33 @@ function ensureTable() {
       PRIMARY KEY (key, user_id)
     );
   `);
+
+  /**
+   * 🔴 أول نسخة من التجاهل كانت مشتركة: `key` مفتاح وحيد و`dismissed_by`
+   * جنبه. و`CREATE TABLE IF NOT EXISTS` **ما بتعمل إشي** لما يكون الجدول
+   * موجود — فالعمود الجديد ما بينضاف، وكل فتحة لشاشة «اليوم» بترمي
+   * `no such column: user_id`. يعني الصفحة كلها بتوقع.
+   *
+   * الاختبارات ما لقطتها لأنّ كل تشغيلة بتبلّش بقاعدة فاضية فبتاخد الشكل
+   * الجديد من أول مرة. الترقية هي اللي بتنكسر، مش الإنشاء.
+   *
+   * الصفوف القديمة ما بتنقل: كانت تجاهلاً مشتركاً بلا صاحب، وتحويلها
+   * لواحد بعينه بيخفي عنه شي ما تجاهله هو.
+   */
+  const columns = (db.prepare("PRAGMA table_info(dismissed_decisions)").all() as Array<{ name: string }>).map(
+    (column) => column.name
+  );
+  if (!columns.includes("user_id")) {
+    db.exec("DROP TABLE dismissed_decisions");
+    db.exec(`
+      CREATE TABLE dismissed_decisions (
+        key TEXT NOT NULL,
+        user_id INTEGER NOT NULL,
+        dismissed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (key, user_id)
+      );
+    `);
+  }
 }
 
 const iso = (value: string) => (value.includes("T") ? value : `${value.replace(" ", "T")}Z`);

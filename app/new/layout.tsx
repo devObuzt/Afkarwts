@@ -28,7 +28,11 @@ export default async function NewLayout({ children }: { children: ReactNode }) {
       />
       <div className="crmWork">
         <div className="crmBody">{children}</div>
-        <WhatsAppWidget canDelete={can(user, "people.delete")} canSend={can(user, "messages.send")} />
+        <WhatsAppWidget
+          canDelete={can(user, "people.delete")}
+          canEdit={can(user, "people.edit")}
+          canSend={can(user, "messages.send")}
+        />
       </div>
     </AreaShell>
   );

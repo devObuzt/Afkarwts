@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { colourForLabel, inkOnLabel } from "@/app/lib/labels/colours";
+import { ConvertToMember } from "./ConvertToMember";
 import { ago, dialRegion, hueOf, initials, preview } from "../format";
 
 type Thread = {
@@ -194,7 +195,15 @@ function MessageBody({ message }: { message: Message }) {
  * It is a new component rather than the old page squeezed — a 2,400-line
  * screen built for full width does not become a sidebar by resizing.
  */
-export function WhatsAppWidget({ canDelete, canSend }: { canDelete: boolean; canSend: boolean }) {
+export function WhatsAppWidget({
+  canDelete,
+  canEdit,
+  canSend
+}: {
+  canDelete: boolean;
+  canEdit: boolean;
+  canSend: boolean;
+}) {
   const [threads, setThreads] = useState<Thread[]>([]);
   const [unreadTotal, setUnreadTotal] = useState(0);
   const [query, setQuery] = useState("");
@@ -209,6 +218,7 @@ export function WhatsAppWidget({ canDelete, canSend }: { canDelete: boolean; can
   const [limit, setLimit] = useState(40);
   // الحذف بدّه الرقم ينكتب بالإيد. القائمة بتتفلتر وبتتحرّك، والزرّ لحاله
   // على المحادثة المفتوحة مش حاجز كافي للي ما بينرجع عنه.
+  const [converting, setConverting] = useState(false);
   const [erasing, setErasing] = useState(false);
   const [erasePhone, setErasePhone] = useState("");
   const [eraseBusy, setEraseBusy] = useState(false);
@@ -545,6 +555,14 @@ export function WhatsAppWidget({ canDelete, canSend }: { canDelete: boolean; can
         </a>
       </div>
 
+      {converting && open && (
+        <ConvertToMember
+          memberId={open.memberId}
+          onClose={() => setConverting(false)}
+          onDone={loadThreads}
+        />
+      )}
+
       {/* The conversation, only once there is one. */}
       {open && (
         <div className="waChat">
@@ -563,6 +581,16 @@ export function WhatsAppWidget({ canDelete, canSend }: { canDelete: boolean; can
             >
               علّمها كغير مقروءة
             </button>
+            {canEdit && (
+              <button
+                className="waConvert"
+                onClick={() => setConverting(true)}
+                title="تسجيل أوّلي: الاسم ← الدفع ← المنتَج"
+                type="button"
+              >
+                تحويل لمنتسب
+              </button>
+            )}
             {canDelete && (
               <button
                 className="waErase"

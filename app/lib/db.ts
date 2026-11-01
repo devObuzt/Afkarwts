@@ -20,6 +20,10 @@ export type Member = {
   city: string;
   joined: string;
   service: string;
+  /** `club` = عضو نادي (كل رقم) · `member` = منتسب (دفع واختار منتَج). */
+  stage: "club" | "member";
+  hebrewName: string;
+  becameMemberAt: string | null;
   lastReadMessageId: number | null;
   unreadCount: number;
   groupIds: number[];
@@ -56,6 +60,9 @@ type DbMember = {
   city?: string | null;
   joined?: string | null;
   service?: string | null;
+  stage?: string | null;
+  hebrew_name?: string | null;
+  became_member_at?: string | null;
   last_read_message_id?: number | null;
   unread_count?: number;
   created_at: string;
@@ -132,6 +139,7 @@ export function getDb() {
     migrateMediaColumns(db);
     migrateMemberReadColumn(db);
     migrateMemberProfileColumns(db);
+    migrateMemberStage(db);
     migrateGroupTables(db);
     migrateCampaignTables(db);
     migrateDeviceTables(db);
@@ -235,6 +243,9 @@ function mapMember(row: DbMember, groupIds?: number[]): Member {
     city: row.city ?? "",
     joined: row.joined ?? "",
     service: row.service ?? "",
+    stage: (row.stage as "club" | "member") ?? "club",
+    hebrewName: row.hebrew_name ?? "",
+    becameMemberAt: row.became_member_at ?? null,
     lastReadMessageId: row.last_read_message_id ?? null,
     unreadCount: row.unread_count ?? 0,
     groupIds: groupIds ?? memberGroupIds(row.id),
@@ -312,6 +323,29 @@ function migrateMemberProfileColumns(db: DatabaseSync) {
     if (!hasColumn(db, "members", column)) {
       db.exec(`ALTER TABLE members ADD COLUMN ${column} TEXT NOT NULL DEFAULT ''`);
     }
+  }
+}
+
+/**
+ * المرحلة على نفس الصف — مش جدول تاني (قرار وسام 01.11).
+ *
+ * كل رقم تلفون بيدخل المنظومة هو **عضو نادي** (`club`)، وبيصير **منتسب**
+ * (`member`) لما يتحوّل بالبوب-أب. نفس الإنسان ونفس المحادثة ونفس
+ * التاريخ — جدولين معناهن نسخ البيانات ومزامنتها، والسؤال «مين هو» بيصير
+ * إله جوابين.
+ *
+ * والاسم العبري جنبه: بينقترح آلياً وبينعدّل بالإيد.
+ */
+function migrateMemberStage(db: DatabaseSync) {
+  if (!hasColumn(db, "members", "stage")) {
+    db.exec("ALTER TABLE members ADD COLUMN stage TEXT NOT NULL DEFAULT 'club'");
+    db.exec("CREATE INDEX IF NOT EXISTS idx_members_stage ON members(stage)");
+  }
+  if (!hasColumn(db, "members", "hebrew_name")) {
+    db.exec("ALTER TABLE members ADD COLUMN hebrew_name TEXT NOT NULL DEFAULT ''");
+  }
+  if (!hasColumn(db, "members", "became_member_at")) {
+    db.exec("ALTER TABLE members ADD COLUMN became_member_at TEXT");
   }
 }
 

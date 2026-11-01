@@ -129,3 +129,36 @@ test("مفتاح مش من اللي بتعرفه الشاشة بينرفض", asy
     assert.equal(isKnownDecisionKey(bad), false, bad);
   }
 });
+
+/**
+ * 🔴 الترقية هي اللي بتنكسر، مش الإنشاء.
+ *
+ * أول نسخة من التجاهل كانت مشتركة (`key` مفتاح وحيد + `dismissed_by`).
+ * و`CREATE TABLE IF NOT EXISTS` ما بتعمل إشي لما يكون الجدول موجود، فالعمود
+ * الجديد ما بينضاف وكل فتحة لشاشة «اليوم» بترمي `no such column: user_id`
+ * — الصفحة كلها بتوقع. وما لقطته الاختبارات لأنّ كل تشغيلة بتبلّش بقاعدة
+ * فاضية فبتاخد الشكل الجديد من أول مرة.
+ */
+test("قاعدة فيها الجدول القديم بتترقّى بدل ما توقع", async () => {
+  const { getDb } = await import("@/app/lib/db");
+  const { dismissDecision, listDismissed } = await import("@/app/lib/decisions");
+  const db = getDb();
+
+  // ارجعها للشكل القديم بالضبط
+  db.exec("DROP TABLE IF EXISTS dismissed_decisions");
+  db.exec(`CREATE TABLE dismissed_decisions (
+             key TEXT PRIMARY KEY,
+             dismissed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+             dismissed_by INTEGER )`);
+  db.prepare("INSERT INTO dismissed_decisions (key, dismissed_by) VALUES ('task-999', 1)").run();
+
+  // هدول كانوا بيرموا `no such column: user_id`
+  assert.doesNotThrow(() => listDismissed(ME));
+  assert.doesNotThrow(() => dismissDecision("task-1000", ME));
+
+  const columns = (db.prepare("PRAGMA table_info(dismissed_decisions)").all() as Array<{ name: string }>).map(
+    (column) => column.name
+  );
+  assert.ok(columns.includes("user_id"), "الجدول ترقّى");
+  assert.ok(listDismissed(ME).has("task-1000"), "والتجاهل الجديد بينحفظ");
+});

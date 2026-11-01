@@ -1347,6 +1347,187 @@
   cursor: not-allowed;
 }
 
+/* ---- تحويل لمنتسب ---- */
+
+.crm .waConvert {
+  border: 1px solid var(--forest);
+  background: var(--forest);
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 7px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.crm .waConvert:hover {
+  background: #00400f;
+  border-color: #00400f;
+}
+
+/* النافذة فوق كل شي، والخلفية بتسكّرها لما تكبس برّا. */
+.crm .cnvWrap {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0, 20, 6, 0.42);
+}
+
+.crm .cnvBox {
+  width: min(520px, 100%);
+  max-height: 86vh;
+  overflow-y: auto;
+  background: var(--card);
+  border-radius: 16px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+}
+
+.crm .cnvHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line-soft);
+  font-size: 15px;
+  color: var(--ink);
+}
+
+/* ثلاث نقاط بتقول وين إحنا — الخطوة بتتقرا بلا ما تنكتب «2 من 3». */
+.crm .cnvSteps {
+  display: inline-flex;
+  gap: 5px;
+  margin-inline-start: auto;
+}
+
+.crm .cnvSteps span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--line-strong);
+}
+
+.crm .cnvSteps span.on {
+  background: var(--forest);
+  transform: scale(1.3);
+}
+
+.crm .cnvSteps span.done {
+  background: var(--sage);
+}
+
+.crm .cnvBody {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  padding: 16px;
+}
+
+.crm .cnvActions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding-top: 6px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.crm .cnvAsk {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.crm .cnvMatch {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+/* كل احتمال كرت بينكبس — والاختيار قرار مش افتراض. */
+.crm .cnvPay {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  text-align: start;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--card);
+  font: inherit;
+  cursor: pointer;
+}
+
+.crm .cnvPay:hover {
+  border-color: var(--sage);
+}
+
+.crm .cnvPay.on {
+  border-color: var(--forest);
+  background: var(--pale);
+}
+
+.crm .cnvPayTop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 14px;
+}
+
+/* المنتجات كصناديق — بتنقرا بلمحة وبتنكبس بالإصبع. */
+.crm .cnvProducts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 9px;
+}
+
+.crm .cnvProduct {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  text-align: start;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  font: inherit;
+  cursor: pointer;
+}
+
+.crm .cnvProduct:hover {
+  border-color: var(--sage);
+}
+
+.crm .cnvProduct.on {
+  border-color: var(--forest);
+  background: var(--pale);
+  box-shadow: inset 0 0 0 1px var(--forest);
+}
+
+.crm .cnvProductName {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.crm .cnvProductKind {
+  font-size: 10.5px;
+  color: var(--faint);
+  letter-spacing: 0.2px;
+}
+
+.crm .cnvProductDetail {
+  font-size: 11.5px;
+  color: var(--faint);
+  line-height: 1.6;
+}
+
 /* ---- الاستيراد ---- */
 
 /* زرّ ملف بدل حقل الملف اللي كل متصفّح بيرسمه بطريقته. */
