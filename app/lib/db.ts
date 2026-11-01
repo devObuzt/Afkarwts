@@ -904,10 +904,31 @@ export function markCampaignRun(id: number) {
   getDb().prepare("UPDATE campaigns SET last_run_at = ? WHERE id = ?").run(new Date().toISOString(), id);
 }
 
-export function recordCampaignRun(input: { campaignId: number; sent: number; failed: number; remaining: number }) {
-  getDb()
-    .prepare("INSERT INTO campaign_runs (campaign_id, sent, failed, remaining) VALUES (?, ?, ?, ?)")
-    .run(input.campaignId, input.sent, input.failed, input.remaining);
+export function recordCampaignRun(input: {
+  campaignId: number;
+  sent: number;
+  failed: number;
+  remaining: number;
+  /** متى صار فعلاً — للاستيراد، لأنّ إرسالة من آب ما بتنحط بتاريخ اليوم. */
+  ranAt?: string | null;
+}) {
+  const db = getDb();
+  if (input.ranAt) {
+    db.prepare("INSERT INTO campaign_runs (campaign_id, sent, failed, remaining, ran_at) VALUES (?, ?, ?, ?, ?)").run(
+      input.campaignId,
+      input.sent,
+      input.failed,
+      input.remaining,
+      input.ranAt
+    );
+    return;
+  }
+  db.prepare("INSERT INTO campaign_runs (campaign_id, sent, failed, remaining) VALUES (?, ?, ?, ?)").run(
+    input.campaignId,
+    input.sent,
+    input.failed,
+    input.remaining
+  );
 }
 
 /**

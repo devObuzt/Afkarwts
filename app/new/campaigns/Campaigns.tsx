@@ -10,7 +10,9 @@ type CampaignInfo = {
   dailyLimit: number;
   status: "active" | "paused" | "done";
   lastRunAt: string | null;
-  progress: { total: number; delivered: number; remaining: number; daysLeft: number };
+  startsAt: string | null;
+  createdAt: string;
+  progress: { total: number; delivered: number; remaining: number; daysLeft: number; failed: number };
 };
 
 type CampaignRun = { id: number; sent: number; failed: number; remaining: number; ranAt: string };
@@ -114,37 +116,24 @@ export function Campaigns({ canSend }: { canSend: boolean }) {
   }
 
   // Sends made before campaigns were logged can be rebuilt from the messages.
-  async function importPast() {
-    setBusy(true);
-    setNote("");
-    const response = await fetch("/api/campaigns/backfill", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: "{}"
-    });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      setNote(payload.error ?? `ما زبطت (${response.status}).`);
-    } else {
-      const created = payload.created?.length ?? 0;
-      setNote(created ? `انضافت ${created} إرسالة قديمة.` : "ولا إرسالة قديمة ناقصة.");
-      await load();
-    }
-    setBusy(false);
-  }
-
   if (loading) {
     return <p className="crmEmpty">بنحمّل…</p>;
   }
 
   return (
     <>
-      <div className="crmCard crmPad" style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-        <button className="crmBtn" disabled={busy} onClick={() => void importPast()} type="button">
-          استيراد الإرسالات القديمة
-        </button>
-        {note ? <span className="crmNote" style={{ margin: 0 }}>{note}</span> : null}
-      </div>
+      {/* «استيراد الإرسالات القديمة» انشالت من هون (قرار وسام 01.11).
+          كانت هجرة لمرة وحدة: اشتغلت 25.10 وعملت 385 صف سجل، وأي كبسة
+          بعدها ما بتعمل إشي لأنها بتفلتر المكرّر — يعني كبسة بأهم مكان
+          بالصفحة وما إلها شغل. المسار `/api/campaigns/backfill` باقٍ
+          لمجموعة جديدة إذا لزم، بس مش معروض. */}
+      {note ? (
+        <div className="crmCard crmPad">
+          <span className="crmNote" style={{ margin: 0 }}>
+            {note}
+          </span>
+        </div>
+      ) : null}
 
       {!campaigns.length ? (
         <section className="crmCard crmPad">
@@ -165,7 +154,13 @@ export function Campaigns({ canSend }: { canSend: boolean }) {
             <header>
               <span className="crmDot" />
               <h2 dir="auto">{campaign.label}</h2>
-              <span className="crmPill spacer">{STATUS[campaign.status]}</span>
+              {/* تاريخ البدء على كل حملة. `startsAt` هو الموعد المحدّد —
+                  وللمستوردة هو تاريخ الإرسال الحقيقي — و`createdAt` بديل
+                  للي انعملت وانطلقت فوراً. */}
+              <span className="crmNote spacer" style={{ margin: 0, whiteSpace: "nowrap" }}>
+                بدأت {when(campaign.startsAt ?? campaign.createdAt)}
+              </span>
+              <span className="crmPill">{STATUS[campaign.status]}</span>
             </header>
 
             <div className="crmPad">
@@ -178,7 +173,8 @@ export function Campaigns({ canSend }: { canSend: boolean }) {
               {done ? (
                 <p className="crmNote" style={{ margin: 0 }}>
                   انبعتت لـ{campaign.progress.delivered} من {campaign.progress.total}
-                  {campaign.lastRunAt ? ` · ${when(campaign.lastRunAt)}` : ""}
+                  {campaign.progress.failed > 0 ? ` · فشلت ${campaign.progress.failed}` : ""}
+                  {campaign.lastRunAt ? ` · آخر دفعة ${when(campaign.lastRunAt)}` : ""}
                 </p>
               ) : (
                 <>

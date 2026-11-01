@@ -76,11 +76,20 @@ function backfillGroup(group: { id: number; name: string }, onlyBody?: string) {
       mode: "template",
       bodyPreview: send.body,
       dailyLimit: Math.max(1, send.recipients),
-      repeatMode: "once"
+      repeatMode: "once",
+      // 🔑 تاريخ الإرسال الحقيقي، مش لحظة الاستيراد. بلاه كل الـ385
+      // حملة بتقرا «بدأت 25.10» وهنّي من آب وأيلول.
+      startsAt: send.firstAt ?? null
     });
     if (!campaign) return null;
     updateCampaignStatus(campaign.id, "done");
-    recordCampaignRun({ campaignId: campaign.id, sent: send.sent, failed: send.failed, remaining: 0 });
+    recordCampaignRun({
+      campaignId: campaign.id,
+      sent: send.sent,
+      failed: send.failed,
+      remaining: 0,
+      ranAt: send.lastAt ?? null
+    });
     return { id: campaign.id, group: group.name, recipients: send.recipients, sent: send.sent, failed: send.failed };
   });
 
