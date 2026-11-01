@@ -51,6 +51,7 @@ export function ConvertToMember({
   const [method, setMethod] = useState<number | null>(null);
   const [paymentId, setPaymentId] = useState<number | null>(null);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [maySeeIncome, setMaySeeIncome] = useState(true);
   const [products, setProducts] = useState<Product[]>([]);
   const [picked, setPicked] = useState<string[]>([]);
 
@@ -69,6 +70,7 @@ export function ConvertToMember({
         setHebrew(payload.member.hebrewName ?? "");
         setPhone(payload.member.phone ?? "");
         setCandidates(payload.payments ?? []);
+        setMaySeeIncome(payload.maySeeIncome !== false);
         setProducts(payload.products ?? []);
       }
       setLoading(false);
@@ -193,9 +195,11 @@ export function ConvertToMember({
                         حسابات مكرّرة عند كو أكاديمي — الأدمن بيوثّق. */}
                     <div className="cnvMatch">
                       <span className="crmRowDetail">
-                        {candidates.length
-                          ? "دفعات من مورنينج ممكن تكون إلها — وثّقي وحدة:"
-                          : "ما لقينا دفعة بمورنينج على هاد الرقم ولا الاسم."}
+                        {!maySeeIncome
+                          ? "دفاتر مورنينج ما بتنعرض بصلاحيتك — سجّلي الوسيلة وبس، والربط بيعمله المالك."
+                          : candidates.length
+                            ? "دفعات من مورنينج ممكن تكون إلها — وثّقي وحدة:"
+                            : "ما لقينا دفعة بمورنينج على هاد الرقم ولا الاسم."}
                       </span>
                       {candidates.map((item) => (
                         <button

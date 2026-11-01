@@ -117,10 +117,23 @@ export function paymentCandidates(member: Member, limit = 8): PaymentCandidate[]
   return [...byPhone.map((row) => map(row, "phone")), ...byName.map((row) => map(row, "name"))];
 }
 
-/** ربط دفعة بمنتسب — بعد ما الأدمن يوثّق. */
+/**
+ * ربط دفعة بمنتسب — بعد ما الأدمن يوثّق.
+ *
+ * 🔒 **ما بتسرق دفعة مربوطة.** الشرط `member_id IS NULL OR = ?` بيخلّي
+ * الكتابة ما بتمسّ دفعة إلها صاحب، حتى لو إجا طلب بمعرّفها. الشاشة
+ * بتعرضها معلّمة «مربوطة بـ…» عشان تنشاف، بس العرض مش حماية.
+ *
+ * ونقل دفعة من شخص لشخص شغلة مقصودة بدها مسار خاص — مش أثر جانبي لتحويل.
+ */
 export function linkPayment(paymentId: number, memberId: number) {
   const changed = getDb()
-    .prepare("UPDATE payments SET member_id = ? WHERE id = ?")
-    .run(memberId, paymentId).changes;
+    .prepare("UPDATE payments SET member_id = ? WHERE id = ? AND (member_id IS NULL OR member_id = ?)")
+    .run(memberId, paymentId, memberId).changes;
   return Number(changed) > 0;
+}
+
+/** هل هاي الدفعة أصلاً من احتمالات هاد الشخص؟ */
+export function isCandidateFor(member: Member, paymentId: number) {
+  return paymentCandidates(member, 50).some((item) => item.id === paymentId);
 }

@@ -1,7 +1,8 @@
 import { getDb, getMember, type Member } from "../db";
 import { hebrewNameFor } from "../forms/hebrew-name";
 import { ensureManagedLabel, addLabel } from "../labels/store";
-import { linkPayment } from "./payment-match";
+import { isCandidateFor, linkPayment } from "./payment-match";
+import { PRODUCTS } from "./products";
 
 /**
  * تحويل عضو نادي إلى **منتسب**.
@@ -44,9 +45,13 @@ export function convertToMember(input: ConvertInput, byUserId: number): ConvertR
     return { ok: false, error: "الاسم مطلوب." };
   }
 
-  const products = input.products.map((item) => item.trim()).filter(Boolean);
+  // 🔒 من اللائحة وبس. `ensureManagedLabel` بتعمل الملصق إذا مش موجود،
+  // فنص حر هون معناه إنّ أي طلب بيقدر يخترع ملصقات أو يصطدم بملصقات
+  // المنظومة. اللائحة بتوسّع بالكود، مش بالطلب.
+  const allowed = new Set(PRODUCTS.map((product) => product.key));
+  const products = input.products.map((item) => item.trim()).filter((item) => allowed.has(item));
   if (!products.length) {
-    return { ok: false, error: "اختاري منتَجاً واحداً على الأقل." };
+    return { ok: false, error: "اختاري منتَجاً واحداً على الأقل من اللائحة." };
   }
 
   // الاسم العبري: اللي كتبه الأدمن بيغلب، وإذا تركه فاضي بنقترح.
@@ -77,7 +82,11 @@ export function convertToMember(input: ConvertInput, byUserId: number): ConvertR
 
   // الربط برّا الترانزكشن: فشله ما بيستاهل يلغي التحويل كله — الدفعة
   // بتنربط بعدين، والمنتسب صار منتسب.
-  const linkedPayment = input.paymentId ? linkPayment(input.paymentId, input.memberId) : false;
+  // والدفعة لازم تكون من احتمالات هاد الشخص — مش أي معرّف بيجي بالطلب.
+  const linkedPayment =
+    input.paymentId && isCandidateFor(existing, input.paymentId)
+      ? linkPayment(input.paymentId, input.memberId)
+      : false;
 
   void byUserId;
   return { ok: true, member: getMember(input.memberId)!, labels: products, linkedPayment };

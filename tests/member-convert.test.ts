@@ -125,3 +125,56 @@ test("الدفعة المربوطة بحدا تاني بتبيّن معلّمة 
   assert.ok(found[0].takenBy, "معلّمة إنها مربوطة — عشان ما تنسرق بالغلط");
   assert.equal(found[0].takenBy!.id, other.id);
 });
+
+/** 🔒 الملصق بينعمل إذا مش موجود — فنص حر معناه اختراع ملصقات. */
+test("منتَج مش من اللائحة بينرفض — ما بيصير ملصق", async () => {
+  const { convertToMember } = await import("@/app/lib/members/convert");
+  const { getMember } = await import("@/app/lib/db");
+  const { listLabels } = await import("@/app/lib/labels/store");
+  const person = await clubMember("محاولة", "+972521230011");
+
+  const result = convertToMember(
+    { memberId: person.id, name: "محاولة", hebrewName: "", paid: false, method: null, paymentId: null,
+      products: ["clean", "بانتظار أفكار", "../admin", "منتَج مخترع"] },
+    1
+  );
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.ok && result.labels, ["clean"], "اللي مش بالائحة انشال");
+  assert.ok(!listLabels().some((label) => label.name === "منتَج مخترع"), "وما انعمل ملصق جديد");
+});
+
+/** 🔒 العرض مش حماية: الشاشة بتعلّم الدفعة المربوطة، والخادم بيرفض يسرقها. */
+test("الدفعة المربوطة بحدا تاني ما بتنسرق", async () => {
+  const { convertToMember } = await import("@/app/lib/members/convert");
+  const { linkPayment } = await import("@/app/lib/members/payment-match");
+  const { getDb } = await import("@/app/lib/db");
+  const owner = await clubMember("صاحبتها", "+972521230012");
+  const thief = await clubMember("صاحبتها", "+972521230013");
+  const payment = await morningPayment({ name: "صاحبتها", amount: 700 });
+  linkPayment(payment, owner.id);
+
+  convertToMember(
+    { memberId: thief.id, name: "صاحبتها", hebrewName: "", paid: true, method: 3, paymentId: payment, products: ["clean"] },
+    1
+  );
+
+  const row = getDb().prepare("SELECT member_id FROM payments WHERE id = ?").get(payment) as { member_id: number };
+  assert.equal(row.member_id, owner.id, "🔑 ضلّت لصاحبتها");
+});
+
+/** معرّف دفعة ما إلها علاقة بهاد الشخص ما بينربط حتى لو إجا بالطلب. */
+test("دفعة مش من احتمالاته ما بتنربط", async () => {
+  const { convertToMember } = await import("@/app/lib/members/convert");
+  const { getDb } = await import("@/app/lib/db");
+  const person = await clubMember("واحدة", "+972521230014");
+  const unrelated = await morningPayment({ name: "إنسان تاني تماماً", phone: "0529999999", amount: 900 });
+
+  convertToMember(
+    { memberId: person.id, name: "واحدة", hebrewName: "", paid: true, method: 3, paymentId: unrelated, products: ["clean"] },
+    1
+  );
+
+  const row = getDb().prepare("SELECT member_id FROM payments WHERE id = ?").get(unrelated) as { member_id: number | null };
+  assert.equal(row.member_id, null, "ما انربطت");
+});

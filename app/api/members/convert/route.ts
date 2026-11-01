@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireApi } from "@/app/lib/users/current";
+import { can } from "@/app/lib/users/permissions";
 import { recordAction } from "@/app/lib/users/audit";
 import { getMember } from "@/app/lib/db";
 import { hebrewNameFor } from "@/app/lib/forms/hebrew-name";
@@ -21,7 +22,13 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "هذا الشخص غير موجود." }, { status: 404 });
   }
 
+  // 🔒 الدفعات دخل أفكار. المدرّبة إلها `people.edit` وما إلها
+  // `income.view` — فبتقدر تحوّل، بس ما بتشوف مبالغ وأسماء زبائن من
+  // دفتر الحسابات. اللي ما إلو الصلاحية بياخد لائحة فاضية مش خطأ.
+  const maySeeIncome = can(auth.user, "income.view");
+
   return NextResponse.json({
+    maySeeIncome,
     member: {
       id: member.id,
       name: member.name,
@@ -30,7 +37,7 @@ export async function GET(request: Request) {
       // المحفوظ بيغلب الاقتراح — الأدمن صحّحه مرة، ما منرجع نخمّن فوقه.
       hebrewName: member.hebrewName || hebrewNameFor(member.name)
     },
-    payments: paymentCandidates(member),
+    payments: maySeeIncome ? paymentCandidates(member) : [],
     products: PRODUCTS
   });
 }
