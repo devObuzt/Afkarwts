@@ -66,16 +66,24 @@ export function IncomeSummary({
   const report = incomeReport({ from, to, method });
 
   return (
-    <section className="crmCard" data-tone="forest">
-      <header>
+    /* مطوي افتراضياً (قرار وسام 01.11): الدخل بياخد نص الشاشة الأولى
+       والمسارات والقرارات بتنزل تحت الطيّة. المجموع بيضل بالترويسة وهو
+       مسكّر — المبلغ هو سبب وجود البطاقة بالأول، والطيّ بيوفّر المساحة
+       مش المعلومة. */
+    <details className="crmCard crmFold" data-tone="forest">
+      <summary>
         <span className="crmDot" />
         <h2>الدخل</h2>
-        <Link className="spacer" href={`/new/income?range=${range}${method ? `&method=${method}` : ""}`} style={{ fontSize: 13.5 }}>
-          كل الفواتير ←
-        </Link>
-      </header>
+        <span className="crmFoldSum">{shekels(report.total.amount)}</span>
+        <span aria-hidden className="crmFoldArrow" />
+      </summary>
 
       <div className="crmPad">
+        <p style={{ margin: "0 0 12px" }}>
+          <Link href={`/new/income?range=${range}${method ? `&method=${method}` : ""}`} style={{ fontSize: 13.5 }}>
+            كل الفواتير ←
+          </Link>
+        </p>
         <IncomeFilters
           by={by}
           buckets={BUCKETS.map((value) => ({ value, label: BUCKET_LABEL[value] }))}
@@ -124,6 +132,6 @@ export function IncomeSummary({
           </>
         )}
       </div>
-    </section>
+    </details>
   );
 }

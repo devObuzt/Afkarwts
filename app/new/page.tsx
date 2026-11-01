@@ -2,8 +2,9 @@ import Link from "next/link";
 import { getToday } from "@/app/lib/today";
 import { requireUser } from "@/app/lib/users/current";
 import { can } from "@/app/lib/users/permissions";
+import { DismissDecision } from "./DismissDecision";
 import { IncomeSummary } from "./IncomeSummary";
-import { ago, clock, hueOf, initials, items, members, paths as pathCount, preview, weekdayAndDay } from "./format";
+import { ago, clock, full, hueOf, initials, items, members, paths as pathCount, preview, weekdayAndDay } from "./format";
 
 export const dynamic = "force-dynamic";
 
@@ -54,8 +55,16 @@ export default async function TodayPage({
             <div className="crmRow" data-tone={item.weight === "now" ? "clay" : "sage"} key={item.key}>
               <div className="grow">
                 <div className="crmRowTitle">{item.title}</div>
-                <div className="crmRowDetail">{item.detail}</div>
+                <div className="crmRowDetail">
+                  {item.detail}
+                  {/* من إمتى قاعدة. النسبي بيقرا أسرع، والتاريخ الكامل
+                      بالـtitle لمّا يلزم الدقة. */}
+                  <span className="crmWhen" title={full(item.createdAt)}>
+                    {ago(item.createdAt, now)}
+                  </span>
+                </div>
               </div>
+              <DismissDecision itemKey={item.key} />
               <Link className={item.weight === "now" ? "crmBtn primary" : "crmBtn"} href={item.href}>
                 {item.action}
               </Link>

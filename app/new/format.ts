@@ -251,3 +251,16 @@ export function preview(message: { type?: string | null; body: string; filename?
 
   return caption ? `${label} · ${caption}` : label;
 }
+
+/** التاريخ والساعة كاملين، بتوقيت البلاد — للـtitle لما يلزم الدقة. */
+export function full(iso: string) {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: JERUSALEM,
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false
+  }).format(new Date(iso));
+}

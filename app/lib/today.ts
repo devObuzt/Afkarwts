@@ -1,5 +1,6 @@
 import { getDb } from "./db";
 import { stepDueAt } from "./journeys/schedule";
+import { listDismissed } from "./decisions";
 
 /**
  * What the screen opens on.
@@ -18,6 +19,13 @@ export type DecisionItem = {
   action: string;
   /** `now` is something that stops a path; `soon` is something to catch up on. */
   weight: "now" | "soon";
+  /** متى فتحت المهمة — أقدم شي وراها، يعني «قاعدة من إمتى». */
+  createdAt: string;
+  /**
+   * آخر حركة عليها. التجاهل بينقاس عليه: مهمة انتجاهلت وبعدين إجاها جديد
+   * بترجع تبيّن لحالها، لأنها صارت شغل تاني مش نفس الشغل المتجاهَل.
+   */
+  updatedAt: string;
 };
 
 export type RunningPath = {
@@ -65,14 +73,21 @@ export function getToday(now = new Date()): Today {
   // Registrations waiting to be let into a item.
   const pending = db
     .prepare(
-      `SELECT f.id AS form_id, f.name AS form_name, COUNT(*) AS waiting
+      `SELECT f.id AS form_id, f.name AS form_name, COUNT(*) AS waiting,
+              MIN(s.submitted_at) AS oldest, MAX(s.submitted_at) AS newest
          FROM form_submissions s
          JOIN forms f ON f.id = s.form_id
         WHERE s.state = 'new'
         GROUP BY f.id
         ORDER BY waiting DESC`
     )
-    .all() as Array<{ form_id: number; form_name: string; waiting: number }>;
+    .all() as Array<{
+    form_id: number;
+    form_name: string;
+    waiting: number;
+    oldest: string;
+    newest: string;
+  }>;
 
   for (const row of pending) {
     decisions.push({
@@ -81,14 +96,16 @@ export function getToday(now = new Date()): Today {
       detail: "بانتظار المراجعة قبل الإضافة إلى المجموعة",
       href: `/new/paths?form=${row.form_id}`,
       action: "مراجعة",
-      weight: "now"
+      weight: "now",
+      createdAt: toIso(row.oldest),
+      updatedAt: toIso(row.newest)
     });
   }
 
   // Tasks the system opened because a message could not be delivered.
   const tasks = db
     .prepare(
-      `SELECT f.id, f.reason, f.kind, m.id AS member_id, m.name, m.phone
+      `SELECT f.id, f.reason, f.kind, f.created_at, m.id AS member_id, m.name, m.phone
          FROM followups f
          JOIN members m ON m.id = f.member_id
         WHERE f.state IN ('open', 'failed')
@@ -104,21 +121,31 @@ export function getToday(now = new Date()): Today {
       detail: String(task.reason) || (task.kind === "sms" ? "الـSMS البديل فشل" : "تحتاج تواصلاً يدوياً"),
       href: `/new/people/${Number(task.member_id)}`,
       action: "فتح الملف",
-      weight: "now"
+      weight: "now",
+      createdAt: toIso(String(task.created_at)),
+      updatedAt: toIso(String(task.created_at))
     });
   }
 
   // People a live path stopped writing to, because nothing was being read.
   const stopped = db
     .prepare(
-      `SELECT j.id AS journey_id, g.name AS group_name, COUNT(*) AS stopped
+      `SELECT j.id AS journey_id, g.name AS group_name, COUNT(*) AS stopped,
+              MIN(COALESCE(e.stopped_at, e.enrolled_at)) AS oldest,
+              MAX(COALESCE(e.stopped_at, e.enrolled_at)) AS newest
          FROM journey_enrollments e
          JOIN journeys j ON j.id = e.journey_id
          LEFT JOIN groups g ON g.id = j.group_id
         WHERE e.state = 'stopped' AND j.status = 'active'
         GROUP BY j.id`
     )
-    .all() as Array<{ journey_id: number; group_name: string; stopped: number }>;
+    .all() as Array<{
+    journey_id: number;
+    group_name: string;
+    stopped: number;
+    oldest: string;
+    newest: string;
+  }>;
 
   for (const row of stopped) {
     decisions.push({
@@ -127,7 +154,9 @@ export function getToday(now = new Date()): Today {
       detail: "لم تُقرأ أي رسالة — يمكن إعادتهم إلى المسار أو تركهم",
       href: `/new/paths/${row.journey_id}`,
       action: "عرض",
-      weight: "soon"
+      weight: "soon",
+      createdAt: toIso(row.oldest),
+      updatedAt: toIso(row.newest)
     });
   }
 
@@ -206,5 +235,12 @@ export function getToday(now = new Date()): Today {
     at: toIso(String(row.created_at))
   }));
 
-  return { decisions, paths, replies };
+  // المتجاهَل بينشال من شاشة اليوم وبس — المهمة بتضل بطابورها كما هي.
+  const dismissed = listDismissed();
+  const shown = decisions.filter((item) => {
+    const at = dismissed.get(item.key);
+    return !at || item.updatedAt > at;
+  });
+
+  return { decisions: shown, paths, replies };
 }

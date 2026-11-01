@@ -1403,6 +1403,79 @@
   margin-bottom: 0;
 }
 
+/* ---- بطاقة بتنطوي ---- */
+
+/* `details` أصلية مش جافاسكربت: بتفتح وبتسكّر بلا كود، وبتشتغل بالكيبورد
+   وبقارئ الشاشة لحالها، وما بتومض وقت التحميل لأنها مش محتاجة ترطيب. */
+.crm .crmFold > summary {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  cursor: pointer;
+  list-style: none;
+  padding: 13px 16px;
+  margin: 0;
+  border-bottom: 1px solid transparent;
+}
+
+.crm .crmFold > summary::-webkit-details-marker {
+  display: none;
+}
+
+.crm .crmFold[open] > summary {
+  border-bottom-color: var(--line-soft);
+}
+
+.crm .crmFold > summary h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+/* المجموع بيضل مقروء والبطاقة مسكّرة — هو سبب وجودها. */
+.crm .crmFoldSum {
+  margin-inline-start: auto;
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--tone-mid, var(--forest));
+  font-variant-numeric: tabular-nums;
+}
+
+.crm .crmFoldArrow {
+  width: 9px;
+  height: 9px;
+  flex: none;
+  border-inline-end: 2px solid var(--faint);
+  border-block-end: 2px solid var(--faint);
+  transform: rotate(45deg);
+  margin-block-end: 3px;
+  transition: transform 140ms ease;
+}
+
+.crm .crmFold[open] .crmFoldArrow {
+  transform: rotate(-135deg);
+  margin-block: 3px 0;
+}
+
+.crm .crmFold > summary:hover .crmFoldArrow {
+  border-color: var(--ink);
+}
+
+.crm .crmFold > summary:focus-visible {
+  outline: 2px solid var(--forest);
+  outline-offset: -2px;
+  border-radius: 12px;
+}
+
+/* وقت المهمة على سطرها: بيقعد بعد الوصف، باهت، بلا ما يسرق النظر. */
+.crm .crmRowDetail .crmWhen {
+  margin-inline-start: 8px;
+  color: var(--faint);
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+
 /* ---- القوالب ---- */
 
 /* «؟» جنب اسم الحقل: الشرح بيفتح بمحلّه بدل حيط تحذيرات فوق الاستمارة. */
