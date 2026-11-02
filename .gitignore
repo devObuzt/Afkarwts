@@ -20,3 +20,4 @@ ios/DerivedData
 android/keystore.properties
 *.keystore
 tsconfig.tsbuildinfo
+tools/opt-out-edits.jsonl

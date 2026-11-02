@@ -31,6 +31,10 @@ const publicPrefixes = [
   // then every request on the whole app throws at runtime. It took the
   // site down on 2026-10-25 for four minutes.
   "/d",
+  // طريق الخروج القانوني من رسائل التسويق. لازم يفتح بلا تسجيل دخول —
+  // اللي بيكبسه مش مستخدم بالمنظومة — والتوكن الموقّع هو اللي بيحمي.
+  "/stop",
+  "/api/stop",
   "/password",
   "/api/auth/password",
   "/_next",

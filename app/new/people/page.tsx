@@ -3,6 +3,7 @@ import Link from "next/link";
 import { listLabels } from "@/app/lib/labels/store";
 import { KIND_LABEL, KIND_TONE, type LabelKind } from "@/app/lib/labels/kinds";
 import { can } from "@/app/lib/users/permissions";
+import { countOptedOut } from "@/app/lib/members/opt-out";
 import { listPeople } from "@/app/lib/people";
 import { ago, hueOf, initials, people as peopleCount } from "../format";
 
@@ -14,7 +15,7 @@ export default async function PeoplePage({
 
   searchParams
 }: {
-  searchParams: Promise<{ q?: string; label?: string | string[]; page?: string }>;
+  searchParams: Promise<{ q?: string; label?: string | string[]; page?: string; stopped?: string }>;
 }) {
   const user = await requireUser("people.view");
 
@@ -24,6 +25,9 @@ export default async function PeoplePage({
     .map(Number)
     .filter(Number.isInteger);
   const page = Math.max(Number(params.page) || 1, 1);
+  // اللي طلبوا الإيقاف بيضلوا بالقائمة — بس إلهم مشهد لحالهم كمان، لأنّ
+  // «مين طلب حذف» سؤال بينسأل لحاله، مش حالة بتندوّر عليها بين ٨ آلاف صف.
+  const stoppedOnly = params.stopped === "1";
 
   // Without people.all a user sees only the members assigned to them, which
   // is how a coach follows her own group and nobody else's.
@@ -31,15 +35,18 @@ export default async function PeoplePage({
     query,
     labelIds: chosen,
     onlyAssignedTo: can(user, "people.all") ? null : user.id,
+    optedOut: stoppedOnly ? true : undefined,
     limit: PAGE_SIZE,
     offset: (page - 1) * PAGE_SIZE
   });
   const labels = listLabels().filter((label) => label.memberCount > 0);
+  const stoppedCount = countOptedOut();
   const pages = Math.max(Math.ceil(total / PAGE_SIZE), 1);
 
-  const link = (next: { page?: number; label?: number[] }) => {
+  const link = (next: { page?: number; label?: number[]; stopped?: boolean }) => {
     const search = new URLSearchParams();
     if (query) search.set("q", query);
+    if (next.stopped ?? stoppedOnly) search.set("stopped", "1");
     for (const id of next.label ?? chosen) {
       search.append("label", String(id));
     }
@@ -57,13 +64,16 @@ export default async function PeoplePage({
         <h1>المنتسبون</h1>
         <p>
           {peopleCount(total)}
-          {query || chosen.length ? " ضمن هذا الفلتر" : ""}.
+          {stoppedOnly ? " طلبوا إيقاف الرسائل" : query || chosen.length ? " ضمن هذا الفلتر" : ""}.
         </p>
         {can(user, "people.edit") && (
           <Link className="crmBtn quiet" href="/new/people/import">
             استيراد لائحة
           </Link>
         )}
+        <Link className={stoppedOnly ? "crmBtn quiet primary" : "crmBtn quiet"} href={link({ page: 1, stopped: !stoppedOnly })}>
+          {stoppedOnly ? "رجوع للكل" : `طلبوا إيقاف الرسائل (${stoppedCount})`}
+        </Link>
       </header>
 
       {/* A plain GET form: searching is a link, so it can be shared and gone back to. */}
@@ -125,6 +135,11 @@ export default async function PeoplePage({
                   {person.unread > 0 && (
                     <span className="crmPill alert" style={{ marginInlineStart: 8 }}>
                       {person.unread} جديد
+                    </span>
+                  )}
+                  {person.optOutAt && (
+                    <span className="crmPill warn" style={{ marginInlineStart: 8 }} title={`طلب إيقاف الرسائل ${ago(person.optOutAt)}`}>
+                      أوقف الرسائل
                     </span>
                   )}
                 </span>

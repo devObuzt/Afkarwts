@@ -28,6 +28,8 @@ export const ACTION_LABEL: Record<string, string> = {
   "member.update": "تعديل بيانات منتسب",
   "member.delete": "حذف منتسب",
   "member.merge": "دمج سجلّي منتسبة",
+  "member.optout": "طلب إيقاف الرسائل",
+  "member.optout.undo": "إرجاع الرسائل",
   "file.upload": "رفع ملف",
   "file.delete": "حذف ملف",
   "file.rename": "تغيير اسم ملف",

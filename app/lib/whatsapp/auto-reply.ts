@@ -39,11 +39,27 @@ https://eat-love-fit.com/programs/clean/
 Afkar-Eat.Love.Fit 
 🌿🌸🌿`;
 
+/**
+ * تأكيد الإيقاف. اللي كتب «وقفوا» لازم يعرف إنه وصل، وإلا بيكرّرها —
+ * والأهم: بلا تأكيد هو ما بيعرف إذا صار إشي أصلاً.
+ *
+ * بينبعت بدل الترحيب مش معه: «ما بديش رسائل» و«شكرا لتواصلك رح نرجعلك»
+ * بنفس الدقيقة بتقرا كإنّ ولا حد سامع.
+ */
+export const STOPPED_TEXT = `تم ✅
+أوقفنا رسائل العروض والحملات عن هذا الرقم.
+
+رح تضل تستلم رسائل برنامجك إذا كنت مشتركة بمسار، وبتقدري ترجعي أي وقت — بس ابعتي «ارجعوني».
+
+Afkar-Eat.Love.Fit
+🌿🌸🌿`;
+
 /** بتميّز رسائلنا التلقائية عن كلام البشر، بعمود `send_key` الموجود أصلاً. */
 export const AFTER_HOURS_KEY = "auto:after-hours";
 export const WELCOME_KEY = "auto:welcome";
+export const STOPPED_KEY = "auto:stopped";
 
-type Decision = { kind: "after-hours" | "welcome"; text: string; key: string } | null;
+type Decision = { kind: "after-hours" | "welcome" | "stopped"; text: string; key: string } | null;
 
 /**
  * شو بينبعت — إذا كان في إشي بينبعت أصلاً.
@@ -53,6 +69,28 @@ type Decision = { kind: "after-hours" | "welcome"; text: string; key: string } |
  */
 export function decideAutoReply(memberId: number, now: Date = new Date()): Decision {
   const db = getDb();
+
+  // التأكيد بيسبق كل إشي: اللي طلب يوقف ما بيستاهل يستلم ترحيب.
+  // بينبعت برا ساعات العمل كمان — الإيقاف صار فعلاً وقت الطلب، فتأكيده
+  // بكرا الصبح متأخّر.
+  const stopped = db
+    .prepare("SELECT opt_out_at, opt_out_source FROM members WHERE id = ?")
+    .get(memberId) as { opt_out_at: string | null; opt_out_source: string | null } | undefined;
+
+  // التأكيد بينبعت للطلب اللي إجا **بالواتساب** بس. اللي كبس الرابط شاف
+  // التأكيد بالصفحة، ولو بعتناله كمان رسالة بعد أسبوع لما يكتب «مرحبا»
+  // بيقرا جواب على «مرحبا» — مش على طلب عمله وخلص.
+  if (stopped?.opt_out_at && stopped.opt_out_source === "reply") {
+    const confirmed = (
+      db
+        .prepare("SELECT COUNT(*) AS n FROM messages WHERE member_id = ? AND send_key = ? AND created_at >= ?")
+        .get(memberId, STOPPED_KEY, stopped.opt_out_at.replace("T", " ").slice(0, 19)) as { n: number }
+    ).n;
+
+    if (confirmed === 0) {
+      return { kind: "stopped", text: STOPPED_TEXT, key: STOPPED_KEY };
+    }
+  }
 
   // 🔑 رسائلنا التلقائية ما بتحسب محادثة. بلا هاد الاستثناء، رد «خارج
   // الدوام» الساعة 2 بالليل بيخلّي الواحد «مش جديد»، فالترحيب ما بيوصله

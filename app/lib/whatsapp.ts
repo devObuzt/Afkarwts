@@ -1,7 +1,9 @@
 import { formatBytes, MAX_MEDIA_BYTES, MAX_MEDIA_LABEL } from "./media-store";
 import { dryRunId, isLive } from "./outbound-guard";
 import { templateHeaderUrl } from "./template-media";
-import { phoneForWhatsApp, type Member } from "./db";
+import { displayName, phoneForWhatsApp, type Member } from "./db";
+import { isOptedOut } from "./members/opt-out";
+import { issueOptOutToken } from "./members/opt-out-token";
 
 type WhatsAppSendResponse = {
   messages?: Array<{ id: string }>;
@@ -172,13 +174,36 @@ export async function sendWhatsAppTemplate(member: Member, options: TemplateSend
 
   // Guard: WhatsApp rejects a template whose {{n}} placeholders are unfilled
   // (error #132000). Fail here with a message the UI can actually show.
+  let known: WhatsAppTemplate[] = [];
+  let match: WhatsAppTemplate | undefined;
   if (options.name) {
-    const known = await listWhatsAppTemplates().catch(() => [] as WhatsAppTemplate[]);
-    const match = known.find((item) => item.name === options.name);
+    known = await listWhatsAppTemplates().catch(() => [] as WhatsAppTemplate[]);
+    match = known.find((item) => item.name === options.name);
     if (match && match.paramCount !== bodyParams.length) {
       throw new Error(
         `This template needs ${match.paramCount} value${match.paramCount === 1 ? "" : "s"} ` +
           `for its {{1}}…{{${match.paramCount}}} placeholders, but ${bodyParams.length} were provided.`
+      );
+    }
+  }
+
+  // الحارس: اللي طلب يوقف الرسائل ما بياخد تسويق.
+  //
+  // وبيرفض كمان لما ما نعرف تصنيف القالب — القائمة بتيجي من ميتا على
+  // الشبكة، وفشلها بيرجّع لائحة فاضية. الفشل المفتوح هون معناه إرسال
+  // عرض لحدا طلب يوقف العروض، فالفشل مقفول بالمقصود: ما بنعرف = ما
+  // بنبعت.
+  if (isOptedOut(member)) {
+    if (!match) {
+      throw new Error(
+        `${displayName(member)} طلبت إيقاف الرسائل، وتصنيف القالب «${templateName}» ما وصل من ميتا — ` +
+          "فما انبعت ولا إشي. جرّب كمان مرة، وإذا ضلّت المشكلة افحص الاتصال بميتا."
+      );
+    }
+    if (match.category === "MARKETING") {
+      throw new Error(
+        `${displayName(member)} طلبت إيقاف رسائل التسويق، و«${templateName}» قالب تسويقي عند ميتا. ` +
+          "رسائل المسار والخدمة لسّه بتنبعت."
       );
     }
   }
@@ -204,6 +229,17 @@ export async function sendWhatsAppTemplate(member: Member, options: TemplateSend
 
   if (bodyParams.length) {
     components.push({ type: "body", parameters: bodyParams.map((text) => ({ type: "text", text })) });
+  }
+
+  // زر الهسرة بياخد توكن هاد الرقم. بينضاف هون لحاله عشان ولا محل
+  // إرسال بالمنظومة يضطر يعرف عنه: أي قالب انضافله الزر بيضل يشتغل.
+  if (match?.optOutButtonIndex !== null && match?.optOutButtonIndex !== undefined) {
+    components.push({
+      type: "button",
+      sub_type: "url",
+      index: String(match.optOutButtonIndex),
+      parameters: [{ type: "text", text: issueOptOutToken(member.phone) }]
+    });
   }
 
   if (components.length) {
@@ -331,12 +367,26 @@ export type WhatsAppTemplate = {
   headerText: string | null;
   paramCount: number;
   hasMediaHeader: boolean;
+  /**
+   * القالب فيه زر رابط متغيّر على مسار الهسرة. لازم نعرف، لأن زر الرابط
+   * المتغيّر **بدّه قيمة وقت الإرسال** وبلاها ميتا بترفض الرسالة كلها
+   * (#132000) — فالقالب اللي انضافله الزر بيوقف يشتغل بهدوء لو الإرسال
+   * ما عرف يحطّ التوكن.
+   */
+  optOutButtonIndex: number | null;
+};
+
+type TemplateButton = {
+  type?: string;
+  text?: string;
+  url?: string;
 };
 
 type TemplateComponent = {
   type?: string;
   format?: string;
   text?: string;
+  buttons?: TemplateButton[];
 };
 
 type TemplateListResponse = {
@@ -405,6 +455,10 @@ export async function listWhatsAppTemplates(
     const body = item.components?.find((component) => component.type === "BODY");
     const header = item.components?.find((component) => component.type === "HEADER");
     const bodyText = body?.text ?? "";
+    const buttons = item.components?.find((component) => component.type === "BUTTONS")?.buttons ?? [];
+    const optOutIndex = buttons.findIndex(
+      (button) => button.type === "URL" && (button.url ?? "").includes("{{1}}") && (button.url ?? "").includes("/stop/")
+    );
 
     templates.push({
       name: item.name,
@@ -414,7 +468,8 @@ export async function listWhatsAppTemplates(
       bodyText,
       headerText: header?.format === "TEXT" ? header.text ?? null : null,
       paramCount: countBodyParams(bodyText),
-      hasMediaHeader: Boolean(header && header.format && header.format !== "TEXT")
+      hasMediaHeader: Boolean(header && header.format && header.format !== "TEXT"),
+      optOutButtonIndex: optOutIndex >= 0 ? optOutIndex : null
     });
   }
 

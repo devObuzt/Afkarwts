@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { OPT_OUT_SOURCE_LABEL, type OptOutSource } from "@/app/lib/members/opt-out";
+import { PersonOptOut } from "./PersonOptOut";
 import { notFound } from "next/navigation";
 import { getPersonRecord } from "@/app/lib/people";
 import { can } from "@/app/lib/users/permissions";
@@ -64,6 +66,18 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
           </div>
           <div className="crmRowDetail" style={{ marginTop: 7 }}>
             {record.coach ? `المرافِقة: ${record.coach.name}` : "بلا مرافِقة"}
+          </div>
+          <div style={{ marginTop: 9 }}>
+            <PersonOptOut
+              canEdit={can(user, "people.edit")}
+              memberId={member.id}
+              optOutAt={member.optOutAt}
+              sourceLabel={
+                member.optOutAt
+                  ? `${OPT_OUT_SOURCE_LABEL[member.optOutSource as OptOutSource] ?? member.optOutSource} · ${ago(member.optOutAt)}`
+                  : ""
+              }
+            />
           </div>
         </div>
         <PersonIdentity

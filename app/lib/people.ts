@@ -300,6 +300,9 @@ export type PersonSummary = {
   lastAt: string | null;
   lastDirection: "incoming" | "outgoing" | null;
   lastBody: string;
+  /** مش فاضي = طلب إيقاف رسائل التسويق. الصف بيضل، والعلامة بتبيّن. */
+  optOutAt: string | null;
+  optOutSource: string;
 };
 
 export type PeoplePage = {
@@ -322,6 +325,8 @@ export function listPeople(
     coachId?: number | null;
     /** Set when the reader may see only the members assigned to them. */
     onlyAssignedTo?: number | null;
+    /** `true` = اللي طلبوا الإيقاف وبس · `false` = بلاهم · غياب = الكل. */
+    optedOut?: boolean;
     limit?: number;
     offset?: number;
   } = {}
@@ -369,6 +374,12 @@ export function listPeople(
     args.push(filter.onlyAssignedTo);
   }
 
+  if (filter.optedOut === true) {
+    where.push("members.opt_out_at IS NOT NULL");
+  } else if (filter.optedOut === false) {
+    where.push("members.opt_out_at IS NULL");
+  }
+
   const clause = where.length ? `WHERE ${where.join(" AND ")}` : "";
 
   const total = Number(
@@ -378,6 +389,7 @@ export function listPeople(
   const rows = db
     .prepare(
       `SELECT members.id, members.name, members.phone, members.city,
+              members.opt_out_at, members.opt_out_source,
               (SELECT COUNT(*) FROM person_files pf WHERE pf.member_id = members.id) AS files,
               (SELECT COUNT(*) FROM messages msg
                 WHERE msg.member_id = members.id AND msg.direction = 'incoming'
@@ -434,7 +446,9 @@ export function listPeople(
     unread: Number(row.unread ?? 0),
     lastAt: row.last_at ? toIso(String(row.last_at)) : null,
     lastDirection: (row.last_direction as "incoming" | "outgoing" | null) ?? null,
-    lastBody: String(row.last_body ?? "")
+    lastBody: String(row.last_body ?? ""),
+    optOutAt: row.opt_out_at ? toIso(String(row.opt_out_at)) : null,
+    optOutSource: String(row.opt_out_source ?? "")
   }));
 
   return {

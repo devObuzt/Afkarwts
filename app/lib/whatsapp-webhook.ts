@@ -1,4 +1,5 @@
 import { createMessage, findOrCreateMemberByPhone, updateMessageStatusByWhatsAppId, type Member, type Message } from "./db";
+import { isResumeRequest, isStopRequest, requestOptOut, undoOptOut } from "./members/opt-out";
 import { createStoredMediaFilename, formatBytes, MAX_MEDIA_BYTES, MAX_MEDIA_LABEL, writeMediaFile } from "./media-store";
 import { downloadWhatsAppMedia, getWhatsAppMediaInfo } from "./whatsapp";
 import { messagePreview, sendPushToDevices } from "./push";
@@ -108,6 +109,15 @@ export async function handleWebhookPayload(
             status: "received"
           });
           notifyDevices(member.name, "text", incoming.text.body, member.id);
+          // «وقفوا» بكلمة وحدة طلب إيقاف زي ما كبسة الرابط طلب. اللي
+          // بيكتبها بالعادة ما بيكبس رابط، فالقراءة من الرد هي طريقه
+          // الوحيد. المطابقة ضيّقة بالمقصود — شوف `isStopRequest`.
+          if (isStopRequest(incoming.text.body)) {
+            requestOptOut({ memberId: member.id, source: "reply", note: incoming.text.body.trim().slice(0, 120) });
+          } else if (isResumeRequest(incoming.text.body)) {
+            // نصّ تأكيد الإيقاف بيوعد بـ«ابعتي ارجعوني». الوعد لازم يشتغل.
+            undoOptOut(member.id, { userId: null, actor: "رد على الواتساب" });
+          }
           continue;
         }
 
@@ -122,6 +132,12 @@ export async function handleWebhookPayload(
             (incoming.interactive?.button_reply?.title || incoming.interactive?.list_reply?.title));
 
         if (pressed) {
+          // زر «إيقاف الرسائل» بيوصل كأي كبسة. بينقرا قبل أي إشي تاني
+          // عشان ما يتعامل كجواب على عرض.
+          if (isStopRequest(pressed)) {
+            requestOptOut({ memberId: member.id, source: "reply", note: pressed.slice(0, 120) });
+          }
+
           // «يا ريت» / «ما في داعي» answer the catch-up offer. Answered
           // here rather than by reading her words later: the press is
           // unambiguous, and a woman who said yes is waiting.
