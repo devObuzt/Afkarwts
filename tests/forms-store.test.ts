@@ -107,3 +107,44 @@ test("Arabic counts agree with their number", async () => {
   assert.equal(registrations(2), "تسجيلان");
   assert.equal(registrations(1), "تسجيل واحد");
 });
+
+/** الشاشة بتعرض صفحة؛ العدّادات والتقرير بدهم الكل. */
+test("التسجيلات بترجع كلها بلا حد، وبصفحة لما تُطلب", async () => {
+  const { createGroup } = await import("@/app/lib/db");
+  const { createForm, listFields, recordSubmission, listSubmissions, countSubmissions } = await import(
+    "@/app/lib/forms/store"
+  );
+
+  const group = createGroup(`تصفيح ${Date.now()}`);
+  const form = createForm({ name: `تصفيح ${Date.now()}`, groupId: group.id, fromTemplate: true });
+  const fields = listFields(form.id);
+  for (let n = 0; n < 7; n += 1) {
+    recordSubmission(
+      form.id,
+      fields.map((field) => ({
+        fieldId: field.id,
+        value:
+          field.mapsTo === "phone"
+            ? `+97252000${String(n).padStart(4, "0")}`
+            : field.mapsTo === "name"
+              ? `وحدة ${n}`
+              : field.kind === "choice" || field.kind === "multi" || field.kind === "consent"
+                ? field.options[0] ?? ""
+                : "جواب"
+      }))
+    );
+  }
+
+  assert.equal(listSubmissions({ formId: form.id }).length, 7, "بلا حد = الكل");
+  assert.equal(countSubmissions({ formId: form.id }), 7);
+  assert.equal(listSubmissions({ formId: form.id, limit: 3 }).length, 3);
+  assert.equal(listSubmissions({ formId: form.id, limit: 3, offset: 6 }).length, 1, "آخر صفحة ناقصة");
+  assert.equal(listSubmissions({ formId: form.id, limit: 3, offset: 99 }).length, 0);
+
+  // الصفحات ما بتعيد ولا بتفوّت صف.
+  const all = listSubmissions({ formId: form.id }).map((row) => row.id);
+  const paged = [0, 3, 6].flatMap((offset) =>
+    listSubmissions({ formId: form.id, limit: 3, offset }).map((row) => row.id)
+  );
+  assert.deepEqual(paged, all, "الصفحات بتغطّي الكل بنفس الترتيب");
+});

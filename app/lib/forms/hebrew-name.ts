@@ -21,11 +21,18 @@ const LETTERS: Record<string, string> = {
   ت: "ת", ة: "ה", ث: "ת",
   // ج is a hard g in Levantine Arabic, which Hebrew writes with a geresh.
   ج: "ג'",
-  ح: "ח", خ: "ח'",
+  ح: "ח",
+  // خ is כ and ص is ס because that is how Afkar's own team writes them —
+  // measured against 20 names they typed by hand into the registration
+  // forms (خالد ← כאלד, منصور ← מנסור). The academic transliteration is
+  // ח' and צ, and the towns register still uses ח' for place names, but a
+  // person's name is written the way the people who use this screen write
+  // it. Wisam settled this on 02.11.2026.
+  خ: "כ",
   د: "ד", ذ: "ד'",
   ر: "ר", ز: "ז",
   س: "ס", ش: "ש",
-  ص: "צ", ض: "ד",
+  ص: "ס", ض: "ד",
   ط: "ט", ظ: "ט'",
   ع: "ע", غ: "ע'",
   ف: "פ", ق: "ק",

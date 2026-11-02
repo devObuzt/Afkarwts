@@ -112,3 +112,26 @@ test("a town already in Hebrew, and one nobody knows", async () => {
   assert.ok(hebrewTownFor("بلدة غير مسجلة").length > 0);
   assert.equal(hebrewTownFor(""), "");
 });
+
+/**
+ * 📐 معاير على **20 اسم كتبهم طاقم أفكار بإيدهم** بالاستمارات على
+ * الإنتاج. النقحرة الأكاديمية بتكتب `خ`←`ח'` و`ص`←`צ`، والطاقم بيكتب
+ * `כ` و`ס` — واسم الإنسان بينكتب زي ما بيكتبه اللي بيشتغلوا عليه.
+ * (قرار وسام 02.11.2026 بعد قياس: 9/15 بالعُرف الأكاديمي مقابل 13/15.)
+ */
+test("خ و ص بتتبعوا كتابة الطاقم مش النقحرة الأكاديمية", async () => {
+  const { hebrewNameFor } = await import("@/app/lib/forms/hebrew-name");
+
+  assert.equal(hebrewNameFor("خالد"), "כאלד");
+  assert.equal(hebrewNameFor("ايمان خليل"), "אימאן כליל");
+  assert.equal(hebrewNameFor("لانا منصور"), "לאנא מנסור");
+  assert.equal(hebrewNameFor("رنا مصالحه"), "רנא מסאלחה");
+});
+
+/** السجل الرسمي بيضل المرجع للبلدات — وهو بيكتب ח' حتى بعد هاد التغيير. */
+test("البلدة بتظل من السجل، فما بتتأثر بعُرف الأسماء", async () => {
+  const { hebrewTownFor } = await import("@/app/lib/forms/hebrew-town");
+
+  assert.equal(hebrewTownFor("سخنين"), "סח'נין");
+  assert.equal(hebrewTownFor("أم الفحم"), "אום אל-פחם");
+});

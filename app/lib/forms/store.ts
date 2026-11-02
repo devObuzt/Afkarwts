@@ -411,7 +411,16 @@ const SUBMISSION_SELECT = `
   LEFT JOIN members ON members.phone = form_submissions.phone AND form_submissions.phone <> ''
 `;
 
-export function listSubmissions(filter: { formId?: number; state?: string } = {}): SubmissionRow[] {
+/**
+ * التسجيلات — بصفحة لما تُطلب صفحة.
+ *
+ * بلا `limit` بترجّع الكل، وهاد المطلوب للعدّادات وللتقرير. الشاشة
+ * بتمرّر `limit` لأنها بتعرض صفحة؛ والعدد الكلي من `countSubmissions`
+ * مش من طول اللائحة.
+ */
+export function listSubmissions(
+  filter: { formId?: number; state?: string; limit?: number; offset?: number } = {}
+): SubmissionRow[] {
   const clauses: string[] = [];
   const params: Array<number | string> = [];
 
@@ -425,10 +434,37 @@ export function listSubmissions(filter: { formId?: number; state?: string } = {}
   }
 
   const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
+  const order = "ORDER BY form_submissions.submitted_at DESC, form_submissions.id DESC";
+
+  if (filter.limit === undefined) {
+    const rows = getDb().prepare(`${SUBMISSION_SELECT} ${where} ${order}`).all(...params) as DbSubmission[];
+    return rows.map(mapSubmission);
+  }
+
+  const limit = Math.min(Math.max(filter.limit, 1), 500);
+  const offset = Math.max(filter.offset ?? 0, 0);
   const rows = getDb()
-    .prepare(`${SUBMISSION_SELECT} ${where} ORDER BY form_submissions.submitted_at DESC, form_submissions.id DESC`)
-    .all(...params) as DbSubmission[];
+    .prepare(`${SUBMISSION_SELECT} ${where} ${order} LIMIT ? OFFSET ?`)
+    .all(...params, limit, offset) as DbSubmission[];
   return rows.map(mapSubmission);
+}
+
+/** العدد الكلي بنفس الفلتر — للعدّادات و«30 من 273». */
+export function countSubmissions(filter: { formId?: number; state?: string } = {}) {
+  const clauses: string[] = [];
+  const params: Array<number | string> = [];
+  if (filter.formId) {
+    clauses.push("form_submissions.form_id = ?");
+    params.push(filter.formId);
+  }
+  if (filter.state) {
+    clauses.push("form_submissions.state = ?");
+    params.push(filter.state);
+  }
+  const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
+  return (
+    getDb().prepare(`SELECT COUNT(*) AS n FROM form_submissions ${where}`).get(...params) as { n: number }
+  ).n;
 }
 
 export function getSubmission(id: number) {

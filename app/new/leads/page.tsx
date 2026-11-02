@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireUser } from "@/app/lib/users/current";
 import { can } from "@/app/lib/users/permissions";
-import { listForms, listSubmissions } from "@/app/lib/forms/store";
+import { countSubmissions, listForms, listSubmissions } from "@/app/lib/forms/store";
 import { registrations } from "../format";
 import { Registrations } from "./Registrations";
 
@@ -24,7 +24,7 @@ const STATES = [
 export default async function LeadsPage({
   searchParams
 }: {
-  searchParams: Promise<{ form?: string; state?: string }>;
+  searchParams: Promise<{ form?: string; state?: string; page?: string }>;
 }) {
   const user = await requireUser("leads.review");
 
@@ -32,20 +32,30 @@ export default async function LeadsPage({
   const formId = Number(params.form) || undefined;
   const state = STATES.some((item) => item.key === params.state) ? params.state! : "new";
 
+  // 30 بالصفحة: التسجيلات عند أفكار 273 اليوم وبتزيد كل دفعة، والشاشة
+  // بتعرض اللي بدّه قرار — مش أرشيفاً.
+  const PAGE = 30;
+  const page = Math.max(Number(params.page) || 1, 1);
+
   const forms = listForms();
-  const rows = listSubmissions({ formId, state });
+  const total = countSubmissions({ formId, state });
+  const rows = listSubmissions({ formId, state, limit: PAGE, offset: (page - 1) * PAGE });
+  const pages = Math.max(Math.ceil(total / PAGE), 1);
 
   // The tabs carry their own counts, so «مرفوضة» is not a door you open to
   // find out whether anything is behind it.
   const counts = Object.fromEntries(
-    STATES.map((item) => [item.key, listSubmissions({ formId, state: item.key }).length])
+    STATES.map((item) => [item.key, countSubmissions({ formId, state: item.key })])
   ) as Record<string, number>;
 
-  const link = (next: { form?: string; state?: string }) => {
+  const link = (next: { form?: string; state?: string; page?: number }) => {
     const search = new URLSearchParams();
     const form = next.form ?? (formId ? String(formId) : "");
     if (form) search.set("form", form);
     search.set("state", next.state ?? state);
+    // تبديل التبويب بيرجّع للصفحة الأولى — الصفحة 4 من «مرفوضة» ما إلها
+    // معنى لما تنتقل لـ«بانتظار المراجعة».
+    if ((next.page ?? 1) > 1) search.set("page", String(next.page));
     return `/new/leads?${search.toString()}`;
   };
 
@@ -114,8 +124,28 @@ export default async function LeadsPage({
           knownMemberId: row.knownMemberId,
           knownMemberName: row.knownMemberName
         }))}
-        summary={registrations(rows.length)}
+        summary={registrations(total)}
       />
+
+      {pages > 1 && (
+        <nav className="crmPager">
+          <span className="crmRowDetail">
+            {`صفحة ${page} من ${pages} · ${registrations(total)}`}
+          </span>
+          <span style={{ display: "flex", gap: 8 }}>
+            {page > 1 && (
+              <Link className="crmBtn quiet" href={link({ page: page - 1 })}>
+                السابقة
+              </Link>
+            )}
+            {page < pages && (
+              <Link className="crmBtn" href={link({ page: page + 1 })}>
+                التالية
+              </Link>
+            )}
+          </span>
+        </nav>
+      )}
     </div>
   );
 }
