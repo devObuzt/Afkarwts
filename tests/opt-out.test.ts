@@ -111,7 +111,7 @@ test("رسالة عادية ما بتوقف إشي", async () => {
   assert.equal(findMemberByPhone("+972521110003")?.optOutAt, null);
 });
 
-test("اللي أوقف ما بياخد قالب تسويقي، وبياخد قالب الخدمة", async () => {
+test("اللي أوقف ما بياخد القالب اللي حامل الزر، وبياخد قالب المسار", async () => {
   const { createMember } = await import("@/app/lib/db");
   const { requestOptOut } = await import("@/app/lib/members/opt-out");
   const whatsapp = await import("@/app/lib/whatsapp");
@@ -127,8 +127,19 @@ test("اللي أوقف ما بياخد قالب تسويقي، وبياخد ق�
       return new Response(
         JSON.stringify({
           data: [
-            { name: "club_offer", status: "APPROVED", language: "ar", category: "MARKETING", components: [{ type: "BODY", text: "عرض" }] },
-            { name: "clean_day1", status: "APPROVED", language: "ar", category: "UTILITY", components: [{ type: "BODY", text: "صباح الخير" }] }
+            {
+              name: "club_offer",
+              status: "APPROVED",
+              language: "ar",
+              category: "MARKETING",
+              components: [
+                { type: "BODY", text: "عرض" },
+                { type: "BUTTONS", buttons: [{ type: "URL", text: "إيقاف الرسائل", url: "https://x/stop/{{1}}" }] }
+              ]
+            },
+            // 🔑 ميتا مصنّفته MARKETING وهو رسالة برنامج لزبونة دافعة.
+            // بلا زر = الهسرة ما بتنطبق عليه، فلازم ينبعت.
+            { name: "clean_day1", status: "APPROVED", language: "ar", category: "MARKETING", components: [{ type: "BODY", text: "صباح الخير" }] }
           ]
         }),
         { status: 200, headers: { "Content-Type": "application/json" } }
@@ -143,8 +154,8 @@ test("اللي أوقف ما بياخد قالب تسويقي، وبياخد ق�
   try {
     await assert.rejects(
       () => whatsapp.sendWhatsAppTemplate(stopped, { name: "club_offer", language: "ar" }),
-      /تسويق/,
-      "القالب التسويقي مرفوض"
+      /إيقاف الرسائل/,
+      "القالب اللي حامل الزر مرفوض"
     );
 
     const sent = await whatsapp.sendWhatsAppTemplate(stopped, { name: "clean_day1", language: "ar" });
@@ -172,7 +183,7 @@ test("ما منعرف التصنيف = ما منبعت", async () => {
   try {
     await assert.rejects(
       () => whatsapp.sendWhatsAppTemplate(stopped, { name: "club_offer", language: "ar" }),
-      /ما وصل من ميتا/
+      /ما وصلت من ميتا/
     );
   } finally {
     globalThis.fetch = realFetch;
@@ -196,4 +207,21 @@ test("تأكيد الإيقاف بينبعت للطلب اللي إجا بالو
   const byLink = createMember({ name: "بالرابط", phone: "+972521110007" });
   requestOptOut({ memberId: byLink.id, source: "link" });
   assert.notEqual(decideAutoReply(byLink.id)?.kind, "stopped");
+});
+
+test("اللي أوقف بينشال من إرسال الملصق، وعدّاد الحملة بيعدّه ناقص", async () => {
+  const { createMember, createGroup, addMembersToGroup, listGroupMembers } = await import("@/app/lib/db");
+  const { requestOptOut } = await import("@/app/lib/members/opt-out");
+
+  const group = createGroup(`حملة ${Date.now()}`);
+  const inside = createMember({ name: "داخلة", phone: "+972521110008" });
+  const quiet = createMember({ name: "أوقفت", phone: "+972521110009" });
+  addMembersToGroup(group.id, [inside.id, quiet.id]);
+  requestOptOut({ memberId: quiet.id, source: "link" });
+
+  // «مين جوّا الملصق» سؤال تاني عن «لمين منبعت» — فالافتراضي بيضل الكل.
+  assert.equal(listGroupMembers(group.id).length, 2);
+  const sending = listGroupMembers(group.id, { excludeOptedOut: true });
+  assert.equal(sending.length, 1);
+  assert.equal(sending[0].id, inside.id);
 });

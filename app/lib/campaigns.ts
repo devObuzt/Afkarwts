@@ -45,7 +45,7 @@ export function campaignProgress(campaign: Campaign) {
     return finishedProgress(campaign.id);
   }
 
-  const members = listGroupMembers(campaign.groupId);
+  const members = listGroupMembers(campaign.groupId, { excludeOptedOut: true });
   const already = listMemberIdsWithOutgoingBody(campaignSendBody(campaign));
   const delivered = members.filter((member) => already.has(member.id)).length;
   const remaining = members.length - delivered;
@@ -66,7 +66,7 @@ export async function runCampaignBatch(campaignId: number) {
   const groupName = group?.name ?? `#${campaign.groupId}`;
   const storedBody = campaignSendBody(campaign);
 
-  const members = listGroupMembers(campaign.groupId);
+  const members = listGroupMembers(campaign.groupId, { excludeOptedOut: true });
   const already = listMemberIdsWithOutgoingBody(storedBody);
   // A refused send is retried — that is the point of not counting it as
   // delivered — but not for ever: a number that can never receive this

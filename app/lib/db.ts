@@ -1505,13 +1505,22 @@ export function removeMemberFromGroup(groupId: number, memberId: number) {
   getDb().prepare("DELETE FROM member_groups WHERE group_id = ? AND member_id = ?").run(groupId, memberId);
 }
 
-export function listGroupMembers(groupId: number): Member[] {
+/**
+ * مين جوّا الملصق.
+ *
+ * `excludeOptedOut` بينحط من مسارات **الإرسال** بالمقصود مش كافتراضي:
+ * «مين جوّا هاد الملصق» سؤال تاني عن «لمين منبعت». ومحطوط على
+ * العدّادات كمان — حملة بتعد ٢٠٠ وبتبعت ١٩٠ بترجّعنا لنفس كذبة
+ * «٠ من ٠».
+ */
+export function listGroupMembers(groupId: number, options: { excludeOptedOut?: boolean } = {}): Member[] {
   const rows = getDb()
     .prepare(
       `SELECT members.*, 0 AS unread_count
        FROM members
        INNER JOIN member_groups ON member_groups.member_id = members.id
        WHERE member_groups.group_id = ?
+         ${options.excludeOptedOut ? "AND members.opt_out_at IS NULL" : ""}
        ORDER BY members.name COLLATE NOCASE ASC`
     )
     .all(groupId) as DbMember[];
