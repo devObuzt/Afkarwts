@@ -20,9 +20,24 @@
  *
  * الاستعمال (بلا `--go` = معاينة، زي كل أدوات البيت):
  *   npx tsx tools/add-opt-out.ts                     # شو رح يصير
+ *   npx tsx tools/add-opt-out.ts --campaigns              # الدفعة الأولى
+ *   npx tsx tools/add-opt-out.ts --campaigns --go
  *   npx tsx tools/add-opt-out.ts --only club_offer_sep2026 --go
  *   npx tsx tools/add-opt-out.ts --go --limit 5
  */
+
+/**
+ * القوالب اللي فعلياً انبعتوا كحملات (قياس من جدول الحملات 02.11.2026).
+ * هاي الدفعة الأولى: بتغطّي كل التسويق الحقيقي بأصغر سطح خطر.
+ */
+export const CAMPAIGN_TEMPLATES = [
+  "club_offer_sep2026",
+  "club_discount_3days",
+  "extra_plus_clean_sale_48h",
+  "clean_reminder_extra_plus_img",
+  "clean_start_announcement_v2",
+  "shaper"
+];
 
 const API = process.env.WHATSAPP_API_VERSION || "v23.0";
 const TOKEN = process.env.WHATSAPP_ACCESS_TOKEN;
@@ -138,13 +153,24 @@ async function edit(template: Template, components: Component[]) {
 
 async function main() {
   const go = flag("--go");
-  const only = value("--only");
+  // لائحة بفواصل: التعديل بينزل على دفعات مسمّاة مش على كل إشي مرة
+  // وحدة. (القياس 02.11: ٦ قوالب بس انبعتوا كحملات فعلياً من أصل ٥٨
+  // «تسويقي» عند ميتا — الباقي محتوى مسار ميتا مصنّفته غلط.)
+  const only = (flag("--campaigns") ? CAMPAIGN_TEMPLATES.join(",") : value("--only"))
+    ?.split(",")
+    .map((name) => name.trim())
+    .filter(Boolean);
   const limit = Number(value("--limit") || 0);
 
   const all = await listAll();
   let marketing = all.filter((template) => template.category === "MARKETING");
-  if (only) {
-    marketing = marketing.filter((template) => template.name === only);
+  if (only?.length) {
+    marketing = marketing.filter((template) => only.includes(template.name));
+    const missing = only.filter((name) => !marketing.some((template) => template.name === name));
+    if (missing.length) {
+      console.error(`🔴 أسماء مش موجودة أو مش تسويقية: ${missing.join(" · ")}`);
+      process.exit(1);
+    }
   }
 
   console.log(`\nالفوتر:  ${FOOTER_TEXT}   (${[...FOOTER_TEXT].length} حرف من 60)`);
