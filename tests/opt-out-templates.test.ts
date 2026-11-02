@@ -22,10 +22,11 @@ test("التعديل بينسخ كل المكوّنات، وما بيمحي مث
 
   const buttons = next[3] as { type: string; buttons: Array<Record<string, unknown>> };
   assert.equal(buttons.type, "BUTTONS");
-  assert.equal(buttons.buttons.length, 1);
-  assert.equal(buttons.buttons[0].text, BUTTON_TEXT);
-  assert.match(String(buttons.buttons[0].url), /\/stop\/\{\{1\}\}$/);
-  assert.ok(Array.isArray(buttons.buttons[0].example), "الزر المتغيّر بدّه مثال");
+  assert.equal(buttons.buttons.length, 3);
+  const optOut = buttons.buttons[2];
+  assert.equal(optOut.text, BUTTON_TEXT, "الهسرة آخر واحد");
+  assert.match(String(optOut.url), /\/stop\/\{\{1\}\}$/);
+  assert.ok(Array.isArray(optOut.example), "الزر المتغيّر بدّه مثال");
 });
 
 test("فوتر البراند بيضل، والزر بينضاف بعد الأزرار الموجودة", async () => {
@@ -43,9 +44,9 @@ test("فوتر البراند بيضل، والزر بينضاف بعد الأز
   assert.deepEqual(next[1], { type: "FOOTER", text: "Afkar – Eat.Love.Fit" }, "كلام البراند ما انمحى");
 
   const buttons = (next[2] as { buttons: Array<Record<string, unknown>> }).buttons;
-  assert.equal(buttons.length, 2);
+  assert.equal(buttons.length, 3);
   assert.equal(buttons[0].text, "بدي العرض", "الكبسة الموجودة أولاً — ميتا بتطلب تجميع الردود السريعة");
-  assert.equal(buttons[1].text, BUTTON_TEXT);
+  assert.equal(buttons[2].text, BUTTON_TEXT, "الهسرة آخر واحد");
 });
 
 test("القالب اللي فيه الزر ما بينعدّل مرتين", async () => {
@@ -63,4 +64,49 @@ test("الفوتر والزر جوّا حدود ميتا", async () => {
   const { FOOTER_TEXT, BUTTON_TEXT } = await import("../tools/add-opt-out.ts");
   assert.ok([...FOOTER_TEXT].length <= 60, "الفوتر 60 حرف بالأكثر");
   assert.ok([...BUTTON_TEXT].length <= 25, "نص الزر 25 حرف بالأكثر");
+});
+
+test("تلاتة أزرار بالترتيب: نعم · لا · إيقاف — والردود السريعة مجمّعة", async () => {
+  const { planComponents, YES_TEXT, NO_TEXT, BUTTON_TEXT } = await import("../tools/add-opt-out.ts");
+
+  const plan = planComponents([{ type: "BODY", text: "عرض الكلين" }] as never);
+  const buttons = ((plan as { next: Array<Record<string, unknown>> }).next.find(
+    (component) => component.type === "BUTTONS"
+  ) as { buttons: Array<Record<string, unknown>> }).buttons;
+
+  assert.deepEqual(
+    buttons.map((button) => [button.type, button.text]),
+    [
+      ["QUICK_REPLY", YES_TEXT],
+      ["QUICK_REPLY", NO_TEXT],
+      ["URL", BUTTON_TEXT]
+    ],
+    "الهسرة آخر واحد، والردود السريعة قبلها — ميتا بترفض «رد، رابط، رد»"
+  );
+
+  // 🔑 ثلاثة هو السقف الظاهر: الرابع بيخفّي الباقي ورا «See all options»
+  // وساعتها طريق الخروج بينخبّى.
+  assert.equal(buttons.length, 3);
+  for (const button of buttons) {
+    assert.ok([...String(button.text)].length <= 25, `«${button.text}» لازم ≤25 حرف`);
+  }
+});
+
+test("«بدي العرض» الموجود بيضل، وبينضاف الرفض والهسرة بس", async () => {
+  const { planComponents, NO_TEXT, BUTTON_TEXT } = await import("../tools/add-opt-out.ts");
+
+  const plan = planComponents([
+    { type: "BODY", text: "عرض" },
+    { type: "BUTTONS", buttons: [{ type: "QUICK_REPLY", text: "بدي العرض" }] }
+  ] as never);
+
+  const buttons = ((plan as { next: Array<Record<string, unknown>> }).next.find(
+    (component) => component.type === "BUTTONS"
+  ) as { buttons: Array<Record<string, unknown>> }).buttons;
+
+  assert.deepEqual(
+    buttons.map((button) => button.text),
+    ["بدي العرض", NO_TEXT, BUTTON_TEXT],
+    "نصّ الزر المعتمد ما بينبدّل — سجل الحملات القديمة بيقرا عليه"
+  );
 });

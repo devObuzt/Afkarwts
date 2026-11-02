@@ -1,4 +1,5 @@
 import { createMessage, findOrCreateMemberByPhone, updateMessageStatusByWhatsAppId, type Member, type Message } from "./db";
+import { offerAnswer, recordOfferDecline } from "./members/offer-reply";
 import { isResumeRequest, isStopRequest, requestOptOut, undoOptOut } from "./members/opt-out";
 import { createStoredMediaFilename, formatBytes, MAX_MEDIA_BYTES, MAX_MEDIA_LABEL, writeMediaFile } from "./media-store";
 import { downloadWhatsAppMedia, getWhatsAppMediaInfo } from "./whatsapp";
@@ -156,7 +157,17 @@ export async function handleWebhookPayload(
             whatsappMessageId: incoming.id ?? null,
             status: "received"
           });
-          notifyDevices(member.name, "text", pressed, member.id);
+
+          // 🔑 «ما في داعي» بتنسجّل بهدوء، و«بدي العرض» بتدقّ.
+          // حملة على ألف رقم بتولّد مئات كبسات الرفض — ولو كل وحدة
+          // دقّت إشعار، الطاقم بيوقف يقرا الإشعارات وبتضيع معها
+          // الكبسات اللي بتعني زبونة. الاثنتين بالمحادثة زي أي رسالة.
+          const answer = offerAnswer(pressed);
+          if (answer === "no") {
+            recordOfferDecline(member.id);
+          } else {
+            notifyDevices(member.name, "text", pressed, member.id);
+          }
           continue;
         }
 

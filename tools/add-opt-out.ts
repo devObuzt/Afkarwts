@@ -47,8 +47,21 @@ const BASE = process.env.PUBLIC_BASE_URL || "https://www.afkarheartbeat.com";
 /** النص القانوني. ≤60 حرف — ميتا بترفض فوتر أطول. */
 export const FOOTER_TEXT = "ما بتحب تستلم عروض؟ اكبس «إيقاف الرسائل»";
 
-/** نص الزر. ≤25 حرف. */
+/** نص زر الهسرة. ≤25 حرف. */
 export const BUTTON_TEXT = "إيقاف الرسائل";
+
+/**
+ * زرّي الجواب على العرض (قرار وسام 02.11).
+ *
+ * 🔑 **ثلاثة أزرار هو السقف اللي بيضل ظاهر.** ميتا بتعرض الرابع وما
+ * بعده ورا «See all options» — وساعتها زر الهسرة بينخفي، يعني طريق
+ * الخروج القانوني بيصير مخبّى ورا كبسة. فما منزيد عن تلاتة.
+ *
+ * والترتيب مفروض من ميتا: الردود السريعة لازم تكون **مجمّعة** والرابط
+ * بمجموعته — «رد، رابط، رد» مرفوض. فالهسرة آخر واحد، زي ما بدّه وسام.
+ */
+export const YES_TEXT = "نعم بدي العرض";
+export const NO_TEXT = "شكراً لا أريد";
 
 export const BUTTON_URL = `${BASE.replace(/\/+$/, "")}/stop/{{1}}`;
 
@@ -113,8 +126,21 @@ export function planComponents(components: Component[]): { next: Component[]; ke
 
   const buttonsComponent = components.find((component) => component.type === "BUTTONS");
   const existing = buttonsComponent?.buttons ?? [];
-  if (existing.length >= 10) {
-    return { skip: "وصل سقف العشر أزرار" };
+  // ثلاثة هو السقف الظاهر، والهسرة لازم تضل وحدة منهن.
+  if (existing.length >= 3) {
+    return { skip: `فيه ${existing.length} أزرار — الهسرة بتنخفي ورا «See all options»` };
+  }
+
+  // الردود السريعة الموجودة بتضل زي ما هي — «بدي العرض» و«معني»
+  // معتمدين عند ميتا وبيشتغلوا، وتبديلهم بيكسر سجل الحملات القديمة.
+  const existingQuickReplies = existing.filter((button) => button.type === "QUICK_REPLY");
+  const hasYes = existingQuickReplies.length > 0;
+  const added: Array<Record<string, unknown>> = [];
+  if (!hasYes) {
+    added.push({ type: "QUICK_REPLY", text: YES_TEXT });
+  }
+  if (existingQuickReplies.length < 2) {
+    added.push({ type: "QUICK_REPLY", text: NO_TEXT });
   }
 
   const optOutButton = {
@@ -133,7 +159,11 @@ export function planComponents(components: Component[]): { next: Component[]; ke
     .map((component) => ({ ...component }));
 
   next.push(keptFooter ? { ...(footer as Component) } : { type: "FOOTER", text: FOOTER_TEXT });
-  next.push({ type: "BUTTONS", buttons: [...existing.map((button) => ({ ...button })), optOutButton] });
+  // الترتيب: كل الردود السريعة أولاً (الموجودة ثم المضافة)، وبعدها
+  // الرابط. خلطهن بيرفضه ميتا.
+  const quickReplies = [...existingQuickReplies.map((button) => ({ ...button })), ...added];
+  const others = existing.filter((button) => button.type !== "QUICK_REPLY").map((button) => ({ ...button }));
+  next.push({ type: "BUTTONS", buttons: [...quickReplies, ...others, optOutButton] });
 
   return { next, keptFooter };
 }

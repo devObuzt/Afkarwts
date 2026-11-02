@@ -225,3 +225,27 @@ test("اللي أوقف بينشال من إرسال الملصق، وعدّاد
   assert.equal(sending.length, 1);
   assert.equal(sending[0].id, inside.id);
 });
+
+test("كبسة الرفض بتنسجّل بهدوء، وكبسة القبول بتدقّ", async () => {
+  const { handleWebhookPayload, buildButtonPayload } = await import("@/app/lib/whatsapp-webhook");
+  const { findMemberByPhone } = await import("@/app/lib/db");
+  const { labelsFor } = await import("@/app/lib/labels/store");
+  const { offerAnswer } = await import("@/app/lib/members/offer-reply");
+
+  assert.equal(offerAnswer("ما في داعي"), "no");
+  assert.equal(offerAnswer("شكراً لا أريد"), "no");
+  assert.equal(offerAnswer("نعم بدي العرض"), "yes");
+  // «إيقاف الرسائل» مش جواب على العرض — إلها زرها ومسارها.
+  assert.equal(offerAnswer("إيقاف الرسائل"), null);
+  assert.equal(offerAnswer("بدي أعرف أكثر عن العرض"), null, "كلام حر مش كبسة");
+
+  await handleWebhookPayload(buildButtonPayload({ phone: "972521110010", text: "ما في داعي" }));
+  const member = findMemberByPhone("+972521110010");
+  assert.ok(member, "الصف انعمل");
+  assert.ok(
+    labelsFor(member!.id).some((label) => label.name === "رفض عرض"),
+    "الرفض انسجّل كملصق بتقدر أفكار تفلتر عليه"
+  );
+  // 🔑 الرفض **مش** هسرة: العروض بتضل تُبعت لحد ما يكبس «إيقاف الرسائل».
+  assert.equal(member!.optOutAt, null);
+});
