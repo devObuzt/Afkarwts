@@ -95,6 +95,30 @@ export default async function AppPage() {
         </section>
       )}
 
+      <Link className="crmCard" data-tone="sage" href="/new/app/foods" style={{ display: "block", textDecoration: "none" }}>
+        <header>
+          <span className="crmDot" />
+          <h2>مكتبة الأطعمة</h2>
+        </header>
+        <p className="crmEmpty">الأكل وقيمه وحصصه — منها تأخذ المنتسبة كل الأرقام.</p>
+      </Link>
+
+      <Link className="crmCard" data-tone="sage" href="/new/app/templates" style={{ display: "block", textDecoration: "none" }}>
+        <header>
+          <span className="crmDot" />
+          <h2>قوالب الوجبات</h2>
+        </header>
+        <p className="crmEmpty">وجبة بخاناتها وبدائلها، تُبنى مرة وتُستعمل في كل مسار.</p>
+      </Link>
+
+      <Link className="crmCard" data-tone="sage" href="/new/app/programs" style={{ display: "block", textDecoration: "none" }}>
+        <header>
+          <span className="crmDot" />
+          <h2>قوالب المسارات</h2>
+        </header>
+        <p className="crmEmpty">أيام من القوالب وأهداف ويوم وزن. خطة كل منتسبة تُعدَّل من صفحتها.</p>
+      </Link>
+
       <Link className="crmCard" data-tone="sage" href="/new/app/exercises" style={{ display: "block", textDecoration: "none" }}>
         <header>
           <span className="crmDot" />

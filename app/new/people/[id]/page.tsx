@@ -13,6 +13,7 @@ import { PersonNotes } from "./PersonNotes";
 import { PersonReply } from "./PersonReply";
 import { PersonApp } from "./PersonApp";
 import { PersonAppMeetings } from "./PersonAppMeetings";
+import { PersonAppPlan } from "./PersonAppPlan";
 import { PersonAppTraining } from "./PersonAppTraining";
 
 export const dynamic = "force-dynamic";
@@ -213,6 +214,7 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
             phone={member.phone}
           />
 
+          <PersonAppPlan canEdit={can(user, "people.edit")} memberId={member.id} />
           <PersonAppMeetings canEdit={can(user, "people.edit")} memberId={member.id} />
           <PersonAppTraining canEdit={can(user, "people.edit")} memberId={member.id} />
 
