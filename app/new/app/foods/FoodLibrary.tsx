@@ -9,7 +9,7 @@ const BLANK: FoodForm = { ar: "", he: "", en: "", synonyms: "", category: "", kc
 const toForm = (f: AppFood): FoodForm => ({
   ar: f.name.ar, he: f.name.he ?? "", en: f.name.en ?? "", synonyms: f.synonyms.join("، "), category: f.category ?? "",
   kcal: String(f.per100.kcal), protein: String(f.per100.protein), carb: String(f.per100.carb), fat: String(f.per100.fat),
-  portions: f.portions.map((p) => ({ id: p.id, label: p.label.ar, grams: String(p.grams) }))
+  portions: f.portions.map((p) => ({ id: p.id, label: p.label.ar, grams: String(p.grams), text: p.label }))
 });
 
 /** Afkar's food library: search it, add to it, correct it. A portion can't be removed once saved: plans point at it. */

@@ -23,5 +23,5 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (!form || !Array.isArray(form.portions)) return refuse("BAD_REQUEST");
   const food = foodPayload(form);
   if (!food.ok) return refuse(food.error, "row" in food ? food.row : undefined);
-  return relay(await appAdmin<AppFood>(auth.user, `/admin/v1/foods/${id}`, { method: "PATCH", body: food.body }));
+  return relay(await appAdmin<AppFood>(auth.user, `/admin/v1/foods/${id}`, { method: "PATCH", body: { ...food.body, category: food.body.category ?? "" } }));
 }

@@ -8,10 +8,10 @@ import { nutritionError, type AppProgramFull, type AppTemplateRow, type ProgramF
 const BLANK: ProgramForm = { key: "", name: "", length_days: "7", weigh_in: "1, 7", teen_mode: false, goals: { kcal: "", protein: "", carb: "", fat: "" }, days: [{ meal_template_ids: [], content: "" }] };
 
 const toForm = (p: AppProgramFull): ProgramForm => ({
-  key: p.key, name: p.name.ar, length_days: String(p.length_days), teen_mode: p.teen_mode,
+  key: p.key, name: p.name.ar, name_text: p.name, length_days: String(p.length_days), teen_mode: p.teen_mode,
   weigh_in: p.weigh_in_days.map((d) => d + 1).join(", "), // stored from 0, read from day 1
   goals: { kcal: String(p.goals?.kcal ?? ""), protein: String(p.goals?.protein ?? ""), carb: String(p.goals?.carb ?? ""), fat: String(p.goals?.fat ?? "") },
-  days: p.days.map((d) => ({ meal_template_ids: d.meal_template_ids, content: d.content?.ar ?? "" }))
+  days: p.days.map((d) => ({ meal_template_ids: d.meal_template_ids, content: d.content?.ar ?? "", content_text: d.content }))
 });
 
 /** A program is a cycle of days built from meal templates. Whoever is already on it keeps the copy she got. */

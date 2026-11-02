@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { nutritionError, type AltForm, type AppDay, type AppDayItem, type AppFood, type Goals, type GoalsForm } from "@/app/lib/afkar-app/nutrition";
 import { FoodPicker } from "@/app/new/app/FoodPicker";
 
@@ -28,15 +28,21 @@ export function PersonAppPlan({ memberId, canEdit }: { memberId: number; canEdit
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
 
+  // Days clicked through quickly: only the last one asked for may fill the card.
+  const latest = useRef(0);
+  const goalsTouched = useRef(false);
+
   const load = useCallback(async (on: string) => {
+    const asked = ++latest.current;
     const response = await fetch(`/api/people/${memberId}/app/plan?date=${on}`, { cache: "no-store" }).catch(() => null);
     const body = response ? await response.json().catch(() => null) : null;
+    if (asked !== latest.current) return;
     // No app, no account there, or not hers to see: no card rather than a misleading error.
     if (!response || !body) return setView({ state: "error" });
     if (body.configured === false || [403, 404].includes(response.status)) return setView({ state: "off" });
     if (!response.ok) return setView({ state: "error" });
     setView({ state: "ready", day: body.day, plans: body.plans });
-    setGoals(goalsForm(planOf(body.day, body.plans)?.goals));
+    if (!goalsTouched.current) setGoals(goalsForm(planOf(body.day, body.plans)?.goals));
   }, [memberId]);
 
   useEffect(() => { void load(date); }, [load, date]);
@@ -55,7 +61,8 @@ export function PersonAppPlan({ memberId, canEdit }: { memberId: number; canEdit
 
   /** The list of alternatives is only sent once it's touched: left alone, the app recounts them from the main food. */
   function altsFor(item: AppDayItem, e: Edit) {
-    return e.alternatives ?? item.alternatives.map((a) => ({ food_id: a.food.id, portion_id: a.portion.id, qty: String(a.qty), name: a.food.name.ar, portions: [a.portion] }));
+    // Only amounts typed by hand stay as numbers; the rest go back empty, so they keep recounting.
+    return e.alternatives ?? item.alternatives.map((a) => ({ food_id: a.food.id, portion_id: a.portion.id, qty: a.qty_manual ? String(a.qty) : "", name: a.food.name.ar, portions: [a.portion] }));
   }
 
   async function saveItem(item: AppDayItem, e: Edit) {
@@ -86,6 +93,7 @@ export function PersonAppPlan({ memberId, canEdit }: { memberId: number; canEdit
     const body = response ? await response.json().catch(() => ({})) : {};
     setBusy(false);
     if (!response?.ok) return setMessage({ ok: false, text: nutritionError(body.error ?? "UNREACHABLE") });
+    goalsTouched.current = false;
     setMessage({ ok: true, text: "حُفظت أهدافها." });
     await load(date);
   }
@@ -95,7 +103,12 @@ export function PersonAppPlan({ memberId, canEdit }: { memberId: number; canEdit
     <section className="crmCard" data-tone="sage">
       <header><span className="crmDot" /><h2>خطة التغذية بالتطبيق</h2></header>
       {view.state === "loading" && <p className="crmEmpty">جارٍ التحميل…</p>}
-      {view.state === "error" && <p className="crmEmpty">التطبيق لا يرد الآن.</p>}
+      {view.state === "error" && (
+        <div className="crmPad">
+          <p className="crmEmpty">التطبيق لا يرد الآن.</p>
+          <button className="crmBtn quiet" onClick={() => void load(date)} type="button">حاولي مرة أخرى</button>
+        </div>
+      )}
       {day && (
         <div className="crmPad" style={{ display: "grid", gap: 12 }}>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
@@ -108,8 +121,8 @@ export function PersonAppPlan({ memberId, canEdit }: { memberId: number; canEdit
           {day.status === "no_plan" && <p className="crmEmpty">لا مسار لها في هذا اليوم.</p>}
           {day.status !== "active" && day.status !== "no_plan" && <p className="crmEmpty">{day.status === "before_start" ? "مسارها لم يبدأ في هذا اليوم." : day.status === "finished" ? "انتهى مسارها قبل هذا اليوم." : "لا خطة في هذا اليوم."}</p>}
           {day.content && <p className="crmRowDetail">محتوى اليوم: {day.content.ar}</p>}
-          {day.totals && day.goals && (
-            <p className="crmRowDetail">أكلت اليوم: سعرات {Math.round(day.totals.kcal)}{day.goals.kcal ? ` من ${day.goals.kcal}` : ""} · بروتين {Math.round(day.totals.protein)}{day.goals.protein ? ` من ${day.goals.protein}` : ""} غ</p>
+          {day.totals && (
+            <p className="crmRowDetail">أكلت اليوم: سعرات {Math.round(day.totals.kcal)}{day.goals?.kcal ? ` من ${day.goals.kcal}` : ""} · بروتين {Math.round(day.totals.protein)}{day.goals?.protein ? ` من ${day.goals.protein}` : ""} غ</p>
           )}
 
           {day.meals.map((meal) => (
@@ -169,7 +182,7 @@ export function PersonAppPlan({ memberId, canEdit }: { memberId: number; canEdit
           {active && !active.teen_mode && canEdit && (
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
               {([["kcal", "هدف سعرات"], ["protein", "بروتين (غ)"], ["carb", "كربوهيدرات (غ)"], ["fat", "دهون (غ)"]] as const).map(([key, label]) => (
-                <label className="crmField" key={key} style={{ width: 110 }}><span>{label}</span><input inputMode="numeric" onChange={(e) => setGoals({ ...goals, [key]: e.target.value })} value={goals[key]} /></label>
+                <label className="crmField" key={key} style={{ width: 110 }}><span>{label}</span><input inputMode="numeric" onChange={(e) => { goalsTouched.current = true; setGoals({ ...goals, [key]: e.target.value }); }} value={goals[key]} /></label>
               ))}
               <button className="crmBtn quiet" disabled={busy} onClick={() => void saveGoals()} type="button">احفظي أهدافها</button>
             </div>

@@ -21,7 +21,7 @@ export type AppProgramFull = {
   goals: Goals | null; version: number; days: Array<{ meal_template_ids: string[]; content: Text | null }>;
 };
 type Values = { kcal: number; protein: number; carb: number; fat: number };
-type Ref = { food: { id: string; name: Text }; portion: { id: string; label: Text; grams: number }; qty: number; values?: Values };
+type Ref = { qty_manual?: boolean; food: { id: string; name: Text }; portion: { id: string; label: Text; grams: number }; qty: number; values?: Values };
 export type AppDayItem = Ref & { id: string; slot_type: SlotType; alternatives: Array<Ref & { index: number }>; logged: { log_id: string; kind: string; alt_index: number | null } | null };
 export type AppDay = {
   date: string; status: string; starts_on: string | null; program: { key: string; name: Text } | null; day_index: number | null; is_weigh_in: boolean;
@@ -31,8 +31,9 @@ export type AppDay = {
 
 const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
 /** Afkar's team types on Arabic keyboards: ٠-٩ and ٫ are the same numbers. */
+const latin = (v: unknown) => str(v).replace(/[٠-٩]/g, (d) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d)));
 const number = (v: unknown): number | null => {
-  const s = str(v).replace(/[٠-٩]/g, (d) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d))).replace("٫", ".");
+  const s = latin(v).replace("٫", ".");
   if (s === "") return null;
   const n = Number(s);
   return Number.isFinite(n) ? n : null;
@@ -41,11 +42,13 @@ const within = (v: unknown, min: number, max: number) => {
   const n = number(v);
   return n !== null && n >= min && n <= max ? n : null;
 };
-const text = (v: unknown): Text | undefined => (str(v) ? { ar: str(v) } : undefined);
+/** The form edits Arabic; the other languages it came with stay. */
+const text = (v: unknown, had?: Text | null): Text | undefined => (str(v) ? { ...(had ?? {}), ar: str(v) } : undefined);
+export const parseAmount = number;
 
 export type FoodForm = {
   ar: string; he: string; en: string; synonyms: string; category: string;
-  kcal: string; protein: string; carb: string; fat: string; portions: Array<{ id?: string; label: string; grams: string }>;
+  kcal: string; protein: string; carb: string; fat: string; portions: Array<{ id?: string; label: string; grams: string; text?: Text }>;
 };
 export type FoodBody = {
   name: Text; synonyms: string[]; category?: string; per100: Values;
@@ -56,13 +59,13 @@ export function foodPayload(form: FoodForm): { ok: true; body: FoodBody } | { ok
   const ar = str(form.ar);
   if (!ar || ar.length > 200) return { ok: false, error: "NAME" };
   const kcal = within(form.kcal, 0, 1000), protein = within(form.protein, 0, 100), carb = within(form.carb, 0, 100), fat = within(form.fat, 0, 100);
-  if (kcal === null || protein === null || carb === null || fat === null || protein + carb + fat > 100) return { ok: false, error: "VALUES" };
+  if (kcal === null || protein === null || carb === null || fat === null || protein + carb + fat > 100.5) return { ok: false, error: "VALUES" };
   const portions: FoodBody["portions"] = [];
   for (const [row, p] of form.portions.entries()) {
     const label = str(p.label);
-    const grams = within(p.grams, 0.1, 5000);
+    const grams = within(p.grams, 0.01, 5000);
     if (!label || label.length > 200 || grams === null) return { ok: false, error: "PORTION", row };
-    portions.push({ ...(p.id ? { id: p.id } : {}), label: { ar: label }, grams });
+    portions.push({ ...(p.id ? { id: p.id } : {}), label: { ...(p.text ?? {}), ar: label }, grams });
   }
   const category = str(form.category).slice(0, 40);
   return {
@@ -93,13 +96,13 @@ function alternatives(rows: AltForm[]): AltBody[] | null {
   return out;
 }
 
-export type TemplateForm = { name: string; time: string; note: string; slots: SlotForm[] };
+export type TemplateForm = { name: string; time: string; note: string; name_text?: Text; note_text?: Text | null; slots: SlotForm[] };
 export type TemplateBody = { name: Text; default_time?: string; note?: Text; slots: SlotBody[] };
 
 export function templatePayload(form: TemplateForm): { ok: true; body: TemplateBody } | { ok: false; error: "NAME" | "TIME" | "EMPTY" } | { ok: false; error: "FOOD" | "QTY"; row: number } {
   const name = str(form.name);
   if (!name || name.length > 200) return { ok: false, error: "NAME" };
-  const time = str(form.time);
+  const time = latin(form.time);
   if (time && !/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) return { ok: false, error: "TIME" };
   if (form.slots.length === 0 || form.slots.length > 20) return { ok: false, error: "EMPTY" };
   const slots: SlotBody[] = [];
@@ -110,8 +113,8 @@ export function templatePayload(form: TemplateForm): { ok: true; body: TemplateB
     if (qty === null || alts === null) return { ok: false, error: "QTY", row };
     slots.push({ slot_type: s.slot_type, food_id: s.food_id, portion_id: s.portion_id, qty, alternatives: alts });
   }
-  const note = text(form.note);
-  return { ok: true, body: { name: { ar: name }, ...(time ? { default_time: time } : {}), ...(note ? { note } : {}), slots } };
+  const note = text(form.note, form.note_text);
+  return { ok: true, body: { name: { ...(form.name_text ?? {}), ar: name }, ...(time ? { default_time: time } : {}), ...(note ? { note } : {}), slots } };
 }
 
 export type GoalsForm = { kcal: string; protein: string; carb: string; fat: string };
@@ -129,8 +132,8 @@ export function goalsPayload(form: GoalsForm): { ok: true; goals: Goals } | { ok
 }
 
 export type ProgramForm = {
-  key: string; name: string; length_days: string; weigh_in: string; teen_mode: boolean; goals: GoalsForm;
-  days: Array<{ meal_template_ids: string[]; content: string }>;
+  key: string; name: string; name_text?: Text; length_days: string; weigh_in: string; teen_mode: boolean; goals: GoalsForm;
+  days: Array<{ meal_template_ids: string[]; content: string; content_text?: Text | null }>;
 };
 export type ProgramBody = {
   key: string; name: Text; length_days: number; weigh_in_days: number[]; teen_mode: boolean; goals?: Goals;
@@ -148,11 +151,11 @@ export function programPayload(form: ProgramForm): { ok: true; body: ProgramBody
   const days: ProgramBody["days"] = [];
   for (const [row, d] of form.days.entries()) {
     if (d.meal_template_ids.length === 0 || d.meal_template_ids.length > 12) return { ok: false, error: "DAY", row };
-    const content = text(d.content);
+    const content = text(d.content, d.content_text);
     days.push({ meal_template_ids: d.meal_template_ids, ...(content ? { content } : {}) });
   }
   // A teen has no goals and no weigh-in, whatever was left in the form before the box was ticked.
-  if (form.teen_mode) return { ok: true, body: { key, name: { ar: name }, length_days: length, weigh_in_days: [], teen_mode: true, days } };
+  if (form.teen_mode) return { ok: true, body: { key, name: { ...(form.name_text ?? {}), ar: name }, length_days: length, weigh_in_days: [], teen_mode: true, days } };
 
   const weighIn: number[] = [];
   for (const part of str(form.weigh_in).split(/[,،\s]+/).filter(Boolean)) {
@@ -165,7 +168,7 @@ export function programPayload(form: ProgramForm): { ok: true; body: ProgramBody
   return {
     ok: true,
     body: {
-      key, name: { ar: name }, length_days: length, weigh_in_days: [...new Set(weighIn)].sort((a, b) => a - b), teen_mode: false,
+      key, name: { ...(form.name_text ?? {}), ar: name }, length_days: length, weigh_in_days: [...new Set(weighIn)].sort((a, b) => a - b), teen_mode: false,
       ...(Object.keys(goals.goals).length ? { goals: goals.goals } : {}), days
     }
   };

@@ -73,3 +73,24 @@ test("one line of her plan, and her own goals", async () => {
   assert.deepEqual(goalsPayload({ kcal: "1600", protein: "", carb: "", fat: "٥٠" }), { ok: true, goals: { kcal: 1600, fat: 50 } });
   assert.deepEqual(goalsPayload({ kcal: "1600.5", protein: "", carb: "", fat: "" }), { ok: false, error: "GOALS" });
 });
+
+test("what the form doesn't show survives a save: other languages stay, real foods from the database still save", async () => {
+  const { foodPayload, templatePayload, programPayload, parseAmount } = await import("@/app/lib/afkar-app/nutrition");
+  const food = { ar: "زيت", he: "", en: "", synonyms: "", category: "", kcal: "884", protein: "0", carb: "0.1", fat: "100", portions: [{ id: "p1", label: "ملعقة", grams: "0.05", text: { ar: "قديم", he: "כף" } }] };
+  const saved = foodPayload(food);
+  assert.ok(saved.ok, "macros of 100.1 and a 0.05 g portion are in the real library");
+  assert.deepEqual(saved.body.portions[0], { id: "p1", label: { ar: "ملعقة", he: "כף" }, grams: 0.05 });
+  assert.deepEqual(foodPayload({ ...food, protein: "5" }), { ok: false, error: "VALUES" });
+
+  const t = templatePayload({ name: "فطور", time: "٠٨:٠٠", note: "ن", name_text: { ar: "ق", he: "ארוחה" }, note_text: { ar: "ق", en: "note" }, slots: [{ slot_type: "veg", food_id: "f", portion_id: "p", qty: "١", alternatives: [] }] });
+  assert.ok(t.ok, "Arabic-keyboard digits in the time");
+  assert.equal(t.body.default_time, "08:00");
+  assert.deepEqual(t.body.name, { ar: "فطور", he: "ארוחה" });
+  assert.deepEqual(t.body.note, { ar: "ن", en: "note" });
+
+  const p = programPayload({ key: "ab", name: "م", name_text: { ar: "ق", he: "מסלול" }, length_days: "7", weigh_in: "", teen_mode: false, goals: { kcal: "", protein: "", carb: "", fat: "" }, days: [{ meal_template_ids: ["t"], content: "ج", content_text: { ar: "ق", he: "תוכן" } }] });
+  assert.ok(p.ok);
+  assert.deepEqual(p.body.name, { ar: "م", he: "מסלול" });
+  assert.deepEqual(p.body.days[0]!.content, { ar: "ج", he: "תוכן" });
+  assert.equal(parseAmount("١٫٥"), 1.5);
+});

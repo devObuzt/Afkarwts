@@ -2,18 +2,18 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { nutritionError, type AppFood, type AppTemplate, type AppTemplateRow, type SlotForm, type SlotType } from "@/app/lib/afkar-app/nutrition";
+import { nutritionError, parseAmount, type AppFood, type Text, type AppTemplate, type AppTemplateRow, type SlotForm, type SlotType } from "@/app/lib/afkar-app/nutrition";
 import { FoodPicker } from "../FoodPicker";
 
 const SLOTS: Record<SlotType, string> = { protein: "بروتين", carb: "نشويات", veg: "خضار", fat: "دهون", drink: "مشروبات", other: "غير ذلك" };
 
-type Form = { name: string; time: string; note: string; slots: SlotForm[] };
+type Form = { name: string; time: string; note: string; name_text?: Text; note_text?: Text | null; slots: SlotForm[] };
 const BLANK: Form = { name: "", time: "", note: "", slots: [] };
 
 function kcalOf(foods: Map<string, AppFood>, foodId: string, portionId: string, qty: string) {
   const food = foods.get(foodId);
   const portion = food?.portions.find((p) => p.id === portionId);
-  const n = Number(qty);
+  const n = parseAmount(qty) ?? 0;
   return food && portion && n > 0 ? Math.round((food.per100.kcal * portion.grams * n) / 100) : 0;
 }
 
@@ -43,7 +43,7 @@ export function TemplateEditor({ templates, canEdit }: { templates: AppTemplateR
     if (!body) return setMessage({ ok: false, text: nutritionError("UNREACHABLE") });
     setFoods(new Map(body.foods.map((f) => [f.id, f])));
     setForm({
-      name: body.template.name.ar, time: body.template.default_time ?? "", note: body.template.note?.ar ?? "",
+      name: body.template.name.ar, name_text: body.template.name, note_text: body.template.note, time: body.template.default_time ?? "", note: body.template.note?.ar ?? "",
       slots: body.template.slots.map((s) => ({
         slot_type: s.slot_type, food_id: s.food_id, portion_id: s.portion_id, qty: String(s.qty),
         // Only amounts typed by hand are kept as typed; the rest recount when the main food changes.
