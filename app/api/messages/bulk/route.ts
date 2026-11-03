@@ -80,7 +80,10 @@ export async function POST(request: Request) {
       if (!sendable.ok) {
         return NextResponse.json({ error: sendable.error }, { status: 400 });
       }
-      members = listGroupMembers(groupId);
+      // اللي طلب يوقف بينشال من الإرسال للملصق. تسميته بالإيد لحالها
+      // بتضل ممكنة — وساعتها الحارس بـ`sendWhatsAppTemplate` هو اللي
+      // بيقرّر حسب القالب، لأن تسمية شخص قرار عن شخص مش إرسال للائحة.
+      members = listGroupMembers(groupId, { excludeOptedOut: true });
     } else if (body.memberIds?.length) {
       members = body.memberIds
         .map((id) => getMember(Number(id)))

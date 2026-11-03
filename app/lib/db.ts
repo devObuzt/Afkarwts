@@ -24,6 +24,10 @@ export type Member = {
   stage: "club" | "member";
   hebrewName: string;
   becameMemberAt: string | null;
+  /** مش فاضي = الرقم طلب يوقف الرسائل. السجل بيضل، والتسويق بيوقف. */
+  optOutAt: string | null;
+  optOutSource: string;
+  optOutNote: string;
   lastReadMessageId: number | null;
   unreadCount: number;
   groupIds: number[];
@@ -63,6 +67,9 @@ type DbMember = {
   stage?: string | null;
   hebrew_name?: string | null;
   became_member_at?: string | null;
+  opt_out_at?: string | null;
+  opt_out_source?: string | null;
+  opt_out_note?: string | null;
   last_read_message_id?: number | null;
   unread_count?: number;
   created_at: string;
@@ -155,6 +162,7 @@ export function getDb() {
     migrateBackfillColumn(db);
     migrateSellerColumn(db);
     migrateIssuedAtColumn(db);
+    migrateOptOutColumns(db);
     globalForDb.__afkarDb = db;
   }
 
@@ -245,6 +253,9 @@ function mapMember(row: DbMember, groupIds?: number[]): Member {
     service: row.service ?? "",
     stage: (row.stage as "club" | "member") ?? "club",
     hebrewName: row.hebrew_name ?? "",
+    optOutAt: row.opt_out_at ?? null,
+    optOutSource: row.opt_out_source ?? "",
+    optOutNote: row.opt_out_note ?? "",
     becameMemberAt: row.became_member_at ?? null,
     lastReadMessageId: row.last_read_message_id ?? null,
     unreadCount: row.unread_count ?? 0,
@@ -336,6 +347,29 @@ function migrateMemberProfileColumns(db: DatabaseSync) {
  *
  * والاسم العبري جنبه: بينقترح آلياً وبينعدّل بالإيد.
  */
+/**
+ * طلب إيقاف الرسائل. القانون بيقول لازم يكون في طريق خروج بكل رسالة
+ * تسويق، ووسام قرر إنّ الخروج **ما بيمحي** السجل: الرقم بيضل بأعضاء
+ * النادي بعلامة «طلب حذف»، لأنّ محو الصف بيمحي معه كل المحادثة
+ * والتاريخ، وبيخلّي نفس الرقم يترجّع لحملة جديدة بعد شهر كأنه ما طلب
+ * ولا إشي.
+ *
+ * محطوطة على `members` مش بجدول لحالها بالمقصود: السؤال «هل هاد الرقم
+ * طلب يوقف؟» بينسأل عند كل إرسالة، والجوين بيفتح طريق للنسيان.
+ */
+function migrateOptOutColumns(db: DatabaseSync) {
+  if (!hasColumn(db, "members", "opt_out_at")) {
+    db.exec("ALTER TABLE members ADD COLUMN opt_out_at TEXT");
+    db.exec("CREATE INDEX IF NOT EXISTS idx_members_opt_out ON members(opt_out_at)");
+  }
+  if (!hasColumn(db, "members", "opt_out_source")) {
+    db.exec("ALTER TABLE members ADD COLUMN opt_out_source TEXT NOT NULL DEFAULT ''");
+  }
+  if (!hasColumn(db, "members", "opt_out_note")) {
+    db.exec("ALTER TABLE members ADD COLUMN opt_out_note TEXT NOT NULL DEFAULT ''");
+  }
+}
+
 function migrateMemberStage(db: DatabaseSync) {
   if (!hasColumn(db, "members", "stage")) {
     db.exec("ALTER TABLE members ADD COLUMN stage TEXT NOT NULL DEFAULT 'club'");
@@ -1471,13 +1505,22 @@ export function removeMemberFromGroup(groupId: number, memberId: number) {
   getDb().prepare("DELETE FROM member_groups WHERE group_id = ? AND member_id = ?").run(groupId, memberId);
 }
 
-export function listGroupMembers(groupId: number): Member[] {
+/**
+ * مين جوّا الملصق.
+ *
+ * `excludeOptedOut` بينحط من مسارات **الإرسال** بالمقصود مش كافتراضي:
+ * «مين جوّا هاد الملصق» سؤال تاني عن «لمين منبعت». ومحطوط على
+ * العدّادات كمان — حملة بتعد ٢٠٠ وبتبعت ١٩٠ بترجّعنا لنفس كذبة
+ * «٠ من ٠».
+ */
+export function listGroupMembers(groupId: number, options: { excludeOptedOut?: boolean } = {}): Member[] {
   const rows = getDb()
     .prepare(
       `SELECT members.*, 0 AS unread_count
        FROM members
        INNER JOIN member_groups ON member_groups.member_id = members.id
        WHERE member_groups.group_id = ?
+         ${options.excludeOptedOut ? "AND members.opt_out_at IS NULL" : ""}
        ORDER BY members.name COLLATE NOCASE ASC`
     )
     .all(groupId) as DbMember[];
