@@ -204,7 +204,7 @@ async function main() {
   }
 
   console.log(`\nالفوتر:  ${FOOTER_TEXT}   (${[...FOOTER_TEXT].length} حرف من 60)`);
-  console.log(`الزر:    ${BUTTON_TEXT}   (${[...BUTTON_TEXT].length} حرف من 25)`);
+  console.log(`الأزرار: ${YES_TEXT} · ${NO_TEXT} · ${BUTTON_TEXT}`);
   console.log(`الرابط:  ${BUTTON_URL}\n`);
   console.log(`قوالب التسويق: ${marketing.length} من ${all.length}\n`);
 
@@ -226,9 +226,13 @@ async function main() {
     }
 
     if (!go) {
+      const willAdd = (plan.next.find((component) => component.type === "BUTTONS") as
+        | { buttons: Array<Record<string, unknown>> }
+        | undefined)?.buttons.map((button) => String(button.text));
       console.log(
         `·  ${template.name} (${template.status}) — ` +
-          (plan.keptFooter ? "الزر فقط، وفوتره الحالي بيضل" : "الفوتر + الزر")
+          (plan.keptFooter ? "فوتره الحالي بيضل" : "+ فوتر") +
+          ` · أزرار: ${willAdd?.join(" | ")}`
       );
       done += 1;
       continue;
