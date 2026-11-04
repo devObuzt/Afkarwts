@@ -2,6 +2,8 @@ import { requireApi } from "@/app/lib/users/current";
 import { NextResponse } from "next/server";
 import { getMember } from "@/app/lib/db";
 import { recordAction } from "@/app/lib/users/audit";
+import { appConfig, coachChangedEvent, deliverAppEvent } from "@/app/lib/afkar-app/client";
+import { coachChangeRefusal } from "@/app/lib/afkar-app/person";
 import { addLabel, assignCoach, getLabel, labelsFor, removeLabel } from "@/app/lib/labels/store";
 
 export const runtime = "nodejs";
@@ -25,7 +27,12 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   };
 
   if (body.coachId !== undefined) {
-    assignCoach(memberId, body.coachId === null ? null : Number(body.coachId));
+    const coachId = body.coachId === null ? null : Number(body.coachId);
+    const refusal = coachChangeRefusal(auth.user, coachId);
+    if (refusal) {
+      return NextResponse.json({ error: refusal === "FORBIDDEN" ? "تغيير المرافِقة ليس من صلاحيتك." : "هذا الحساب غير متاح." }, { status: refusal === "FORBIDDEN" ? 403 : 400 });
+    }
+    assignCoach(memberId, coachId);
     recordAction({
       userId: auth.user.id,
       actor: auth.user.name,
@@ -35,6 +42,12 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       subjectLabel: member.name,
       detail: body.coachId === null ? "أُزيلت المرافِقة" : "أُسندت مرافِقة"
     });
+    // In the background, with retries: a slow or dead app must not hold HeartBeat's own screen.
+    if (appConfig()) {
+      void deliverAppEvent(coachChangedEvent(memberId, coachId)).then((arrived) => {
+        if (!arrived) console.error("[app] coach change not delivered", memberId);
+      });
+    }
     return NextResponse.json({ labels: labelsFor(memberId) });
   }
 

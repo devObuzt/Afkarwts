@@ -126,7 +126,7 @@ export function PersonApp({ memberId, name, phone, canEdit }: { memberId: number
                     {plan.name}
                   </span>
                   <span className="crmRowDetail" style={{ display: "block" }}>
-                    من {plan.starts_on} · {plan.length_days} يوم
+                    من {plan.starts_on} · أيام: {plan.length_days}
                   </span>
                 </span>
                 <span className={plan.status === "active" ? "crmPill live" : "crmPill"}>
@@ -147,7 +147,7 @@ export function PersonApp({ memberId, name, phone, canEdit }: { memberId: number
                     <select onChange={(event) => setProgramKey(event.target.value)} value={programKey}>
                       {view.programs.map((program) => (
                         <option key={program.key} value={program.key}>
-                          {program.name} · {program.length_days} يوم
+                          {program.name} · أيام: {program.length_days}
                         </option>
                       ))}
                     </select>

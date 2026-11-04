@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { nutritionError, type AltForm, type AppDay, type AppDayItem, type AppFood, type Goals, type GoalsForm } from "@/app/lib/afkar-app/nutrition";
+import { nutritionError, type AltForm, type AppDay, type AppDayItem, type AppFood, type AppTemplateRow, type Goals, type GoalsForm, type Text } from "@/app/lib/afkar-app/nutrition";
 import { FoodPicker } from "@/app/new/app/FoodPicker";
 
 type Plan = { id: string; program_key: string; starts_on: string; name: string; status: string; goals: Goals | null; teen_mode: boolean };
-type View = { state: "loading" } | { state: "off" } | { state: "error" } | { state: "ready"; day: AppDay; plans: Plan[] };
+type View = { state: "loading" } | { state: "off" } | { state: "error" } | { state: "ready"; day: AppDay; plans: Plan[]; templates: AppTemplateRow[] };
+type MealEdit = { id: string; time: string; note: string; note_text: Text | null };
 type Edit = {
   id: string; name: string; food_id: string; portion_id: string; qty: string; portions: Array<{ id: string; label: { ar: string }; grams: number }>;
   alternatives: Array<AltForm & { name: string; portions: Array<{ id: string; label: { ar: string }; grams: number }> }> | null;
@@ -24,6 +25,8 @@ export function PersonAppPlan({ memberId, canEdit }: { memberId: number; canEdit
   const [view, setView] = useState<View>({ state: "loading" });
   const [date, setDate] = useState(today());
   const [edit, setEdit] = useState<Edit | null>(null);
+  const [mealEdit, setMealEdit] = useState<MealEdit | null>(null);
+  const [removing, setRemoving] = useState<string | null>(null);
   const [goals, setGoals] = useState<GoalsForm>(goalsForm());
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
@@ -41,7 +44,7 @@ export function PersonAppPlan({ memberId, canEdit }: { memberId: number; canEdit
     if (!response || !body) return setView({ state: "error" });
     if (body.configured === false || [403, 404].includes(response.status)) return setView({ state: "off" });
     if (!response.ok) return setView({ state: "error" });
-    setView({ state: "ready", day: body.day, plans: body.plans });
+    setView({ state: "ready", day: body.day, plans: body.plans, templates: body.templates ?? [] });
     if (!goalsTouched.current) setGoals(goalsForm(planOf(body.day, body.plans)?.goals));
   }, [memberId]);
 
@@ -71,7 +74,7 @@ export function PersonAppPlan({ memberId, canEdit }: { memberId: number; canEdit
     const response = await fetch(`/api/people/${memberId}/app/plan`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        item_id: item.id, date, food_id: e.food_id, portion_id: e.portion_id, qty: e.qty,
+        item_id: item.id, date: view.state === "ready" ? view.day.date : date, food_id: e.food_id, portion_id: e.portion_id, qty: e.qty,
         ...(e.alternatives ? { alternatives: e.alternatives.map(({ food_id, portion_id, qty }) => ({ food_id, portion_id, qty })) } : {})
       })
     }).catch(() => null);
@@ -80,6 +83,22 @@ export function PersonAppPlan({ memberId, canEdit }: { memberId: number; canEdit
     if (!response?.ok) return setMessage({ ok: false, text: nutritionError(body.error ?? "UNREACHABLE") });
     setEdit(null);
     setMessage({ ok: true, text: "حُفظ لها. القالب لم يتغيّر." });
+    await load(date);
+  }
+
+  /** Everything about a meal goes through one door: the server checks it's on her day before acting. */
+  async function sendMeal(method: "POST" | "PATCH" | "DELETE", body: Record<string, unknown>, done: string) {
+    setBusy(true);
+    setMessage(null);
+    const response = await fetch(`/api/people/${memberId}/app/plan/meals`, {
+      method, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ date: view.state === "ready" ? view.day.date : date, ...body })
+    }).catch(() => null);
+    const reply = response ? await response.json().catch(() => ({})) : {};
+    setBusy(false);
+    if (!response?.ok) return setMessage({ ok: false, text: nutritionError(reply.error ?? "UNREACHABLE") });
+    setMealEdit(null);
+    setRemoving(null);
+    setMessage({ ok: true, text: done });
     await load(date);
   }
 
@@ -112,9 +131,9 @@ export function PersonAppPlan({ memberId, canEdit }: { memberId: number; canEdit
       {day && (
         <div className="crmPad" style={{ display: "grid", gap: 12 }}>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
-            <button aria-label="اليوم السابق" className="crmBtn quiet" onClick={() => { setEdit(null); setDate(shift(date, -1)); }} type="button">›</button>
-            <label className="crmField"><span>اليوم</span><input dir="ltr" onChange={(e) => { if (e.target.value) { setEdit(null); setDate(e.target.value); } }} type="date" value={date} /></label>
-            <button aria-label="اليوم التالي" className="crmBtn quiet" onClick={() => { setEdit(null); setDate(shift(date, 1)); }} type="button">‹</button>
+            <button aria-label="اليوم السابق" className="crmBtn quiet" onClick={() => { setEdit(null); setMealEdit(null); setRemoving(null); setDate(shift(date, -1)); }} type="button">›</button>
+            <label className="crmField"><span>اليوم</span><input dir="ltr" onChange={(e) => { if (e.target.value) { setEdit(null); setMealEdit(null); setRemoving(null); setDate(e.target.value); } }} type="date" value={date} /></label>
+            <button aria-label="اليوم التالي" className="crmBtn quiet" onClick={() => { setEdit(null); setMealEdit(null); setRemoving(null); setDate(shift(date, 1)); }} type="button">‹</button>
             {day.program && <span className="crmRowDetail">{day.program.name.ar}{day.day_index !== null ? ` · يوم ${day.day_index + 1}` : ""}{day.is_weigh_in ? " · يوم وزن" : ""}</span>}
           </div>
 
@@ -130,8 +149,23 @@ export function PersonAppPlan({ memberId, canEdit }: { memberId: number; canEdit
               <div style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
                 <strong style={{ flex: 1 }}>{meal.name.ar}{meal.time ? <> · <bdi dir="ltr">{meal.time.slice(0, 5)}</bdi></> : null}</strong>
                 <span className="crmRowDetail">سعرات: {Math.round(meal.items.reduce((sum, i) => sum + (i.values?.kcal ?? 0), 0))}</span>
+                {canEdit && mealEdit?.id !== meal.id && <button className="crmBtn quiet" onClick={() => { setRemoving(null); setMealEdit({ id: meal.id, time: meal.time?.slice(0, 5) ?? "", note: meal.note?.ar ?? "", note_text: meal.note }); }} type="button">الوقت والملاحظة</button>}
+                {canEdit && (removing === meal.id
+                  ? <>
+                      <button className="crmBtn danger" disabled={busy} onClick={() => void sendMeal("DELETE", { meal_id: meal.id }, "أُزيلت الوجبة من خطتها. ما سجّلته منها يبقى محسوباً.")} type="button">تأكيد الإزالة</button>
+                      <button className="crmBtn quiet" onClick={() => setRemoving(null)} type="button">إلغاء</button>
+                    </>
+                  : <button className="crmBtn quiet" onClick={() => setRemoving(meal.id)} type="button">إزالة</button>)}
               </div>
-              {meal.note && <span className="crmRowDetail">{meal.note.ar}</span>}
+              {meal.note && mealEdit?.id !== meal.id && <span className="crmRowDetail">{meal.note.ar}</span>}
+              {mealEdit?.id === meal.id && (
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
+                  <label className="crmField" style={{ width: 110 }}><span>الوقت</span><input dir="ltr" onChange={(e) => setMealEdit({ ...mealEdit, time: e.target.value })} placeholder="08:00" value={mealEdit.time} /></label>
+                  <label className="crmField" style={{ flex: 1, minWidth: 180 }}><span>ملاحظة لها</span><input maxLength={200} onChange={(e) => setMealEdit({ ...mealEdit, note: e.target.value })} value={mealEdit.note} /></label>
+                  <button className="crmBtn primary" disabled={busy} onClick={() => void sendMeal("PATCH", { meal_id: meal.id, time: mealEdit.time, note: mealEdit.note, note_text: mealEdit.note_text }, "حُفظ لها.")} type="button">احفظي</button>
+                  <button className="crmBtn quiet" onClick={() => setMealEdit(null)} type="button">إلغاء</button>
+                </div>
+              )}
               {meal.items.map((item) => {
                 const open = edit?.id === item.id ? edit : null;
                 const alts = open ? altsFor(item, open) : [];
@@ -178,6 +212,15 @@ export function PersonAppPlan({ memberId, canEdit }: { memberId: number; canEdit
               })}
             </div>
           ))}
+
+          {canEdit && day.status === "active" && view.state === "ready" && view.templates.length > 0 && (
+            <label className="crmField"><span>أضيفي وجبة من القوالب، لها فقط — تُضاف وتُزال في كل مرة يتكرر فيها هذا اليوم</span>
+              <select disabled={busy} onChange={(e) => { if (e.target.value) void sendMeal("POST", { template_id: e.target.value }, "أُضيفت لخطتها."); }} value="">
+                <option value="">اختاري قالباً…</option>
+                {view.templates.map((t) => <option key={t.id} value={t.id}>{t.name.ar}</option>)}
+              </select>
+            </label>
+          )}
 
           {active && !active.teen_mode && canEdit && (
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>

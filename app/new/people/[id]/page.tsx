@@ -141,6 +141,10 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
 
           <PersonFiles files={record.files} memberId={member.id} />
 
+          {/* These two edit tables of food and exercises: they need the wide column. */}
+          <PersonAppPlan canEdit={can(user, "people.edit")} memberId={member.id} />
+          <PersonAppTraining canEdit={can(user, "people.edit")} memberId={member.id} />
+
           <section className="crmCard" data-tone="forest">
             <header>
               <span className="crmDot" />
@@ -209,6 +213,7 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
           <PersonLabels
             all={listLabels()}
             canEdit={can(user, "people.edit")}
+            canAssign={can(user, "people.edit") && can(user, "people.all")}
             coach={record.coach}
             coaches={coaches}
             labels={record.labels}
@@ -228,9 +233,7 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
             phone={member.phone}
           />
 
-          <PersonAppPlan canEdit={can(user, "people.edit")} memberId={member.id} />
           <PersonAppMeetings canEdit={can(user, "people.edit")} memberId={member.id} />
-          <PersonAppTraining canEdit={can(user, "people.edit")} memberId={member.id} />
 
           <section className="crmCard" data-tone="sage">
             <header>

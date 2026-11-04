@@ -24,7 +24,7 @@ type Values = { kcal: number; protein: number; carb: number; fat: number };
 type Ref = { qty_manual?: boolean; food: { id: string; name: Text }; portion: { id: string; label: Text; grams: number }; qty: number; values?: Values };
 export type AppDayItem = Ref & { id: string; slot_type: SlotType; alternatives: Array<Ref & { index: number }>; logged: { log_id: string; kind: string; alt_index: number | null } | null };
 export type AppDay = {
-  date: string; status: string; starts_on: string | null; program: { key: string; name: Text } | null; day_index: number | null; is_weigh_in: boolean;
+  date: string; status: string; starts_on: string | null; program: { key: string; name: Text } | null; day_index: number | null; cycle_day?: number; is_weigh_in: boolean;
   content: Text | null; meals: Array<{ id: string; name: Text; time: string | null; note: Text | null; items: AppDayItem[] }>;
   progress: { items_planned: number; items_done: number }; totals?: Values; goals?: Goals;
 };
@@ -181,6 +181,13 @@ export function planItemPayload(form: { food_id: string; portion_id: string; qty
   const alts = alternatives(form.alternatives);
   if (qty === null || alts === null) return { ok: false, error: "QTY" };
   return { ok: true, body: { food_id: form.food_id, portion_id: form.portion_id, qty, alternatives: alts } };
+}
+
+export function planMealPayload(form: { time: string; note: string; note_text?: Text | null }):
+  { ok: true; body: { time: string | null; note: Text | null } } | { ok: false; error: "TIME" } {
+  const time = latin(form.time);
+  if (time && !/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) return { ok: false, error: "TIME" };
+  return { ok: true, body: { time: time || null, note: text(form.note, form.note_text) ?? null } };
 }
 
 /** What the app's refusals mean, in words Afkar's team can act on. */

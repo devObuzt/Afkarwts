@@ -94,3 +94,10 @@ test("what the form doesn't show survives a save: other languages stay, real foo
   assert.deepEqual(p.body.days[0]!.content, { ar: "ج", he: "תוכן" });
   assert.equal(parseAmount("١٫٥"), 1.5);
 });
+
+test("a meal's time and note on her plan", async () => {
+  const { planMealPayload } = await import("@/app/lib/afkar-app/nutrition");
+  assert.deepEqual(planMealPayload({ time: "٠٨:٣٠", note: " ببطء ", note_text: { ar: "قديم", he: "לאט" } }), { ok: true, body: { time: "08:30", note: { ar: "ببطء", he: "לאט" } } });
+  assert.deepEqual(planMealPayload({ time: "", note: "" }), { ok: true, body: { time: null, note: null } }, "emptied means gone");
+  assert.deepEqual(planMealPayload({ time: "25:00", note: "" }), { ok: false, error: "TIME" });
+});

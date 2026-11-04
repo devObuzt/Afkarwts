@@ -74,6 +74,16 @@ export function enrollmentEvent(person: Person, enrollment: Enrollment, now = ne
   };
 }
 
+/** Who sees her in the app follows her coach in HeartBeat. No app account yet: the app ignores it. */
+export function coachChangedEvent(personId: number, coachUserId: number | null, now = new Date()) {
+  return {
+    event_id: randomUUID(),
+    type: "person.updated" as const,
+    occurred_at: now.toISOString(),
+    data: { person_id: String(personId), coach_user_id: coachUserId === null ? null : String(coachUserId) }
+  };
+}
+
 export type AppResult<T> = { ok: true; data: T } | { ok: false; status: number; error: string };
 
 const TIMEOUT_MS = 10_000;
@@ -88,6 +98,18 @@ async function call<T>(url: string, init: RequestInit): Promise<AppResult<T>> {
     return { ok: true, data: body as T };
   } catch {
     return { ok: false, status: 0, error: "UNREACHABLE" };
+  }
+}
+
+/** The same event again if the app is down: it ignores an event_id it has seen. False = never arrived. */
+export async function deliverAppEvent(event: { event_id: string }, options: { waits?: number[] } = {}): Promise<boolean> {
+  const waits = options.waits ?? [5_000, 30_000];
+  for (let attempt = 0; ; attempt++) {
+    const sent = await sendAppEvent(event);
+    if (sent.ok) return true;
+    const wait = waits[attempt];
+    if (wait === undefined) return false;
+    await new Promise((resolve) => setTimeout(resolve, wait));
   }
 }
 
