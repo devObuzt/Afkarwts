@@ -1,5 +1,6 @@
 import { getDb } from "@/app/lib/db";
 import { can } from "@/app/lib/users/permissions";
+import { getUser } from "@/app/lib/users/store";
 import { appAdmin, type AppResult } from "./client";
 
 type Staff = { id: number; name: string; role: string };
@@ -64,6 +65,18 @@ export function canActOnPerson(user: { id: number; role: string; permissions: st
     | { owner: number | null }
     | undefined;
   return row?.owner === user.id;
+}
+
+/**
+ * Who a person's coach is decides who reads her health file and her plan, so it isn't a coach's
+ * own call: choosing herself would hand her any file. Returns why not, or null.
+ */
+export function coachChangeRefusal(user: { role: string; permissions: string[] }, coachId: number | null): "FORBIDDEN" | "BAD_COACH" | null {
+  if (!can(user as never, "people.all")) return "FORBIDDEN";
+  if (coachId === null) return null;
+  if (!Number.isInteger(coachId)) return "BAD_COACH";
+  const target = getUser(coachId);
+  return target?.active ? null : "BAD_COACH";
 }
 
 /**

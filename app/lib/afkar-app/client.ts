@@ -101,6 +101,18 @@ async function call<T>(url: string, init: RequestInit): Promise<AppResult<T>> {
   }
 }
 
+/** The same event again if the app is down: it ignores an event_id it has seen. False = never arrived. */
+export async function deliverAppEvent(event: { event_id: string }, options: { waits?: number[] } = {}): Promise<boolean> {
+  const waits = options.waits ?? [5_000, 30_000];
+  for (let attempt = 0; ; attempt++) {
+    const sent = await sendAppEvent(event);
+    if (sent.ok) return true;
+    const wait = waits[attempt];
+    if (wait === undefined) return false;
+    await new Promise((resolve) => setTimeout(resolve, wait));
+  }
+}
+
 /** A call to the app's admin API, as the signed-in HeartBeat user. */
 export async function appAdmin<T>(user: Staff, path: string, init: { method?: string; body?: unknown } = {}): Promise<AppResult<T>> {
   const config = appConfig();

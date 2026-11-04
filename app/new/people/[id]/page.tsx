@@ -213,6 +213,7 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
           <PersonLabels
             all={listLabels()}
             canEdit={can(user, "people.edit")}
+            canAssign={can(user, "people.edit") && can(user, "people.all")}
             coach={record.coach}
             coaches={coaches}
             labels={record.labels}

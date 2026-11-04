@@ -145,3 +145,41 @@ test("a coach change on her page tells the app, so the new coach sees her and th
   assert.deepEqual(coachChangedEvent(7, null).data, { person_id: "7", coach_user_id: null }, "removed means removed, not left as it was");
   assert.notEqual(coachChangedEvent(7, 12).event_id, set.event_id, "the app ignores an event_id it has seen");
 });
+
+test("who may change a coach: only whoever sees everyone, and only to a live account", async () => {
+  const { useTempDataDir } = await import("./helpers/data-dir.ts");
+  useTempDataDir();
+  const { createUser, setUserActive } = await import("@/app/lib/users/store") as any;
+  const { coachChangeRefusal } = await import("@/app/lib/afkar-app/person");
+  const stamp = Date.now();
+  const coach = createUser({ name: "م", username: `cc${stamp}`, password: "p".repeat(12), role: "coach", mustChangePassword: false });
+  const owner = createUser({ name: "و", username: `oo${stamp}`, password: "p".repeat(12), role: "owner", mustChangePassword: false });
+  assert.ok(coach.ok && owner.ok);
+  assert.equal(coachChangeRefusal(coach.user, coach.user.id), "FORBIDDEN", "a coach can't give herself someone's file");
+  assert.equal(coachChangeRefusal(coach.user, null), "FORBIDDEN", "nor take a colleague off it");
+  assert.equal(coachChangeRefusal(owner.user, coach.user.id), null);
+  assert.equal(coachChangeRefusal(owner.user, null), null);
+  assert.equal(coachChangeRefusal(owner.user, 999999), "BAD_COACH");
+  assert.equal(coachChangeRefusal(owner.user, Number.NaN), "BAD_COACH");
+});
+
+test("a coach change is retried when the app is down, under one event id", async () => {
+  const { deliverAppEvent } = await import("@/app/lib/afkar-app/client");
+  process.env.AFKAR_APP_URL = "https://api.example"; process.env.AFKAR_APP_SERVICE_KEY = "k";
+  process.env.AFKAR_APP_STAFF_SECRET = "s"; process.env.AFKAR_APP_EVENTS_SECRET = "e";
+  const original = globalThis.fetch;
+  const ids: string[] = [];
+  globalThis.fetch = (async (_u: string, init: RequestInit) => {
+    ids.push(JSON.parse(String(init.body)).event_id);
+    if (ids.length < 3) throw new Error("down");
+    return new Response("{}", { status: 200 });
+  }) as typeof fetch;
+  try {
+    assert.equal(await deliverAppEvent({ event_id: "same" }, { waits: [0, 0] }), true);
+    assert.deepEqual(ids, ["same", "same", "same"]);
+    ids.length = 0;
+    globalThis.fetch = (async () => { ids.push("x"); throw new Error("down"); }) as typeof fetch;
+    assert.equal(await deliverAppEvent({ event_id: "gone" }, { waits: [0] }), false);
+    assert.equal(ids.length, 2);
+  } finally { globalThis.fetch = original; }
+});

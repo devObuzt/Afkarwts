@@ -16,7 +16,8 @@ export function PersonLabels({
   all,
   coach,
   coaches,
-  canEdit
+  canEdit,
+  canAssign
 }: {
   memberId: number;
   labels: Label[];
@@ -24,6 +25,7 @@ export function PersonLabels({
   coach: { id: number; name: string } | null;
   coaches: Array<{ id: number; name: string }>;
   canEdit: boolean;
+  canAssign: boolean;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -73,7 +75,7 @@ export function PersonLabels({
         <div className="crmFacts" style={{ marginTop: 16 }}>
           <dt>المرافِقة</dt>
           <dd>
-            {canEdit ? (
+            {canAssign ? (
               <select
                 disabled={busy}
                 onChange={(event) =>

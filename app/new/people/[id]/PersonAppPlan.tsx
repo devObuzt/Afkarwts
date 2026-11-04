@@ -74,7 +74,7 @@ export function PersonAppPlan({ memberId, canEdit }: { memberId: number; canEdit
     const response = await fetch(`/api/people/${memberId}/app/plan`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        item_id: item.id, date, food_id: e.food_id, portion_id: e.portion_id, qty: e.qty,
+        item_id: item.id, date: view.state === "ready" ? view.day.date : date, food_id: e.food_id, portion_id: e.portion_id, qty: e.qty,
         ...(e.alternatives ? { alternatives: e.alternatives.map(({ food_id, portion_id, qty }) => ({ food_id, portion_id, qty })) } : {})
       })
     }).catch(() => null);
@@ -91,7 +91,7 @@ export function PersonAppPlan({ memberId, canEdit }: { memberId: number; canEdit
     setBusy(true);
     setMessage(null);
     const response = await fetch(`/api/people/${memberId}/app/plan/meals`, {
-      method, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ date, ...body })
+      method, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ date: view.state === "ready" ? view.day.date : date, ...body })
     }).catch(() => null);
     const reply = response ? await response.json().catch(() => ({})) : {};
     setBusy(false);
@@ -214,7 +214,7 @@ export function PersonAppPlan({ memberId, canEdit }: { memberId: number; canEdit
           ))}
 
           {canEdit && day.status === "active" && view.state === "ready" && view.templates.length > 0 && (
-            <label className="crmField"><span>أضيفي وجبة من القوالب، لها فقط</span>
+            <label className="crmField"><span>أضيفي وجبة من القوالب، لها فقط — تُضاف وتُزال في كل مرة يتكرر فيها هذا اليوم</span>
               <select disabled={busy} onChange={(e) => { if (e.target.value) void sendMeal("POST", { template_id: e.target.value }, "أُضيفت لخطتها."); }} value="">
                 <option value="">اختاري قالباً…</option>
                 {view.templates.map((t) => <option key={t.id} value={t.id}>{t.name.ar}</option>)}
