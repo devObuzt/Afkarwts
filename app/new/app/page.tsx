@@ -142,7 +142,7 @@ export default async function AppPage() {
                   {program.name}
                 </span>
                 <span className="crmRowDetail" style={{ display: "block" }}>
-                  {program.length_days} يوم · {program.key}
+                  أيام: {program.length_days} · {program.key}
                 </span>
               </span>
             </div>

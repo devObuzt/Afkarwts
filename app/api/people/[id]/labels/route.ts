@@ -2,6 +2,7 @@ import { requireApi } from "@/app/lib/users/current";
 import { NextResponse } from "next/server";
 import { getMember } from "@/app/lib/db";
 import { recordAction } from "@/app/lib/users/audit";
+import { appConfig, coachChangedEvent, sendAppEvent } from "@/app/lib/afkar-app/client";
 import { addLabel, assignCoach, getLabel, labelsFor, removeLabel } from "@/app/lib/labels/store";
 
 export const runtime = "nodejs";
@@ -35,6 +36,11 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       subjectLabel: member.name,
       detail: body.coachId === null ? "أُزيلت المرافِقة" : "أُسندت مرافِقة"
     });
+    // The assignment here stands either way: a dead app must not block HeartBeat's own screen.
+    if (appConfig()) {
+      const told = await sendAppEvent(coachChangedEvent(memberId, body.coachId === null ? null : Number(body.coachId)));
+      if (!told.ok) console.error("[app] coach change not delivered", memberId, told.error);
+    }
     return NextResponse.json({ labels: labelsFor(memberId) });
   }
 

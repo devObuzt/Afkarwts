@@ -74,6 +74,16 @@ export function enrollmentEvent(person: Person, enrollment: Enrollment, now = ne
   };
 }
 
+/** Who sees her in the app follows her coach in HeartBeat. No app account yet: the app ignores it. */
+export function coachChangedEvent(personId: number, coachUserId: number | null, now = new Date()) {
+  return {
+    event_id: randomUUID(),
+    type: "person.updated" as const,
+    occurred_at: now.toISOString(),
+    data: { person_id: String(personId), coach_user_id: coachUserId === null ? null : String(coachUserId) }
+  };
+}
+
 export type AppResult<T> = { ok: true; data: T } | { ok: false; status: number; error: string };
 
 const TIMEOUT_MS = 10_000;

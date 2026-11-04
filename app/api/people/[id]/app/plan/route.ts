@@ -3,7 +3,7 @@ import { requireApi } from "@/app/lib/users/current";
 import { appAdmin, appConfig } from "@/app/lib/afkar-app/client";
 import { refuse, relay } from "@/app/lib/afkar-app/library-route";
 import { appMemberFor, type AppPlan } from "@/app/lib/afkar-app/person";
-import { goalsPayload, planItemPayload, type AltForm, type AppDay, type Goals, type GoalsForm } from "@/app/lib/afkar-app/nutrition";
+import { goalsPayload, planItemPayload, type AltForm, type AppDay, type AppTemplateRow, type Goals, type GoalsForm } from "@/app/lib/afkar-app/nutrition";
 
 export const runtime = "nodejs";
 type P = { params: Promise<{ id: string }> };
@@ -25,7 +25,8 @@ export async function GET(request: Request, { params }: P) {
   ]);
   if (!day.ok) return relay(day);
   if (!plans.ok) return relay(plans);
-  return NextResponse.json({ day: day.data, plans: plans.data.plans });
+  const templates = await appAdmin<{ meal_templates: AppTemplateRow[] }>(auth.user, "/admin/v1/meal-templates");
+  return NextResponse.json({ day: day.data, plans: plans.data.plans, templates: templates.ok ? templates.data.meal_templates : [] });
 }
 
 /** One line of her plan. The line must be on her day: an id alone proves nothing about whose it is. */

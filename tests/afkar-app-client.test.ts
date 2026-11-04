@@ -135,3 +135,13 @@ test("acting on someone's app account needs people.all or her being assigned to 
   assert.equal(canActOnPerson({ ...limited, permissions: [...limited.permissions, "people.all"] }, other.id), true);
   assert.equal(canActOnPerson({ ...limited, role: "owner", permissions: [] }, other.id), true, "the owner is never short");
 });
+
+test("a coach change on her page tells the app, so the new coach sees her and the old one doesn't", async () => {
+  const { coachChangedEvent } = await import("@/app/lib/afkar-app/client");
+  const set = coachChangedEvent(7, 12);
+  assert.equal(set.type, "person.updated");
+  assert.deepEqual(set.data, { person_id: "7", coach_user_id: "12" });
+  assert.ok(set.event_id && set.occurred_at);
+  assert.deepEqual(coachChangedEvent(7, null).data, { person_id: "7", coach_user_id: null }, "removed means removed, not left as it was");
+  assert.notEqual(coachChangedEvent(7, 12).event_id, set.event_id, "the app ignores an event_id it has seen");
+});
