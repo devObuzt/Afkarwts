@@ -1,11 +1,17 @@
+import { notFound } from "next/navigation";
 import { requireUser } from "@/app/lib/users/current";
+import { can } from "@/app/lib/users/permissions";
 import { listLabels } from "@/app/lib/labels/store";
 import { SmsBlast } from "./SmsBlast";
 
 export const dynamic = "force-dynamic";
 
 export default async function SmsPage() {
-  await requireUser("people.edit");
+  // نفس البوابة المزدوجة تبع المسار: بيبعت **و**بيشوف كل الجمهور.
+  const user = await requireUser("messages.send");
+  if (!can(user, "people.all")) {
+    notFound();
+  }
 
   // المسار مش قائمة إرسال — وبينشال من الاختيار أصلاً مش بينرفض بعدين.
   const labels = listLabels().filter((label) => label.kind !== "path" && label.memberCount > 0);

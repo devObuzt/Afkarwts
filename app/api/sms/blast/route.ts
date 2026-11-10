@@ -5,6 +5,7 @@ import { getDataDir } from "@/app/lib/media-store";
 import { audienceFor, renderFor, segments, STOP_TOKEN } from "@/app/lib/sms/blast";
 import { sendSms } from "@/app/lib/sms";
 import { requireApi } from "@/app/lib/users/current";
+import { can } from "@/app/lib/users/permissions";
 import { recordAction } from "@/app/lib/users/audit";
 import { sendTelegramMessage } from "@/app/lib/telegram";
 
@@ -20,9 +21,19 @@ export const maxDuration = 300;
  * انعرض عليه.
  */
 export async function POST(request: Request) {
-  const auth = await requireApi("people.edit");
+  // 🔒 `people.edit` كانت غلط: بتخوّل المرافِقة تعدّل بيانات منتسبة —
+  // مش تبعت خمس آلاف رسالة. الإرسال الجماعي بدّه **الاثنين**:
+  // `messages.send` (إنّه مخوّل يبعت) و`people.all` (إنّه مخوّل يشوف كل
+  // الجمهور أصلاً) — والمرافِقة عندها الأولى بلا التانية، فبتنحجب.
+  const auth = await requireApi("messages.send");
   if (!auth.ok) {
     return auth.response;
+  }
+  if (!can(auth.user, "people.all")) {
+    return NextResponse.json(
+      { error: "الإرسال الجماعي لمين بيشوف كل أعضاء النادي — إنتِ بتشوفي منتسباتك بس." },
+      { status: 403 }
+    );
   }
 
   const body = (await request.json()) as {
