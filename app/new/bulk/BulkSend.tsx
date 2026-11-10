@@ -280,8 +280,15 @@ export function BulkSend({ groups }: { groups: Group[] }) {
         <section className="crmCard crmPad">
           <label style={{ display: "block", marginBottom: 10 }}>
             <input checked={skipAlreadySent} onChange={(event) => setSkipAlreadySent(event.target.checked)} type="checkbox" />{" "}
-            تخطّي اللي وصلتها هاي الرسالة من قبل
+            تخطّي اللي وصلها <strong>نفس النص</strong> من قبل
           </label>
+          {skipAlreadySent ? (
+            <p className="crmNote">
+              ⚠️ المقارنة على <strong>نص الرسالة</strong> مش على القالب. قالبان نصّهما واحد (مثلاً نسخة
+              بصورة ونسخة بلاها) بيتحسبوا نفس الرسالة — فاللي استلم الأولى بينتخطّى بالتانية. إذا بدّك
+              تبعتي النسخة التانية لنفس الناس، شيلي العلامة.
+            </p>
+          ) : null}
           {!skipAlreadySent ? (
             <p className="crmNote">
               بلا هاد ما في مؤشّر: الإرسال بياخد أول دفعة وبس، وما بيكمّل على الباقي — وهاد مقصود،
