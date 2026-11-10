@@ -87,3 +87,37 @@ export function removeFromGroup(groupId: number, templateName: string) {
     .prepare("DELETE FROM template_group_items WHERE group_id = ? AND template_name = ?")
     .run(groupId, templateName);
 }
+
+/**
+ * مين **ما** بدّه سطر إيقاف الرسائل.
+ *
+ * القاعدة (وسام 10.11): كل قالب MARKETING بياخد السطر افتراضياً. الصف
+ * اللي بـ`opt_out_line = 0` هو قرار صريح إنّ هاد القالب بلا سطر —
+ * وهاد اللي بيميّز «قرّرنا لأ» عن «ما حدا فتحه لهلق».
+ *
+ * 🔑 الاستثناء الحقيقي هون محتوى المسار: ميتا مصنّفة ٤٥ من قوالب كلين
+ * كـMARKETING وهنّي رسائل برنامج لزبونة دافعة. سطر «ما بتحب تستلم
+ * عروض؟» على رسالة يوم تالت بيقرا غلط، والأخطر إنّ كبستها بتوقف عنها
+ * رسائل برنامجها — لأنّ الحارس بيمشي على **حمل الزر**.
+ */
+export function optOutLineOff(): string[] {
+  const rows = getDb()
+    .prepare("SELECT template_name FROM template_aliases WHERE opt_out_line = 0")
+    .all() as Array<{ template_name: string }>;
+  return rows.map((row) => row.template_name);
+}
+
+export function wantsOptOutLine(templateName: string) {
+  const row = getDb()
+    .prepare("SELECT opt_out_line FROM template_aliases WHERE template_name = ?")
+    .get(templateName) as { opt_out_line: number } | undefined;
+  // غياب الصف = ما حدا قرّر = القاعدة بتنطبق.
+  return row ? row.opt_out_line !== 0 : true;
+}
+
+export function setOptOutLine(templateName: string, wanted: boolean) {
+  ensureRow(templateName);
+  getDb()
+    .prepare("UPDATE template_aliases SET opt_out_line = ? WHERE template_name = ?")
+    .run(wanted ? 1 : 0, templateName);
+}

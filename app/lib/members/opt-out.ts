@@ -1,4 +1,8 @@
+import { appendFileSync } from "node:fs";
+import path from "node:path";
 import { findMemberByPhone, getDb, getMember, type Member } from "../db";
+import { getDataDir } from "../media-store";
+import { sendTelegramMessage } from "../telegram";
 import { recordAction } from "../users/audit";
 
 /**
@@ -139,6 +143,27 @@ export function requestOptOut(input: {
       subjectLabel: member.name || member.phone,
       detail: `طلب إيقاف الرسائل — ${OPT_OUT_SOURCE_LABEL[input.source]}${input.note ? ` · ${input.note}` : ""}`
     });
+
+    logOptOut({
+      at: new Date().toISOString(),
+      event: "optout",
+      memberId: member.id,
+      phone: member.phone,
+      name: member.name,
+      source: input.source,
+      note: (input.note ?? "").slice(0, 200),
+      byUserId: input.byUserId ?? null
+    });
+
+    // التنبيه بلا انتظار: طلب الإيقاف انسجّل خلص، وفشل تلجرام ما
+    // بيستاهل يوقّف استقبال الرسالة اللي جابته.
+    void sendTelegramMessage(
+      `🛑 طلب إيقاف رسائل — أفكار\n` +
+        `${member.name || member.phone}\n` +
+        `${member.phone}\n` +
+        `المصدر: ${OPT_OUT_SOURCE_LABEL[input.source]}` +
+        (input.note ? `\nكتب: ${input.note.slice(0, 120)}` : "")
+    ).catch((error) => console.error("Opt-out Telegram failed:", error));
   }
 
   return getMember(member.id);
@@ -165,7 +190,37 @@ export function undoOptOut(memberId: number, by: { userId: number | null; actor:
     detail: "إرجاع الرسائل بعد طلب إيقاف"
   });
 
+  // الرجعة حدث متل الإيقاف — بلاها السجل بيقرا إنّ الرقم لسّه موقّف.
+  logOptOut({
+    at: new Date().toISOString(),
+    event: "resume",
+    memberId,
+    phone: member.phone,
+    name: member.name,
+    byUserId: by.userId,
+    actor: by.actor
+  });
+
   return getMember(memberId);
+}
+
+/**
+ * سجل مستقل عن القاعدة، سطر لكل طلب (`optout.jsonl` جانب القاعدة على
+ * نفس الفوليوم).
+ *
+ * ليش مرتين — بالقاعدة وبالملف: العمود بالقاعدة حالة، بينقرا وبينغيّر
+ * وبينشال؛ والملف **حدث**، append-only. لو رجّع حدا رقم بالغلط أو
+ * انمحى صف، الملف بيضل شاهد إنّ الطلب صار بهاي اللحظة. وهاد طلب قانوني
+ * قبل ما يكون ميزة.
+ *
+ * الكتابة ما بترمي أبداً: فقدان سطر سجل أرخص من رفض طلب إيقاف.
+ */
+function logOptOut(entry: Record<string, unknown>) {
+  try {
+    appendFileSync(path.join(getDataDir(), "optout.jsonl"), JSON.stringify(entry) + "\n");
+  } catch (error) {
+    console.error("optout.jsonl write failed:", error);
+  }
 }
 
 export function countOptedOut() {

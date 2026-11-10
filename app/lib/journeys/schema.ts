@@ -132,5 +132,9 @@ export function migrateJourneyTables(db: DatabaseSync) {
   // can tell "never answered" from "we decided to try again".
   addColumnIfMissing(db, "journey_enrollments", "resumed_at", "TEXT");
   addColumnIfMissing(db, "template_aliases", "frozen_at", "TEXT");
+  // قاعدة وسام 10.11: كل قالب MARKETING بياخد سطر إيقاف **افتراضياً**،
+  // وإلغاؤه قرار بينكتب. الافتراضي 1 عشان القالب الجديد يدخل القاعدة
+  // لحاله — ولو كان الافتراضي 0 كانت القاعدة بتعتمد على إنّ حدا يتذكّر.
+  addColumnIfMissing(db, "template_aliases", "opt_out_line", "INTEGER NOT NULL DEFAULT 1");
   addColumnIfMissing(db, "followups", "step_id", "INTEGER");
 }
