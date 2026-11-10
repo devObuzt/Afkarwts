@@ -54,3 +54,16 @@ test("ملصق المسار مرفوض كقائمة إرسال", async () => {
   setLabelKind(group.id, "path");
   assert.throws(() => audienceFor([group.id]), /مسار مش دفعة/);
 });
+
+test("قالب بهيدر صورة بياخد رابطه من الخريطة لما ما يكون في ملف مرفوع", async () => {
+  const { templateHeaderUrl } = await import("@/app/lib/template-media");
+  const { TEMPLATE_HEADER_URLS } = await import("@/app/lib/template-headers");
+
+  // 🔑 بلا هاد الرجوع، قالب انعمل من برا الواجهة بيفشل إرساله بـ#132012
+  // برسالة ما بتذكر صورة أبداً — وبيضل ميت بهدوء.
+  const name = Object.keys(TEMPLATE_HEADER_URLS)[0];
+  assert.ok(name, "في قالب واحد على الأقل بالخريطة");
+  assert.equal(templateHeaderUrl(name), TEMPLATE_HEADER_URLS[name]);
+  assert.match(String(templateHeaderUrl(name)), /^https:\/\//, "ميتا بتجيب الصورة بنفسها فلازم رابط عام");
+  assert.equal(templateHeaderUrl("قالب_مش_موجود"), null);
+});

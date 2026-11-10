@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { getDataDir } from "./media-store";
+import { headerUrlFor } from "./template-headers";
 
 /**
  * The picture at the top of a template.
@@ -62,5 +63,11 @@ export function templateHeaderFile(name: string) {
  */
 export function templateHeaderUrl(name: string) {
   const base = process.env.PUBLIC_BASE_URL || "https://www.afkarheartbeat.com";
-  return templateHeaderFile(name) ? `${base.replace(/\/$/, "")}/api/t/${name}/header` : null;
+  if (templateHeaderFile(name)) {
+    return `${base.replace(/\/$/, "")}/api/t/${name}/header`;
+  }
+  // الملف المرفوع أولاً، وبعده الرابط العام المكتوب بالريبو. بلا هاد
+  // الرجوع، قالب بهيدر صورة انعمل من برا الواجهة بيفشل إرساله بـ#132012
+  // برسالة ما بتذكر صورة.
+  return headerUrlFor(name);
 }
