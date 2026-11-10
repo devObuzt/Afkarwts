@@ -485,8 +485,20 @@ export async function listWhatsAppTemplates(
 
 export type NewTemplateButton =
   | { type: "QUICK_REPLY"; text: string }
-  | { type: "URL"; text: string; url: string }
-  | { type: "PHONE_NUMBER"; text: string; phoneNumber: string };
+  /** `urlExample` إجباري لما الرابط فيه `{{1}}` — ميتا بترفض بلاه. */
+  | { type: "URL"; text: string; url: string; urlExample?: string }
+  | { type: "PHONE_NUMBER"; text: string; phoneNumber: string }
+  /**
+   * زر نسخ كود الكوبون.
+   *
+   * ⚠️ **الكود بينحدّد وقت الإرسال** حسب توثيق ميتا، وشكل البارامتر
+   * **مش موثّق** بأي صفحة قدرنا نقراها. يعني قالب فيه هاد الزر ممكن
+   * يحتاج بارامتر بالحمولة، وغيابه بيرجّع #132000 وبتفشل كل إرسالة.
+   * لهيك: أول إرسالة لأي قالب فيه هاد الزر بتروح **لرقم وسام** وبتنقرا
+   * النتيجة قبل أي حملة. والكود مكتوب بنص الرسالة كمان، فحتى لو الزر
+   * ما اشتغل الكود بيوصل.
+   */
+  | { type: "COPY_CODE"; code: string };
 
 export type NewTemplate = {
   name: string;
@@ -548,13 +560,22 @@ export async function createWhatsAppTemplate(input: NewTemplate) {
   if (input.buttons?.length) {
     components.push({
       type: "BUTTONS",
-      buttons: input.buttons.map((button) =>
-        button.type === "URL"
-          ? { type: "URL", text: button.text, url: button.url }
-          : button.type === "PHONE_NUMBER"
-            ? { type: "PHONE_NUMBER", text: button.text, phone_number: button.phoneNumber }
-            : { type: "QUICK_REPLY", text: button.text }
-      )
+      buttons: input.buttons.map((button) => {
+        if (button.type === "URL") {
+          // المثال بينبعت بس لما الرابط فيه متغيّر — ميتا بترفض مثالاً
+          // على رابط ثابت، وبترفض رابطاً متغيّراً بلا مثال.
+          return button.url.includes("{{1}}")
+            ? { type: "URL", text: button.text, url: button.url, example: [button.urlExample ?? button.url.replace("{{1}}", "example")] }
+            : { type: "URL", text: button.text, url: button.url };
+        }
+        if (button.type === "PHONE_NUMBER") {
+          return { type: "PHONE_NUMBER", text: button.text, phone_number: button.phoneNumber };
+        }
+        if (button.type === "COPY_CODE") {
+          return { type: "COPY_CODE", example: button.code };
+        }
+        return { type: "QUICK_REPLY", text: button.text };
+      })
     });
   }
 
