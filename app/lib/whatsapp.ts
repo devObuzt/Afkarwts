@@ -506,6 +506,13 @@ export type NewTemplate = {
   category: "UTILITY" | "MARKETING";
   bodyText: string;
   headerText?: string;
+  /**
+   * مقبض صورة الهيدر من Resumable Upload API.
+   *
+   * ميتا ما بتقبل رابط صورة وقت إنشاء القالب — بدها الملف ينترفع أولاً
+   * وبترجّع مقبض (`h`)، وهو اللي بينحط كـ`example.header_handle`.
+   */
+  headerImageHandle?: string;
   footerText?: string;
   buttons?: NewTemplateButton[];
   allowCategoryChange?: boolean;
@@ -543,7 +550,13 @@ export async function createWhatsAppTemplate(input: NewTemplate) {
 
   const components: Array<Record<string, unknown>> = [];
 
-  if (input.headerText?.trim()) {
+  if (input.headerImageHandle) {
+    components.push({
+      type: "HEADER",
+      format: "IMAGE",
+      example: { header_handle: [input.headerImageHandle] }
+    });
+  } else if (input.headerText?.trim()) {
     components.push({ type: "HEADER", format: "TEXT", text: input.headerText.trim() });
   }
 
@@ -805,4 +818,57 @@ export async function downloadWhatsAppMedia(mediaUrl: string) {
   }
 
   return new Uint8Array(await response.arrayBuffer());
+}
+
+/**
+ * بترفع صورة لميتا وبترجّع مقبضها، عشان تنحط كهيدر بقالب جديد.
+ *
+ * ميتا ما بتقبل رابط صورة وقت إنشاء القالب — في مسار منفصل
+ * (Resumable Upload API) على **معرّف التطبيق** مش على رقم الواتساب:
+ * جلسة أولاً، وبعدها البايتات، والرد فيه `h` وهو المقبض.
+ *
+ * ⚠️ الترويسة هون `Authorization: OAuth <token>` مش `Bearer` — ميتا
+ * بترفض `Bearer` على هاد المسار لحاله.
+ */
+export async function uploadTemplateHeaderImage(input: {
+  bytes: Uint8Array;
+  mimeType: string;
+  appId?: string;
+}) {
+  const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
+  const apiVersion = process.env.WHATSAPP_API_VERSION || "v23.0";
+  const appId = input.appId || process.env.WHATSAPP_APP_ID;
+
+  if (!accessToken) {
+    throw new Error("WHATSAPP_ACCESS_TOKEN is missing.");
+  }
+  if (!appId) {
+    throw new Error("WHATSAPP_APP_ID is missing — the resumable upload runs on the app, not the phone number.");
+  }
+
+  const start = await fetch(
+    `https://graph.facebook.com/${apiVersion}/${appId}/uploads` +
+      `?file_length=${input.bytes.byteLength}&file_type=${encodeURIComponent(input.mimeType)}`,
+    { method: "POST", headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+  const session = (await start.json()) as { id?: string; error?: { message?: string } };
+  if (!start.ok || !session.id) {
+    throw new Error(session.error?.message || `فتح جلسة الرفع فشل (${start.status})`);
+  }
+
+  const upload = await fetch(`https://graph.facebook.com/${apiVersion}/${session.id}`, {
+    method: "POST",
+    headers: {
+      Authorization: `OAuth ${accessToken}`,
+      file_offset: "0",
+      "Content-Type": input.mimeType
+    },
+    body: Buffer.from(input.bytes)
+  });
+  const payload = (await upload.json()) as { h?: string; error?: { message?: string } };
+  if (!upload.ok || !payload.h) {
+    throw new Error(payload.error?.message || `رفع الصورة فشل (${upload.status})`);
+  }
+
+  return payload.h;
 }

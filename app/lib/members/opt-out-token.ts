@@ -86,3 +86,63 @@ export function phoneFromOptOutToken(token: string): string | null {
 export function optOutLink(phone: string, base = process.env.PUBLIC_BASE_URL || "https://www.afkarheartbeat.com") {
   return `${base.replace(/\/+$/, "")}/stop/${issueOptOutToken(phone)}`;
 }
+
+/**
+ * التوكن القصير — لرسائل الـSMS.
+ *
+ * 🔑 **ليش نسخة تانية:** توكن `/stop/` فيه الرقم كاملاً وبصمة ١٦ حرف،
+ * فالرابط بيطلع ٦٢ حرف. بالـSMS العربي المقطع ٧٠ حرف — يعني الرابط
+ * لحاله بياكل مقطع، وكل مقطع زيادة = ٥ آلاف رسالة زيادة على دفعة
+ * الـ٥ آلاف.
+ *
+ * فالقصير بيحمل **معرّف الصف** بـbase36 بدل الرقم، وبصمة ٧ أحرف
+ * base64url (42 بت). التزوير بدّه ٢ أس ٤٢ محاولة على فعل **عكوس**
+ * (الطاقم بيرجّع بكبسة) — فالمقايضة مقبولة هون وما بتنطبق على `/stop/`.
+ */
+const SHORT_SIGNATURE_LENGTH = 7;
+
+function shortSign(id: number) {
+  return createHmac("sha256", secret()).update(`m${id}`).digest("base64url").slice(0, SHORT_SIGNATURE_LENGTH);
+}
+
+export function issueShortOptOutToken(memberId: number) {
+  if (!Number.isInteger(memberId) || memberId <= 0) {
+    throw new Error("A member id is needed to issue a short opt-out link.");
+  }
+  return `${memberId.toString(36)}.${shortSign(memberId)}`;
+}
+
+/** بيرجّع معرّف الصف إذا البصمة صحّت، و`null` غير هيك. */
+export function memberIdFromShortToken(token: string): number | null {
+  const raw = (token ?? "").trim();
+  const dot = raw.lastIndexOf(".");
+  if (dot <= 0 || dot === raw.length - 1) {
+    return null;
+  }
+
+  const id = Number.parseInt(raw.slice(0, dot), 36);
+  if (!Number.isInteger(id) || id <= 0) {
+    return null;
+  }
+
+  const given = Buffer.from(raw.slice(dot + 1));
+  let expected: Buffer;
+  try {
+    expected = Buffer.from(shortSign(id));
+  } catch {
+    return null;
+  }
+
+  if (given.length !== expected.length || !timingSafeEqual(given, expected)) {
+    return null;
+  }
+
+  return id;
+}
+
+export function shortOptOutLink(
+  memberId: number,
+  base = process.env.PUBLIC_BASE_URL || "https://www.afkarheartbeat.com"
+) {
+  return `${base.replace(/\/+$/, "")}/s/${issueShortOptOutToken(memberId)}`;
+}

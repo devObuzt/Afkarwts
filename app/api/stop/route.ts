@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { findMemberByPhone } from "@/app/lib/db";
+import { findMemberByPhone, getMember } from "@/app/lib/db";
 import { requestOptOut, undoOptOut } from "@/app/lib/members/opt-out";
-import { phoneFromOptOutToken } from "@/app/lib/members/opt-out-token";
+import { memberIdFromShortToken, phoneFromOptOutToken } from "@/app/lib/members/opt-out-token";
 
 export const runtime = "nodejs";
 
@@ -22,12 +22,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "طلب غير صالح." }, { status: 400 });
   }
 
-  const phone = phoneFromOptOutToken(body.token ?? "");
-  if (!phone) {
-    return NextResponse.json({ error: "الرابط غير صالح." }, { status: 404 });
-  }
+  // التوكنان الاثنان بيفوتوا من هون: الطويل من رسالة الواتساب،
+  // والقصير من الـSMS. المقارنة بوقت ثابت بالحالتين.
+  const token = body.token ?? "";
+  const phone = phoneFromOptOutToken(token);
+  const shortId = phone ? null : memberIdFromShortToken(token);
 
-  const member = findMemberByPhone(`+${phone}`) ?? findMemberByPhone(phone);
+  const member = phone
+    ? findMemberByPhone(`+${phone}`) ?? findMemberByPhone(phone)
+    : shortId
+      ? getMember(shortId)
+      : null;
+
   if (!member) {
     return NextResponse.json({ error: "الرابط غير صالح." }, { status: 404 });
   }
