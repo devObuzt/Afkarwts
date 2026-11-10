@@ -38,6 +38,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "الرابط غير صالح." }, { status: 404 });
   }
 
+  // 🔑 الرجعة بالتوكن القصير ممنوعة: هي بتلغي طلب إيقاف، وبصمة ٦٠ بت
+  // جايّة بـSMS مش أساس كافي لفعل بيلغي حقاً قانونياً. الطويل أو الطاقم.
+  if (body.action === "resume" && !phone) {
+    return NextResponse.json(
+      { error: "إرجاع الرسائل بيتعمل من رابط الواتساب أو من الطاقم." },
+      { status: 403 }
+    );
+  }
+
   if (body.action === "resume") {
     undoOptOut(member.id, { userId: null, actor: "رابط الرسالة" });
     return NextResponse.json({ ok: true, stopped: false });
