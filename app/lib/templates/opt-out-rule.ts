@@ -20,7 +20,8 @@ function base() {
   return (process.env.PUBLIC_BASE_URL || "https://www.afkarheartbeat.com").replace(/\/+$/, "");
 }
 
-export function optOutButton(): NewTemplateButton {
+/** النوع صريح (مش الاتحاد) عشان `.url` تكون مقروءة بلا تضييق. */
+export function optOutButton(): { type: "URL"; text: string; url: string; urlExample: string } {
   return {
     type: "URL",
     text: OPT_OUT_BUTTON_TEXT,
@@ -29,8 +30,30 @@ export function optOutButton(): NewTemplateButton {
   };
 }
 
+/**
+ * هل الزر الموجود هو **زرّنا** فعلاً.
+ *
+ * 🔴 كان `url.includes("/stop/")` — وهاد بيخلّي أي رابط فيه المقطع
+ * (`https://any.site/stop/x`) يمرّق كأنه طريق خروج، فالقاعدة بتتخطّى
+ * نفسها والمنظومة بتسجّل «يحمل سطر إيقاف» على قالب ما بيحمله. وأسوأ
+ * إشي إنّ حارس الإرسال بيقرا من نفس السجل.
+ *
+ * فالمقارنة صارت على **الأصل والمسار**: نفس الهوست ومسار `/stop/`
+ * بالضبط. أي إشي تاني = مش زرّنا، والزر الحقيقي بينضاف.
+ */
 export function alreadyCarriesOptOut(buttons: NewTemplateButton[] | undefined) {
-  return (buttons ?? []).some((button) => button.type === "URL" && button.url.includes("/stop/"));
+  const expected = new URL(optOutButton().url.replace("{{1}}", "x"));
+  return (buttons ?? []).some((button) => {
+    if (button.type !== "URL") {
+      return false;
+    }
+    try {
+      const url = new URL(button.url.replace("{{1}}", "x"));
+      return url.origin === expected.origin && url.pathname.startsWith("/stop/");
+    } catch {
+      return false;
+    }
+  });
 }
 
 /**
@@ -41,7 +64,7 @@ export function alreadyCarriesOptOut(buttons: NewTemplateButton[] | undefined) {
  */
 export function applyOptOutRule(
   input: NewTemplate & { optOutLine?: boolean }
-): { template: NewTemplate; applied: boolean; notes: string[] } {
+): { template: NewTemplate; applied: boolean; blocked?: boolean; notes: string[] } {
   const wanted = input.optOutLine !== false;
   const notes: string[] = [];
 
@@ -60,9 +83,13 @@ export function applyOptOutRule(
   // 🔑 ثلاثة هو السقف اللي بيضل ظاهر عند ميتا — الرابع وما بعده بينخفوا
   // ورا «See all options»، وساعتها طريق الخروج القانوني بيصير مخبّى.
   if (buttons.length >= 3) {
+    // 🔑 الفشل مقفول: بترجّع `blocked` فالمسار بيرفض بـ400 بدل ما يعمل
+    // القالب بهدوء ويسجّله كملتزم. إنشاء قالب تسويقي بلا طريق خروج
+    // وتسجيله كأنه ملتزم أسوأ من رفض بوجه صاحبه.
     return {
       template: input,
       applied: false,
+      blocked: true,
       notes: [`فيه ${buttons.length} أزرار — زر الهسرة بينخفي ورا «See all options». شيلي زر.`]
     };
   }

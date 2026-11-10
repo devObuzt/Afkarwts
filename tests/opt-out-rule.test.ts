@@ -90,3 +90,42 @@ test("القالب اللي فيه الزر ما بياخده مرتين", async
   assert.equal(applied, true);
   assert.equal(template.buttons?.length, 1);
 });
+
+test("رابط غريب فيه /stop/ ما بيمرّق كطريق خروج", async () => {
+  const { applyOptOutRule, alreadyCarriesOptOut } = await import("@/app/lib/templates/opt-out-rule");
+
+  // 🔴 الثقب اللي انسدّ: `includes("/stop/")` كان بيخلّي أي رابط يمرّق،
+  // فالقاعدة بتتخطّى نفسها والسجل بيقول «ملتزم» على قالب ما بيحمل إشي —
+  // وحارس الإرسال بيقرا من نفس السجل.
+  const foreign = [{ type: "URL" as const, text: "عرض", url: "https://evil.example.com/stop/x" }];
+  assert.equal(alreadyCarriesOptOut(foreign), false, "هوست تاني مش زرّنا");
+
+  const { template, applied } = applyOptOutRule({ ...BASE, buttons: [...foreign] });
+  assert.equal(applied, true);
+  assert.equal(template.buttons?.length, 2, "الزر الحقيقي انضاف فوقه");
+  assert.match(String((template.buttons?.[1] as { url: string }).url), /afkarheartbeat\.com\/stop\//);
+
+  // ومسار تاني على نفس الهوست كمان مش طريق خروج.
+  assert.equal(
+    alreadyCarriesOptOut([{ type: "URL", text: "x", url: "https://www.afkarheartbeat.com/new/stop-ish" }]),
+    false
+  );
+  // ورابط مكسور ما بيرمي.
+  assert.equal(alreadyCarriesOptOut([{ type: "URL", text: "x", url: "مش رابط" }]), false);
+});
+
+test("تلاتة أزرار بترجّع blocked — مش إنشاء صامت", async () => {
+  const { applyOptOutRule } = await import("@/app/lib/templates/opt-out-rule");
+  const { blocked, applied } = applyOptOutRule({
+    ...BASE,
+    buttons: [
+      { type: "QUICK_REPLY", text: "أ" },
+      { type: "QUICK_REPLY", text: "ب" },
+      { type: "URL", text: "ج", url: "https://x.example" }
+    ]
+  });
+  // المسار بيرفض بـ400 على هاي: قالب تسويقي بلا طريق خروج **مسجَّل
+  // كملتزم** أسوأ من رفض بوجه صاحبه.
+  assert.equal(blocked, true);
+  assert.equal(applied, false);
+});
