@@ -163,6 +163,7 @@ export function getDb() {
     migrateSellerColumn(db);
     migrateIssuedAtColumn(db);
     migrateOptOutColumns(db);
+    migrateAppState(db);
     globalForDb.__afkarDb = db;
   }
 
@@ -357,6 +358,17 @@ function migrateMemberProfileColumns(db: DatabaseSync) {
  * محطوطة على `members` مش بجدول لحالها بالمقصود: السؤال «هل هاد الرقم
  * طلب يوقف؟» بينسأل عند كل إرسالة، والجوين بيفتح طريق للنسيان.
  */
+/** مفاتيح وقيم صغيرة للمجدول: آخر رقم تقرير لكل حملة مثلاً. */
+function migrateAppState(db: DatabaseSync) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS app_state (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+}
+
 function migrateOptOutColumns(db: DatabaseSync) {
   if (!hasColumn(db, "members", "opt_out_at")) {
     db.exec("ALTER TABLE members ADD COLUMN opt_out_at TEXT");

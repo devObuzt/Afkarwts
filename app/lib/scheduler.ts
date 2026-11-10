@@ -31,6 +31,18 @@ if (!globalForScheduler.__afkarSchedulerStarted) {
   setTimeout(drainNow, 15 * 1000);
   setInterval(drainNow, 60 * 1000);
 
+  // تقرير الحملات على تلجرام. بيمشي كل عشر دقايق وبيبعت **بس لما يتغيّر
+  // رقم** — وسام سأل «نتأكد إنه عملنا اللي علينا» وقت ما تكون الشاشة
+  // مسكّرة، وهاد جوابه بلا ما يفتح إشي.
+  const reportTick = () => {
+    import("./campaign-watch")
+      .then((module) => module.reportActiveCampaigns())
+      .catch((error) => console.error("Campaign report tick failed:", error));
+  };
+
+  setTimeout(reportTick, 45 * 1000);
+  setInterval(reportTick, 10 * 60 * 1000);
+
   // Journeys tick far more often than campaigns: a step is due at a given hour,
   // and a missed window is reported rather than sent late.
   const journeyTick = () => {
