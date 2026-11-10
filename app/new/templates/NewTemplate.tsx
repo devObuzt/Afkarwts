@@ -36,6 +36,9 @@ export function NewTemplate({
   const [footerText, setFooterText] = useState("");
   const [buttons, setButtons] = useState<Button[]>([]);
   const [examples, setExamples] = useState<string[]>([]);
+  // قاعدة وسام 10.11: معلَّم افتراضياً لكل قالب تسويقي. السيرفر هو اللي
+  // بيفرضها — هون بس عشان تنشاف وتنقدر تنشال بوعي.
+  const [optOutLine, setOptOutLine] = useState(true);
 
   const params = placeholders(bodyText);
   const headerHasEmoji = EMOJI.test(headerText);
@@ -55,6 +58,7 @@ export function NewTemplate({
           bodyText,
           footerText,
           buttons,
+          optOutLine,
           bodyExamples: Array.from({ length: params }, (_, at) => examples[at] || "سارة")
         })
       });
@@ -237,6 +241,27 @@ export function NewTemplate({
           />
         </label>
 
+        {category === "MARKETING" && (
+          <div className="crmField full">
+            <label style={{ display: "flex", gap: 9, alignItems: "flex-start", cursor: "pointer" }}>
+              <input
+                checked={optOutLine}
+                onChange={(event) => setOptOutLine(event.target.checked)}
+                style={{ width: "auto", marginTop: 3 }}
+                type="checkbox"
+              />
+              <span>
+                <strong>يحمل طريق إيقاف الرسائل</strong>
+                <span style={{ display: "block", color: "var(--faint)", fontSize: 12, marginTop: 3 }}>
+                  بينضاف لحاله: زر «إيقاف الرسائل» آخر الأزرار، وسطر فوتر إذا الفوتر فاضي. القانون بيطلب طريق
+                  خروج بكل رسالة تسويق — فشيلي العلامة بس إذا هاد القالب مش عرض فعلاً (محتوى مسار لزبونة
+                  دافعة مثلاً)، والقرار بينكتب باسمك.
+                </span>
+              </span>
+            </label>
+          </div>
+        )}
+
         <div className="crmField full">
           <span>
             أزرار (اختياري)
@@ -310,7 +335,7 @@ export function NewTemplate({
             </div>
           ))}
 
-          {buttons.length < 3 && (
+          {buttons.length < (category === "MARKETING" && optOutLine ? 2 : 3) && (
             <button
               className="crmBtn quiet"
               onClick={() => setButtons([...buttons, { type: "QUICK_REPLY", text: "" }])}
