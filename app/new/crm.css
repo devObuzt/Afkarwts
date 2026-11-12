@@ -3221,3 +3221,88 @@ body.resizingCol {
     display: none;
   }
 }
+
+
+/* ────────────────────────────────────────────────────────────────
+   لابتوب صغير: الجدول بيسكرول جوّا الشاشة، واللوحة بتنطوي
+   ──────────────────────────────────────────────────────────────── */
+
+/**
+ * شريط السكرول الأفقي بيصير على طرف الشاشة مش على طرف الجدول.
+ *
+ * 🔴 **كان الجدول بيمتد بطوله، فشريط السكرول الأفقي بينزل تحت آخر
+ * سطر.** مع ١١٦ تسجيل، اللي بدّه يشوف عمود على الشمال لازم ينزل
+ * الصفحة كلها لتحت، يسحب، ويطلع من جديد. على لابتوب بفأرة هاي
+ * الرحلة بتتكرر كل عمود.
+ *
+ * بتحديد ارتفاع الصندوق، السكرولان التنين بيقعدوا على حدود الشاشة
+ * وبيضلوا بمتناول اليد، والعناوين بتثبت فوق لأنها `sticky` جوّا
+ * هاد الصندوق. `min-height` حتى ما ينهرس الجدول على شاشة واطية.
+ */
+@media screen {
+  .crm .gridScroll {
+    max-height: calc(100svh - 196px);
+    min-height: 320px;
+    overflow: auto;
+    /* السكرول بينتهي عند حدود الجدول بدل ما يكمّل يحرّك الصفحة ورا. */
+    overscroll-behavior: contain;
+  }
+}
+
+/** كبسة طيّ اللوحة، بزاوية رأس القائمة. */
+.crm .waFold {
+  margin-inline-end: auto;
+  padding: 0 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 22px;
+  cursor: pointer;
+}
+
+.crm .waFold:hover {
+  border-color: var(--line-strong);
+  color: var(--ink);
+}
+
+/** مطوية: شريط ضيّق وبس. */
+.crm .waPane[data-collapsed="yes"] {
+  flex: 0 0 34px;
+  min-width: 34px;
+}
+
+.crm .waReopen {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.crm .waReopen:hover {
+  color: var(--ink);
+  background: var(--tone-wash);
+}
+
+/** الاسم بينقرا من تحت لفوق، فالشريط بيضل ٣٤ بكسل. */
+.crm .waReopenText {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+@media print {
+  .crm .waFold,
+  .crm .waPane[data-collapsed="yes"] {
+    display: none;
+  }
+}

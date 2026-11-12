@@ -57,6 +57,9 @@ const GRIPS = {
 
 type GripName = keyof typeof GRIPS;
 
+/** طيّ اللوحة بينتذكر بهاد المتصفح، زي عرض الأعمدة. */
+const FOLD_KEY = "afkar:wa:folded";
+
 function readWidth(name: GripName) {
   const grip = GRIPS[name];
   const live = parseFloat(
@@ -207,6 +210,33 @@ export function WhatsAppWidget({
   const [threads, setThreads] = useState<Thread[]>([]);
   const [unreadTotal, setUnreadTotal] = useState(0);
   const [query, setQuery] = useState("");
+  /**
+   * اللوحة مطوية ولا لأ — بينتذكر بهاد المتصفح.
+   *
+   * ⚠️ بينقرا بعد التركيب مش وقت أول رسم: السيرفر ما بيعرف تخزين
+   * المتصفح، ولو رسمنا المطوية من أول لحظة بتختلف نسخة السيرفر عن
+   * نسخة المتصفح وبترمي React الشجرة كلها.
+   */
+  const [collapsed, setCollapsed] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+    try {
+      setCollapsed(window.localStorage.getItem(FOLD_KEY) === "yes");
+    } catch {
+      // متصفح بوضع خاص بيرمي على التخزين. اللوحة بتفتح، وهاد الصح.
+    }
+  }, []);
+  useEffect(() => {
+    if (!mounted) {
+      return;
+    }
+    try {
+      window.localStorage.setItem(FOLD_KEY, collapsed ? "yes" : "no");
+    } catch {
+      // مش مشكلة: بتضل مفتوحة بالجلسة الجاية وبس.
+    }
+  }, [collapsed, mounted]);
   const [openId, setOpenId] = useState<number | null>(null);
   // The rail is filtered by the search box. Without a copy of the thread,
   // typing a name would close the conversation that is open.
@@ -441,6 +471,21 @@ export function WhatsAppWidget({
     await loadThreads();
   }
 
+  // 🔑 **اللوحة بتنطوي.** على لابتوب صغير بتاخد ربع الشاشة، والجدول
+  // اللي جنبها فيه عشرين عمود — فالشغل على الجدول بيصير بشق النفس.
+  // المطوية بتسيب شريط ضيّق فيه الاسم وعدّاد اللي ما انقرا، فالقرار
+  // «أفتحها ولا لأ» بيضل قدّام العين بدل ما تختفي اللوحة بلا رجعة.
+  if (mounted && collapsed) {
+    return (
+      <aside className="waPane" data-collapsed="yes">
+        <button className="waReopen" onClick={() => setCollapsed(false)} title="افتح الواتساب" type="button">
+          <span className="waReopenText">واتساب</span>
+          {unreadTotal > 0 && <span className="crmPill alert">{unreadTotal}</span>}
+        </button>
+      </aside>
+    );
+  }
+
   return (
     /* The conversation is not drawn until one is chosen, and the rail
        alone leaves the system 85% of the screen instead of 60%. */
@@ -454,6 +499,14 @@ export function WhatsAppWidget({
       <div className="waRail">
         {open ? <PaneGrip label="عرض قائمة المحادثات" name="rail" /> : null}
         <div className="waRailHead">
+          <button
+            className="waFold"
+            onClick={() => setCollapsed(true)}
+            title="اطوِ لوحة الواتساب — بتفضى الشاشة للجدول"
+            type="button"
+          >
+            ⟨
+          </button>
           <span className="waTitle">واتساب</span>
           {unreadTotal > 0 && <span className="crmPill alert">{unreadTotal}</span>}
         </div>
