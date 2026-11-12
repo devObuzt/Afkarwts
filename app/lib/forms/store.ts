@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { getDb, normalizeImportPhone } from "../db";
 import { CLEAN_INTRO, CLEAN_TEMPLATE, CLEAN_TITLE, type FieldKind, type NewField } from "./clean-template";
-import { fillMedicalNotes } from "./medical";
+import { fillMedicalNoteFor } from "./medical";
 import { phoneIsVerified } from "./verify";
 
 export type Form = {
@@ -796,6 +796,10 @@ export function submitForm(
   const id = recordSubmission(form.id, collected);
   // الخانة الطبية بتتعبّى لحظة التسجيل، مش بتشغيلة لاحقة: اللي بيفتح
   // التقرير بعد خمس دقايق لازم يلاقيها معبّاية.
-  fillMedicalNotes(form.id);
+  //
+  // 🔴 **لهاي التسجيلة لحالها، مش لكل الاستمارة.** هاد المسار عام، ومسح
+  // كل التسجيلات عند كل إرسالية بيخلّي كبسة من برا تولّد شغل بقدّ حجم
+  // الاستمارة كلها. المسح الكامل ورا تسجيل الدخول بـ`/api/forms/[id]/medical`.
+  fillMedicalNoteFor(id);
   return { ok: true as const, id };
 }

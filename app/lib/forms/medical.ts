@@ -92,6 +92,35 @@ export function medicalSummary(answers: Answer[]) {
  * واللي بيمحي الخانة بتنمحى الصف، فبترجع تنعبّى بالتشغيلة الجاية: محو
  * الخانة معناه «ارجع للاستمارة»، والتعديل معناه «خلّيك عندي».
  */
+export function fillMedicalNoteFor(submissionId: number) {
+  const db = getDb();
+  const taken = db
+    .prepare("SELECT 1 FROM submission_notes WHERE submission_id = ? AND key = 'medical'")
+    .get(submissionId);
+  if (taken) {
+    return false;
+  }
+
+  const answers = db
+    .prepare("SELECT label, value FROM form_answers WHERE submission_id = ?")
+    .all(submissionId) as Answer[];
+  const text = medicalSummary(answers);
+  if (!text) {
+    return false;
+  }
+
+  setNote(submissionId, "medical", text);
+  return true;
+}
+
+/**
+ * نفس الإشي لكل تسجيلات استمارة.
+ *
+ * 🔴 **بتنكبس من ورا تسجيل دخول بس.** مسار إرسال الاستمارة عام — أي حدا
+ * بيقدر يبعتله — فلو ناداها هو، كل إرسالية وحدة بتصير مسح لكل تسجيلات
+ * الاستمارة وقراءة إجاباتهن كلها. استمارة فيها ألوف بتتحوّل لمضخّة شغل
+ * بكبسة من برا. التسجيل الجديد بياخد `fillMedicalNoteFor` لحاله.
+ */
 export function fillMedicalNotes(formId?: number) {
   const db = getDb();
   const rows = db
