@@ -31,23 +31,37 @@ export function RowOrder({ formId }: { formId: number }) {
     let dragging: HTMLTableRowElement | null = null;
     const rows = () => Array.from(body.querySelectorAll<HTMLTableRowElement>("tr[data-id]"));
 
-    const grips: HTMLElement[] = [];
-    for (const row of rows()) {
-      const cell = row.querySelector<HTMLTableCellElement>("td.colIndex");
-      if (!cell || cell.querySelector(".rowGrip")) {
-        continue;
+    /**
+     * بتزرع المقبض على كل سطر ناقصه.
+     *
+     * 🔴 **لازم تنعاد، مش مرة وحدة عند التركيب.** المقبض عنصر مزروع
+     * من برا شجرة ريأكت — وكل كبسة بتعيد رسم الجدول («ترتيب رسمي»،
+     * الترتيب الأبجدي، تعبئة الطبي) بتمسحه. أول نسخة زرعته مرة وحدة،
+     * فأول كبسة ترتيب كانت بتطيّر المقبض من الصفحة وما بيرجع إلا
+     * بإعادة تحميل كاملة.
+     */
+    function ensureGrips() {
+      for (const row of rows()) {
+        const cell = row.querySelector<HTMLTableCellElement>("td.colIndex");
+        if (!cell || cell.querySelector(".rowGrip")) {
+          continue;
+        }
+        const grip = document.createElement("span");
+        grip.className = "rowGrip";
+        grip.title = "اسحبي السطر لمكانه";
+        grip.setAttribute("aria-hidden", "true");
+        // ⠿ — النقط الستة: المقبض المتعارف عليه للسحب، بينقرا بلا شرح.
+        grip.textContent = "⠿";
+        grip.draggable = true;
+        cell.prepend(grip);
       }
-      const grip = document.createElement("span");
-      grip.className = "rowGrip";
-      grip.title = "اسحبي السطر لمكانه";
-      grip.setAttribute("aria-hidden", "true");
-      // ⠿ — النقط الستة. المقبض المتعارف عليه للسحب، وبينقرا كمقبض
-      // بلا ما يحتاج شرح ولا صورة.
-      grip.textContent = "⠿";
-      grip.draggable = true;
-      cell.prepend(grip);
-      grips.push(grip);
     }
+
+    ensureGrips();
+    // المراقبة بتمسك إعادة الرسم. زرعنا إحنا بيولّد تغيير كمان، بس
+    // `ensureGrips` بتلاقي المقبض موجود وبتسكت — فما في دورة.
+    const watch = new MutationObserver(() => ensureGrips());
+    watch.observe(body, { childList: true, subtree: true });
 
     function onDragStart(event: DragEvent) {
       const grip = event.target as HTMLElement;
@@ -140,7 +154,8 @@ export function RowOrder({ formId }: { formId: number }) {
       body.removeEventListener("dragstart", onDragStart);
       body.removeEventListener("dragover", onDragOver);
       body.removeEventListener("dragend", onDragEnd);
-      for (const grip of grips) {
+      watch.disconnect();
+      for (const grip of Array.from(body.querySelectorAll(".rowGrip"))) {
         grip.remove();
       }
     };
