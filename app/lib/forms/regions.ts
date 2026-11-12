@@ -46,6 +46,7 @@ export const TOWNS: Town[] = [
   { name: "طمرة", region: "north", aliases: ["טמרה"] },
   { name: "المغار", region: "north", aliases: ["מע'אר", "מגאר"] },
   { name: "عزير", region: "north", aliases: ["עוזייר"] },
+  { name: "كفر كنا", region: "north", aliases: ["כפר כנא", "كفركنا"] },
   { name: "الرينة", region: "north", aliases: ["ריינה"] },
   { name: "عين ماهل", region: "north", aliases: ["עין מאהל"] },
   { name: "الناصرة", region: "north", aliases: ["נצרת"] },
@@ -76,10 +77,12 @@ export const TOWNS: Town[] = [
   // ── الجنوب: النقب ──
   { name: "رهط", region: "south", aliases: ["רהט"] },
   { name: "شقيب السلام", region: "south", aliases: ["שגב שלום", "سجيب السلام"] },
+  { name: "أبو قويدر", region: "south", aliases: ["אבו קוידר", "ابوقويدر"] },
   { name: "أبو تلول", region: "south", aliases: ["אבו תלול"] },
 
   // ── القدس والضفة ──
   { name: "طولكرم", region: "jerusalem", aliases: ["טולכרם"] },
+  { name: "نابلس", region: "jerusalem", aliases: ["שכם"] },
   { name: "رام الله", region: "jerusalem", aliases: ["רמאללה"] },
   { name: "الجديرة", region: "jerusalem", aliases: ["جديرة", "ג'דירה"] },
   { name: "عين رافا", region: "jerusalem", aliases: ["עין ראפה"] },
