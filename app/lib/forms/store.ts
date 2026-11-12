@@ -431,16 +431,28 @@ const SUBMISSION_SELECT = `
  * بدل ما يرقّمه — المسار ورا تسجيل دخول، بس هاد الفحص بيمنع خلط
  * استمارتين بالغلط كمان.
  */
-/** سطور الاستمارة بترتيبها الحالي، ببلادها — مادة الترتيب الرسمي. */
-export function submissionTowns(formId: number) {
+/**
+ * سطور الاستمارة بترتيبها الحالي — مادة كل ترتيب بينحسب على السيرفر.
+ *
+ * بترجع بالترتيب المحفوظ مش بترتيب التسجيل: الترتيب الجديد بينبنى على
+ * اللي قدّام المستخدم، فالسطور المتساوية (نفس البلد، نفس الاسم) بتحافظ
+ * على ترتيبها بينها بدل ما تقفز كل كبسة.
+ */
+export function submissionsForOrdering(formId: number) {
   return getDb()
     .prepare(
-      `SELECT id, city, hebrew_city AS hebrewCity
+      `SELECT id, name, city, hebrew_name AS hebrewName, hebrew_city AS hebrewCity
          FROM form_submissions
         WHERE form_id = ? AND state <> 'rejected'
         ORDER BY sort_order IS NULL, sort_order, submitted_at, id`
     )
-    .all(formId) as Array<{ id: number; city: string; hebrewCity: string }>;
+    .all(formId) as Array<{
+    id: number;
+    name: string;
+    city: string;
+    hebrewName: string;
+    hebrewCity: string;
+  }>;
 }
 
 /** بتشيل الترتيب اليدوي، فترجع الاستمارة لترتيبها الأصلي بتاريخ التسجيل. */

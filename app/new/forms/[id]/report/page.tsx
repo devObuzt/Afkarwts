@@ -23,8 +23,10 @@ import { SearchBox } from "./SearchBox";
 import { EditableCell } from "./EditableCell";
 import { HebrewCell } from "./HebrewCell";
 import { FillMedical } from "./FillMedical";
+import { GridFit } from "./GridFit";
 import { OfficialOrder } from "./OfficialOrder";
 import { RowOrder } from "./RowOrder";
+import { SortHead } from "./SortHead";
 import { PdfButton } from "./PdfButton";
 import { can } from "@/app/lib/users/permissions";
 import { NOTE_COLUMNS } from "@/app/lib/forms/notes";
@@ -335,6 +337,7 @@ export default async function ReportPage({
       )}
 
       {!printing && <ColumnSizing formId={form.id} />}
+      {!printing && <GridFit />}
       {/* السحب بيحفظ القائمة كما هي معروضة — فمع بحث أو فلتر منكون
           عم نرقّم جزء من الصفوف وبس. المقبض بيختفي بدل ما يشتغل غلط. */}
       {editable && !search && !state && <RowOrder formId={form.id} />}
@@ -350,9 +353,17 @@ export default async function ReportPage({
               <th className="colIndex">#</th>
               {markColumn && <th className="colActions">{markHeading}</th>}
               <th className="colDate">التاريخ</th>
-              {grid.nameColumn !== null && <th className="colName">{grid.columns[grid.nameColumn]}</th>}
-              <th>الاسم بالعبرية</th>
-              <th>البلدة</th>
+              {grid.nameColumn !== null && (
+                <th className="colName">
+                  {editable ? (
+                    <SortHead by="name" formId={form.id} label={grid.columns[grid.nameColumn]} />
+                  ) : (
+                    grid.columns[grid.nameColumn]
+                  )}
+                </th>
+              )}
+              <th>{editable ? <SortHead by="hebrewName" formId={form.id} label="الاسم بالعبرية" /> : "الاسم بالعبرية"}</th>
+              <th>{editable ? <SortHead by="city" formId={form.id} label="البلدة" /> : "البلدة"}</th>
               {rest.map((slot) =>
                 "note" in slot ? (
                   <th className="noteHead" key={`note-${slot.note.key}`}>

@@ -34,8 +34,11 @@ test("every column drawn in the header is drawn in the body too", () => {
 
   // The Hebrew pair: two headings, and two cells on each of the two paths
   // (printing renders plain, the screen renders the editor).
-  assert.equal((SOURCE.match(/<th>الاسم بالعبرية<\/th>/g) ?? []).length, 1);
-  assert.equal((SOURCE.match(/<th>البلدة<\/th>/g) ?? []).length, 1, "one town column, in Hebrew");
+  // العنوانين صاروا كبسة ترتيب لمين إلو صلاحية، ونص عادي لغيره —
+  // فالمرساة صارت اسم العمود مرة وحدة، مش شكل الـ`th`.
+  assert.equal((SOURCE.match(/الاسم بالعبرية/g) ?? []).length, 2, "one Hebrew-name heading, in both branches");
+  assert.equal((SOURCE.match(/"البلدة"/g) ?? []).length, 2, "one town column, in Hebrew — in both branches");
+  assert.equal((SOURCE.match(/<SortHead/g) ?? []).length, 3, "الاسم · الاسم بالعبرية · البلدة");
   // The Arabic name stands beside the Hebrew one, pinned, so the two can
   // be read against each other — with no town between them.
   assert.equal((SOURCE.match(/className="colName"/g) ?? []).length, 1, "the name heading");
@@ -147,7 +150,7 @@ test("the cells come in the order their headings do", () => {
     head.indexOf('className="colDate"'),
     head.indexOf('className="colName"'),
     head.indexOf("الاسم بالعبرية"),
-    head.indexOf("<th>البلدة</th>"),
+    head.indexOf('by="city"'),
     head.indexOf("rest.map(")
   ];
   const bodyOrder = [

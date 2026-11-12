@@ -3241,10 +3241,14 @@ body.resizingCol {
  */
 @media screen {
   .crm .gridScroll {
+    /* رقم احتياطي وبس: `GridFit` بتقيس وين الجدول بلّش فعلاً وبتكتب
+       `max-height` مكانه. التخمين هون بيشتغل للحظة قبل ما يشتغل
+       الجافاسكربت، ولو ما اشتغل أصلاً. */
     max-height: calc(100svh - 196px);
-    min-height: 320px;
+    min-height: 260px;
     overflow: auto;
-    /* السكرول بينتهي عند حدود الجدول بدل ما يكمّل يحرّك الصفحة ورا. */
+    /* السكرول بينتهي عند حدود الجدول بدل ما يكمّل يحرّك الصفحة ورا —
+       وهاد اللي بيمنع السكرول العمودي يمشي وإنت بتسحب الأفقي. */
     overscroll-behavior: contain;
   }
 }
@@ -3303,6 +3307,49 @@ body.resizingCol {
 @media print {
   .crm .waFold,
   .crm .waPane[data-collapsed="yes"] {
+    display: none;
+  }
+}
+
+
+/** عنوان عمود بيترتّب: كل الخانة كبسة، فالهدف واسع ومش أيقونة صغيرة. */
+.crm .thSort {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.crm .thSort:hover {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.crm .thSort[disabled] {
+  cursor: default;
+}
+
+.crm .thSortMark {
+  flex: 0 0 auto;
+  opacity: 0.45;
+  font-size: 10px;
+}
+
+.crm .thSort:hover .thSortMark {
+  opacity: 1;
+}
+
+@media print {
+  .crm .thSortMark {
     display: none;
   }
 }
