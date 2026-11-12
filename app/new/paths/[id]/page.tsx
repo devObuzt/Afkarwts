@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { getDb } from "@/app/lib/db";
 import { journeyFunnel, journeyLabel, stepBreakdown } from "@/app/lib/journeys/report";
 import { listForms } from "@/app/lib/forms/store";
-import { getJourney } from "@/app/lib/journeys/store";
+import { getJourney, journeySendCount } from "@/app/lib/journeys/store";
 import { day, hueOf, initials, members as memberCount } from "../../format";
 import { Report } from "./Report";
 import { RunControls } from "../RunControls";
@@ -140,7 +140,7 @@ export default async function CohortPage({
           )}
 
           <div className="crmCard crmPad">
-            <RunControls journeyId={journeyId} status={journey.status} />
+            <RunControls canDelete={journeySendCount(journeyId) === 0} journeyId={journeyId} status={journey.status} />
             <p className="crmNote" style={{ marginTop: 10 }}>
               تعديل الخطوات بيغيّر كل مسار لسّه ما بعت هاي الخطوة.
             </p>

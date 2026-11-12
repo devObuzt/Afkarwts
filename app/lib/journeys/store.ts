@@ -291,6 +291,70 @@ export function listActiveJourneys() {
   return rows.map(mapJourney);
 }
 
+/** كم إرسالية سجّلها هاد المسار — صفر معناها ما لمس ولا منتسبة. */
+export function journeySendCount(journeyId: number) {
+  return (
+    getDb()
+      .prepare(
+        `SELECT COUNT(*) AS n FROM journey_sends s
+          JOIN journey_enrollments e ON e.id = s.enrollment_id
+         WHERE e.journey_id = ?`
+      )
+      .get(journeyId) as { n: number }
+  ).n;
+}
+
+/**
+ * محو مسار ما بعت ولا رسالة.
+ *
+ * 🔴 **الشرط: صفر إرساليات.** مسار بعت بيحمل تاريخ مين وصلته ومين لأ —
+ * وهاد ما بينمحى أبداً، بينقفل بـ«منتهي». الحذف هون للمسودّة اللي انعملت
+ * بالغلط أو انكرّرت على نفس المجموعة، ولو ضلّت قاعدة بيقدر حدا يشغّلها
+ * وتبعت نفس الرسالة مرة تانية لنفس الناس.
+ *
+ * ⚠️ **و`ON DELETE CASCADE` بالسكيما زينة مش أكتر** — `PRAGMA foreign_keys`
+ * مطفي بهاي القاعدة (نفس الفخ الموثّق عند `deleteMember`). فالأولاد
+ * بينمحوا بالإيد وبالترتيب، وإلا بتضل صفوف معلّقة بتشاور على مسار راح.
+ */
+export function deleteJourney(journeyId: number) {
+  const journey = getJourney(journeyId);
+  if (!journey) {
+    return { ok: false as const, error: "المسار مش موجود." };
+  }
+
+  const sends = journeySendCount(journeyId);
+  if (sends > 0) {
+    return {
+      ok: false as const,
+      error: `هاد المسار بعت ${sends} رسالة — ما بينمحى عشان ما يضيع سجلّ مين وصلته. سكّريه بـ«منتهي».`
+    };
+  }
+
+  const db = getDb();
+  db.exec("BEGIN");
+  try {
+    // الترتيب: الأولاد قبل الأب، والمهام اليدوية بتنفك مش بتنمحي —
+    // مهمة مفتوحة على منتسبة شغل إنسان، مش ملحق بالمسار.
+    db.prepare(
+      "DELETE FROM journey_catchup WHERE enrollment_id IN (SELECT id FROM journey_enrollments WHERE journey_id = ?)"
+    ).run(journeyId);
+    db.prepare(
+      "UPDATE followups SET enrollment_id = NULL WHERE enrollment_id IN (SELECT id FROM journey_enrollments WHERE journey_id = ?)"
+    ).run(journeyId);
+    db.prepare(
+      "DELETE FROM journey_sends WHERE enrollment_id IN (SELECT id FROM journey_enrollments WHERE journey_id = ?)"
+    ).run(journeyId);
+    db.prepare("DELETE FROM journey_enrollments WHERE journey_id = ?").run(journeyId);
+    db.prepare("DELETE FROM journeys WHERE id = ?").run(journeyId);
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+
+  return { ok: true as const, journey };
+}
+
 export function setJourneyStatus(id: number, status: Journey["status"]) {
   const activating = status === "active";
   getDb()

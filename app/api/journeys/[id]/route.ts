@@ -1,7 +1,7 @@
 import { recordAction } from "@/app/lib/users/audit";
 import { requireApi } from "@/app/lib/users/current";
 import { NextResponse } from "next/server";
-import { getJourney, listSteps, setJourneyStatus, syncEnrollments } from "@/app/lib/journeys/store";
+import { deleteJourney, getJourney, listSteps, setJourneyStatus, syncEnrollments } from "@/app/lib/journeys/store";
 
 export const runtime = "nodejs";
 
@@ -54,4 +54,36 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   return NextResponse.json({ journey: getJourney(id) });
+}
+
+/**
+ * محو مسار ما بعت ولا رسالة.
+ *
+ * مسار بعت ما بينمحى — `deleteJourney` بترفضه، لأنّ سجلّ مين وصلته
+ * الرسالة أهم من ترتيب الشاشة. المسودّة اللي انعملت بالغلط هي الحالة
+ * اللي هاد موجود إلها: قاعدة على نفس المجموعة، وكبسة «شغّلي» وحدة
+ * بتبعت نفس الرسالة مرة تانية لنفس الناس.
+ */
+export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireApi("journeys.manage");
+  if (!auth.ok) {
+    return auth.response;
+  }
+
+  const id = Number((await params).id);
+  const result = deleteJourney(id);
+  if (!result.ok) {
+    return NextResponse.json({ error: result.error }, { status: 400 });
+  }
+
+  recordAction({
+    userId: auth.user.id,
+    actor: auth.user.name,
+    action: "journey.status",
+    subjectType: "journey",
+    subjectId: id,
+    detail: `انمحى المسار (مجموعة ${result.journey.groupId}، بلا أي إرسالية)`
+  });
+
+  return NextResponse.json({ ok: true });
 }
