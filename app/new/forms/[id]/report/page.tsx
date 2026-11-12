@@ -23,6 +23,7 @@ import { SearchBox } from "./SearchBox";
 import { EditableCell } from "./EditableCell";
 import { HebrewCell } from "./HebrewCell";
 import { FillMedical } from "./FillMedical";
+import { RowOrder } from "./RowOrder";
 import { PdfButton } from "./PdfButton";
 import { can } from "@/app/lib/users/permissions";
 import { NOTE_COLUMNS } from "@/app/lib/forms/notes";
@@ -199,7 +200,7 @@ export default async function ReportPage({
   // the browser drops the moment the content wants more — so the columns
   // came out as wide as their widest cell whatever the colgroup said. Fixed
   // pixels are obeyed, and they are also what a drag handle can change.
-  const PX = { index: 30, actions: 58, date: 56, name: 150, hebrewName: 120, hebrewCity: 110, note: 110 };
+  const PX = { index: 46, actions: 58, date: 56, name: 150, hebrewName: 120, hebrewCity: 110, note: 110 };
   // The weights stay the ruler: a consent paragraph still gets more room
   // than a phone. 14px per point, floored and capped so nothing vanishes
   // and nothing eats the screen.
@@ -230,7 +231,7 @@ export default async function ReportPage({
   // are pinned, and each one's offset is the sum of the ones before it. The
   // mark column comes and goes, so the two that follow it are told where
   // they start rather than guessing from their position.
-  const pinned = { "--offDate": markColumn ? "88px" : "30px", "--offName": markColumn ? "146px" : "88px" };
+  const pinned = { "--offDate": markColumn ? "104px" : "46px", "--offName": markColumn ? "162px" : "104px" };
   const key = headerKey(grid.columns);
   // Every answer cell is built here, name column included — it used to be
   // one of the answers and must keep behaving like one when it moves.
@@ -332,6 +333,9 @@ export default async function ReportPage({
       )}
 
       {!printing && <ColumnSizing formId={form.id} />}
+      {/* السحب بيحفظ القائمة كما هي معروضة — فمع بحث أو فلتر منكون
+          عم نرقّم جزء من الصفوف وبس. المقبض بيختفي بدل ما يشتغل غلط. */}
+      {editable && !search && !state && <RowOrder formId={form.id} />}
       <div className="gridScroll">
         <table className="gridTable" style={{ ...pinned, width: tableWidth } as React.CSSProperties}>
           <colgroup>
@@ -361,7 +365,7 @@ export default async function ReportPage({
           </thead>
           <tbody>
             {grid.rows.map((row, index) => (
-              <tr key={row.submissionId}>
+              <tr data-id={row.submissionId} key={row.submissionId}>
                 <td className="colIndex">
                   {/* The number is the way in: a typo is noticed while
                       reading the table, so the correction starts there. */}

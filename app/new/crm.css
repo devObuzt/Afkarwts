@@ -2687,14 +2687,17 @@ body.isResizing * {
 
 .crm .gridTable .colIndex {
   inset-inline-start: 0;
-  width: 30px;
-  min-width: 30px;
+  /* ٤٦ مش ٣٠: الخانة صارت تحمل مقبض السحب جنب الرقم.
+     أي تغيير هون لازم يتبعه `PX.index` و`--offDate`/`--offName`
+     بصفحة التقرير — التلاتة بيوصفوا نفس العمود. */
+  width: 46px;
+  min-width: 46px;
   font-weight: 600;
   color: var(--faint);
 }
 
 .crm .gridTable .colActions {
-  inset-inline-start: 30px;
+  inset-inline-start: 46px;
   width: 58px;
   min-width: 58px;
   padding-inline: 5px;
@@ -3178,4 +3181,43 @@ body.resizingCol {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+
+/**
+ * مقبض سحب السطر.
+ *
+ * على طرف السطر بخانة الرقم — أبعد نقطة عن «حذف»، لأنّ كبسة غلط بين
+ * الاتنين غالية: وحدة بترتّب والتانية بتمحي.
+ *
+ * باهت لحد ما يمرق الفأر على السطر: ١٢٠ سطر × نقط غامقة بتعمل ضجّة
+ * بصرية بعمود كل شغلته رقم.
+ */
+.crm .rowGrip {
+  display: inline-block;
+  margin-inline-end: 6px;
+  cursor: grab;
+  color: var(--line-strong);
+  font-size: 13px;
+  line-height: 1;
+  user-select: none;
+  transition: color 0.12s ease;
+}
+
+.crm tr:hover .rowGrip {
+  color: var(--muted);
+}
+
+.crm .rowGrip:active {
+  cursor: grabbing;
+}
+
+.crm tr.rowDragging {
+  opacity: 0.45;
+}
+
+@media print {
+  .crm .rowGrip {
+    display: none;
+  }
 }

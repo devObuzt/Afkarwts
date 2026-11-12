@@ -419,6 +419,42 @@ const SUBMISSION_SELECT = `
  * بتمرّر `limit` لأنها بتعرض صفحة؛ والعدد الكلي من `countSubmissions`
  * مش من طول اللائحة.
  */
+/**
+ * ترتيب سطور التقرير بالإيد.
+ *
+ * بتاخد القائمة كاملة كما هي معروضة وبتعطي كل سطر رقمه. ما بتاخد
+ * «نقّل هاد لهون»: حساب موقع واحد بين اتنين بيحتاج يعرف شو بينهن،
+ * والقائمة اللي قدّام المستخدم هي الجواب الوحيد الأكيد على هاد.
+ *
+ * 🔴 **ولا معرّف من برا الاستمارة بينكتب.** بينجاب معرّفات الاستمارة من
+ * القاعدة وبينرشّح عليهن، فطلب فيه معرّف تسجيل من استمارة تانية بيتجاهله
+ * بدل ما يرقّمه — المسار ورا تسجيل دخول، بس هاد الفحص بيمنع خلط
+ * استمارتين بالغلط كمان.
+ */
+export function setSubmissionOrder(formId: number, ids: number[]) {
+  const db = getDb();
+  const mine = new Set(
+    (db.prepare("SELECT id FROM form_submissions WHERE form_id = ?").all(formId) as Array<{ id: number }>).map(
+      (row) => row.id
+    )
+  );
+
+  const seen = new Set<number>();
+  const ordered = ids.filter((id) => mine.has(id) && !seen.has(id) && seen.add(id));
+
+  db.exec("BEGIN");
+  try {
+    const write = db.prepare("UPDATE form_submissions SET sort_order = ? WHERE id = ? AND form_id = ?");
+    ordered.forEach((id, index) => write.run(index + 1, id, formId));
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+
+  return { ordered: ordered.length };
+}
+
 export function listSubmissions(
   filter: { formId?: number; state?: string; limit?: number; offset?: number } = {}
 ): SubmissionRow[] {
@@ -435,7 +471,11 @@ export function listSubmissions(
   }
 
   const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
-  const order = "ORDER BY form_submissions.submitted_at DESC, form_submissions.id DESC";
+  // الترتيب اليدوي بيسبق، واللي ما انسحب بيضل على ترتيبه القديم بعده.
+  // `sort_order IS NULL` أول مفتاح: صفر للمرتّبين، واحد للباقي.
+  const order =
+    "ORDER BY form_submissions.sort_order IS NULL, form_submissions.sort_order, " +
+    "form_submissions.submitted_at DESC, form_submissions.id DESC";
 
   if (filter.limit === undefined) {
     const rows = getDb().prepare(`${SUBMISSION_SELECT} ${where} ${order}`).all(...params) as DbSubmission[];

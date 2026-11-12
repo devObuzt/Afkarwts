@@ -149,6 +149,9 @@ export function migrateFormTables(db: DatabaseSync) {
   addColumnIfMissing(db, "forms", "title", "TEXT NOT NULL DEFAULT ''");
   addColumnIfMissing(db, "form_fields", "show_when_field_id", "INTEGER");
   addColumnIfMissing(db, "form_fields", "show_when_value", "TEXT NOT NULL DEFAULT ''");
+  // ترتيب يدوي بالتقرير: NULL معناها «ما انسحبت» — وبتنزل بآخر القائمة،
+  // فالتسجيل الجديد بيبان بالآخر بدل ما يفوت بنص مسار توصيل مرتّب.
+  addColumnIfMissing(db, "form_submissions", "sort_order", "INTEGER");
   widenFieldKinds(db);
 }
 
