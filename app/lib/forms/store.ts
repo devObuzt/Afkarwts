@@ -431,6 +431,23 @@ const SUBMISSION_SELECT = `
  * بدل ما يرقّمه — المسار ورا تسجيل دخول، بس هاد الفحص بيمنع خلط
  * استمارتين بالغلط كمان.
  */
+/** سطور الاستمارة بترتيبها الحالي، ببلادها — مادة الترتيب الرسمي. */
+export function submissionTowns(formId: number) {
+  return getDb()
+    .prepare(
+      `SELECT id, city, hebrew_city AS hebrewCity
+         FROM form_submissions
+        WHERE form_id = ? AND state <> 'rejected'
+        ORDER BY sort_order IS NULL, sort_order, submitted_at, id`
+    )
+    .all(formId) as Array<{ id: number; city: string; hebrewCity: string }>;
+}
+
+/** بتشيل الترتيب اليدوي، فترجع الاستمارة لترتيبها الأصلي بتاريخ التسجيل. */
+export function clearSubmissionOrder(formId: number) {
+  getDb().prepare("UPDATE form_submissions SET sort_order = NULL WHERE form_id = ?").run(formId);
+}
+
 export function setSubmissionOrder(formId: number, ids: number[]) {
   const db = getDb();
   const mine = new Set(

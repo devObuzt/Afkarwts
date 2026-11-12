@@ -402,7 +402,11 @@ export function submissionGrid(formId: number, filter: { state?: string } = {}):
               hebrew_name, hebrew_city
          FROM form_submissions
         WHERE ${where.join(" AND ")}
-        ORDER BY submitted_at, id`
+        -- 🔴 الجدول بينقرا من هون، مش من \`listSubmissions\`. أول نسخة من
+        -- الترتيب اليدوي عدّلت هديك وبس، فالسحب كان بينحفظ بالقاعدة
+        -- والشاشة بترجع للترتيب القديم مع أول ريفرش.
+        -- الترتيب اليدوي بيسبق، واللي ما انسحب بيضل على ترتيبه بعده.
+        ORDER BY sort_order IS NULL, sort_order, submitted_at, id`
     )
     .all(...args) as Array<Record<string, string | number | null>>;
 
