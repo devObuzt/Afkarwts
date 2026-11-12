@@ -76,7 +76,8 @@ export function DeleteMark({
       </button>
 
       {asking && mounted && createPortal(
-        <div className="crmModalWrap" onClick={() => !busy && setAsking(false)} role="presentation">
+        <div className="crm crmPortal">
+          <div className="crmModalWrap" onClick={() => !busy && setAsking(false)} role="presentation">
           <div
             aria-modal="true"
             className="crmModal"
@@ -111,6 +112,7 @@ export function DeleteMark({
                 إلغاء
               </button>
             </div>
+          </div>
           </div>
         </div>,
         document.body
