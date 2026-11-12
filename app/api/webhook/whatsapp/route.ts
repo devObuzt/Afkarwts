@@ -26,6 +26,14 @@ export async function POST(request: Request) {
 
   // السرّ مضبوط ← الرابط مقفول: حمولة بلا توقيع صحيح ما بتفوت أصلاً.
   if (signature.configured && !signature.valid) {
+    // 🔴 **لازم ينكتب.** سرّ غلط بحرف واحد بيرفض ميتا نفسها، فكل
+    // الرسائل الداخلة بتوقف — والإنبوكس بيسكت بلا ولا رسالة خطأ على
+    // الشاشة. بلا هاد السطر، الفرق بين «ما حدا كتب» و«كل الرسائل
+    // بتنرفض» مش قابل للقراءة من برا أبداً.
+    console.error(
+      "WhatsApp webhook refused a payload: the signature did not match WHATSAPP_APP_SECRET. " +
+        "If this repeats, the secret is wrong and every incoming message is being dropped."
+    );
     return NextResponse.json({ error: "Bad signature." }, { status: 401 });
   }
 
