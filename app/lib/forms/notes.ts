@@ -13,7 +13,10 @@ export const NOTE_COLUMNS = [
   { key: "medical", label: "ملاحظات طبية" },
   { key: "ocean", label: "OCEAN" },
   { key: "sending", label: "ملاحظات للإرسال" },
-  { key: "mashbaha", label: "مشبحة" },
+  // المفتاح «mashbaha» بيضل زي ما هو: القيم المكتوبة محفوظة عليه،
+  // وتغييره بيتّم القيم اللي جوّا. العنوان بس هو اللي انعدّل — كان
+  // نقحرة لـ«משפחה» وما بتعني إشي بالعربي.
+  { key: "mashbaha", label: "العائلة" },
   { key: "shaper", label: "SHAPER" }
 ] as const;
 
