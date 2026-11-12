@@ -22,6 +22,7 @@ import { RestoreMark } from "./RestoreMark";
 import { SearchBox } from "./SearchBox";
 import { EditableCell } from "./EditableCell";
 import { HebrewCell } from "./HebrewCell";
+import { FillMedical } from "./FillMedical";
 import { PdfButton } from "./PdfButton";
 import { can } from "@/app/lib/users/permissions";
 import { NOTE_COLUMNS } from "@/app/lib/forms/notes";
@@ -305,6 +306,7 @@ export default async function ReportPage({
             </span>
             <SearchBox formId={form.id} state={state} value={search} />
             <span className="spacer" style={{ display: "flex", gap: 8, marginInlineStart: "auto" }}>
+              {editable && <FillMedical formId={form.id} />}
               <a className="crmBtn" href={`/api/forms/${form.id}/export${view}`}>
                 تنزيل Excel
               </a>

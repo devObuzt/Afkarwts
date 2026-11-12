@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { getDb, normalizeImportPhone } from "../db";
 import { CLEAN_INTRO, CLEAN_TEMPLATE, CLEAN_TITLE, type FieldKind, type NewField } from "./clean-template";
+import { fillMedicalNotes } from "./medical";
 import { phoneIsVerified } from "./verify";
 
 export type Form = {
@@ -792,5 +793,9 @@ export function submitForm(
     return { ok: false as const, error: "أكّدي رقم هاتفك بالكود قبل الإرسال." };
   }
 
-  return { ok: true as const, id: recordSubmission(form.id, collected) };
+  const id = recordSubmission(form.id, collected);
+  // الخانة الطبية بتتعبّى لحظة التسجيل، مش بتشغيلة لاحقة: اللي بيفتح
+  // التقرير بعد خمس دقايق لازم يلاقيها معبّاية.
+  fillMedicalNotes(form.id);
+  return { ok: true as const, id };
 }
