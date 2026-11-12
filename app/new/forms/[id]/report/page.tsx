@@ -24,6 +24,7 @@ import { EditableCell } from "./EditableCell";
 import { HebrewCell } from "./HebrewCell";
 import { FillMedical } from "./FillMedical";
 import { GridFit } from "./GridFit";
+import { HeadFull } from "./HeadFull";
 import { OfficialOrder } from "./OfficialOrder";
 import { RowOrder } from "./RowOrder";
 import { SortHead } from "./SortHead";
@@ -53,11 +54,19 @@ const STATES = [
  * repeating it across pages — so it prints as a number and the key sits
  * under the table.
  */
+/**
+ * فوق هاد الطول، العنوان أكيد بينقص بأربع سطور — فبيجي معه «⋯».
+ * رقم مقطوع بالمقصود: قياس القص لازم متصفح، والعدّ هون بيشتغل على
+ * السيرفر ومعه الصفحة الأولى.
+ */
+const LONG_LABEL = 64;
+
 function ThAnswer({ index, label }: { index: number; label: string }) {
   const short = printHeader(label, index);
   return (
     <th>
       <span className="thFull">{label}</span>
+      {label.length > LONG_LABEL ? <HeadFull text={label} /> : null}
       <span className={short === label ? "thShort" : "thShort thRef"}>{short}</span>
     </th>
   );

@@ -3353,3 +3353,78 @@ body.resizingCol {
     display: none;
   }
 }
+
+
+/* ────────────────────────────────────────────────────────────────
+   سطر العناوين: مقصوص، والكامل ورا «⋯»
+   ──────────────────────────────────────────────────────────────── */
+
+/**
+ * 🔴 **سؤال الموافقة فقرة، وكان بينرسم بطوله.** سطر العناوين كان
+ * بيطلع بعلو نص الشاشة — عمود واحد طويل بيفرض علوّه على العشرين
+ * عمود القصيرة جنبه، فمساحة فاضية بعرض الجدول كله.
+ *
+ * أربع سطور سقف. اللي انقص بيضل موجود ورا «⋯» على نفس الخانة.
+ */
+.crm .gridTable thead .thFull {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  overflow: hidden;
+}
+
+.crm .thMore {
+  position: relative;
+  display: inline-block;
+}
+
+.crm .thMoreBtn {
+  padding: 0 4px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 15px;
+  cursor: pointer;
+}
+
+.crm .thMoreBtn:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+/**
+ * اللوحة بتطلع برّا الخانة وفوق الجدول.
+ *
+ * ⚠️ خانة العنوان `sticky` وبتعمل سياق تكديس خاص فيها، فـ`z-index`
+ * عالي ما بيضمن إنها تطلع فوق الخانات اللي جنبها — بس هي جوّا نفس
+ * الصف، والصف أعلى من الجدول، فبتكفي قيمة أعلى من ٣ المستعملة
+ * بالأعمدة المثبّتة.
+ */
+.crm .thMorePanel {
+  position: absolute;
+  inset-inline-end: 0;
+  top: calc(100% + 6px);
+  z-index: 9;
+  display: block;
+  width: 260px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--card);
+  box-shadow: 0 10px 28px rgb(0 42 12 / 18%);
+  color: var(--body);
+  font-weight: 400;
+  font-size: 12px;
+  line-height: 1.7;
+  white-space: normal;
+  text-align: start;
+}
+
+@media print {
+  .crm .thMore {
+    display: none;
+  }
+}

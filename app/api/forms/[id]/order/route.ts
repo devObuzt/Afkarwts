@@ -3,6 +3,7 @@ import { requireApi } from "@/app/lib/users/current";
 import { recordAction } from "@/app/lib/users/audit";
 import { clearSubmissionOrder, setSubmissionOrder, submissionsForOrdering } from "@/app/lib/forms/store";
 import { officialOrder } from "@/app/lib/forms/regions";
+import { forgetTownOrder, loadTownOrder, saveTownOrder, townSequence } from "@/app/lib/forms/town-order";
 
 export const runtime = "nodejs";
 
@@ -29,9 +30,27 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     ids?: unknown;
     official?: boolean;
     reset?: boolean;
+    forget?: boolean;
     sortBy?: unknown;
     dir?: unknown;
   };
+
+  // نسيان المسار المتعلَّم: الترتيب الرسمي بيرجع لملف `regions` لحاله.
+  // منفصل عن «رجّع الأصلي» بالمقصود — واحد بيشيل ترتيب السطور، والتاني
+  // بيشيل اللي تعلّمناه عن مسار البلاد.
+  if (body.forget) {
+    forgetTownOrder();
+    recordAction({
+      userId: auth.user.id,
+      actor: auth.user.name,
+      action: "lead.edit",
+      subjectType: "submission",
+      subjectId: 0,
+      subjectLabel: "مسار التوصيل",
+      detail: "انمحى ترتيب البلاد المتعلَّم"
+    });
+    return NextResponse.json({ ok: true, forgot: true });
+  }
 
   // رجوع للترتيب الأصلي: بتنشال الأرقام، فبيرجع ترتيب تاريخ التسجيل.
   if (body.reset) {
@@ -104,7 +123,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   // الشاشة بتعرض اللي انرتّب، فلو كانت هي مصدر الترتيب كمان بنكون
   // عم نصدّق نفسنا.
   if (body.official) {
-    const plan = officialOrder(submissionsForOrdering(formId));
+    const plan = officialOrder(submissionsForOrdering(formId), loadTownOrder());
     setSubmissionOrder(formId, plan.ids);
     recordAction({
       userId: auth.user.id,
@@ -129,6 +148,22 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const result = setSubmissionOrder(formId, ids);
 
+  // التعلّم من ترتيب الإيد — بس لما تكون البلاد متلمّة. التفصيل
+  // والسبب بـ`town-order.ts`.
+  const sequence = townSequence(submissionsForOrdering(formId));
+  const learned = sequence ? saveTownOrder(sequence) : 0;
+  if (learned > 0) {
+    recordAction({
+      userId: auth.user.id,
+      actor: auth.user.name,
+      action: "lead.edit",
+      subjectType: "submission",
+      subjectId: 0,
+      subjectLabel: "مسار التوصيل",
+      detail: `انتعلّم ترتيب البلاد من السحب — ${learned} بلد غيّرت محلها`
+    });
+  }
+
   recordAction({
     userId: auth.user.id,
     actor: auth.user.name,
@@ -139,5 +174,5 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     detail: `انرتّبت سطور التقرير بالإيد (${result.ordered} سطر)`
   });
 
-  return NextResponse.json({ ok: true, ...result });
+  return NextResponse.json({ ok: true, ...result, learned });
 }

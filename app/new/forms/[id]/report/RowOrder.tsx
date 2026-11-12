@@ -102,8 +102,11 @@ export function RowOrder({ formId }: { formId: number }) {
         window.location.reload();
         return;
       }
-      setSaid("انحفظ الترتيب");
-      window.setTimeout(() => setSaid(""), 2500);
+      const payload = (await response.json().catch(() => ({}))) as { learned?: number };
+      // لما تكون البلاد متلمّة، السحب بيعلّم المسار — وبينقال، لأنه
+      // تغيير بيأثّر على كل دفعة جاية مش على هاي الصفحة وبس.
+      setSaid(payload.learned ? `انحفظ الترتيب · واتعلّم مسار ${payload.learned} بلد` : "انحفظ الترتيب");
+      window.setTimeout(() => setSaid(""), 4000);
     }
 
     /** الأرقام بتتبع العين: السطر الأول واحد مهما كان أصله. */

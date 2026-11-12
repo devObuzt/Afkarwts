@@ -87,6 +87,7 @@ export const TOWNS: Town[] = [
   { name: "الجديرة", region: "jerusalem", aliases: ["جديرة", "ג'דירה"] },
   { name: "عين رافا", region: "jerusalem", aliases: ["עין ראפה"] },
   { name: "القدس", region: "jerusalem", aliases: ["ירושלים"] },
+  { name: "بيت لحم", region: "jerusalem", aliases: ["בית לחם"] },
   { name: "بيت صفافا", region: "jerusalem", aliases: ["בית צפאפא"] }
 ];
 
@@ -137,12 +138,22 @@ export type Placeable = { id: number; city: string; hebrewCity?: string };
  * اللي بلا منطقة بينزلوا بالآخر، على ترتيبهم الحالي بينهم، وبينترجعوا
  * بأسمائهم عشان الشاشة تقدر تقول لمين لازم ينتبه.
  */
-export function officialOrder(rows: Placeable[]) {
+export function officialOrder(rows: Placeable[], learned?: Map<string, number>) {
   const ranked: Array<{ id: number; region: number; order: number; at: number }> = [];
   const unplaced: number[] = [];
   const unknownTowns = new Set<string>();
 
   rows.forEach((row, at) => {
+    // اللي انتعلّم من ترتيب الإيد بيسبق الملف: الملف جغرافيا، والمتعلَّم
+    // مسار حقيقي ساقه حدا. ومنحطّه بـ«منطقة» قبل كل المناطق حتى يضل
+    // التسلسل اللي انتعلّم كما هو بلا ما تكسره المناطق.
+    const key = normalizeTown(row.city || row.hebrewCity || "");
+    const taught = learned?.get(key);
+    if (taught !== undefined) {
+      ranked.push({ id: row.id, region: -1, order: taught, at });
+      return;
+    }
+
     const place = placeOf(row.city, row.hebrewCity);
     if (!place) {
       unplaced.push(row.id);

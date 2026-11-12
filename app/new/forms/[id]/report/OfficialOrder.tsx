@@ -16,16 +16,18 @@ import { useState } from "react";
  */
 export function OfficialOrder({ formId }: { formId: number }) {
   const router = useRouter();
-  const [busy, setBusy] = useState<"" | "official" | "reset">("");
+  const [busy, setBusy] = useState<"" | "official" | "reset" | "forget">("");
   const [said, setSaid] = useState("");
 
-  async function run(what: "official" | "reset") {
+  async function run(what: "official" | "reset" | "forget") {
     setBusy(what);
     setSaid("");
     const response = await fetch(`/api/forms/${formId}/order`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(what === "official" ? { official: true } : { reset: true })
+      body: JSON.stringify(
+        what === "official" ? { official: true } : what === "forget" ? { forget: true } : { reset: true }
+      )
     });
     const payload = (await response.json().catch(() => ({}))) as {
       placed?: number;
@@ -39,7 +41,9 @@ export function OfficialOrder({ formId }: { formId: number }) {
       return;
     }
     setSaid(
-      what === "reset"
+      what === "forget"
+        ? "انمحى المسار المتعلَّم"
+        : what === "reset"
         ? "رجع الترتيب الأصلي"
         : payload.unplaced
           ? `انرتّب ${payload.placed} سطر · ${payload.unplaced} بالآخر بلا منطقة: ${(payload.unknownTowns ?? []).join("، ")}`
@@ -61,6 +65,15 @@ export function OfficialOrder({ formId }: { formId: number }) {
         type="button"
       >
         {busy === "reset" ? "…" : "رجّع الأصلي"}
+      </button>
+      <button
+        className="crmBtn quiet"
+        disabled={Boolean(busy)}
+        onClick={() => void run("forget")}
+        title="بينسى ترتيب البلاد اللي اتعلّمه من السحب، فيرجع الترتيب الرسمي للجغرافيا"
+        type="button"
+      >
+        {busy === "forget" ? "…" : "انسى المسار"}
       </button>
       {said ? <span className="crmNote">{said}</span> : null}
     </>
