@@ -3,6 +3,8 @@ import { requireApi } from "@/app/lib/users/current";
 import { recordAction } from "@/app/lib/users/audit";
 import { clearSubmissionOrder, setSubmissionOrder, submissionsForOrdering } from "@/app/lib/forms/store";
 import { officialOrder } from "@/app/lib/forms/regions";
+import { hebrewNameFor } from "@/app/lib/forms/hebrew-name";
+import { hebrewTownFor } from "@/app/lib/forms/hebrew-town";
 import { forgetTownOrder, loadTownOrder, saveTownOrder, townSequence } from "@/app/lib/forms/town-order";
 
 export const runtime = "nodejs";
@@ -86,12 +88,20 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       numeric: true,
       sensitivity: "base"
     });
+    // 🔴 **المفتاح لازم يكون اللي الجدول بيعرضه، مش اللي بالقاعدة.**
+    //
+    // عمودَي العبري بالجدول بينرسموا بـ`hebrewFor`: المخزّن إذا موجود،
+    // وإلا **نقحرة** من العربي. وأول نسخة من الترتيب قرأت العمود الخام
+    // ورجعت للاسم العربي لما تلاقيه فاضي — فالصفوف المنقحَرة انرتّبت
+    // بنصّها العربي. والعربي بترتيب العبري بيجي **بعد** كل الحروف
+    // العبرية، فانرمت تلات أسماء بآخر القائمة: «היא חסין» بعد «נור».
+    // الترتيب كان سليم؛ الغلط إنّا رتّبنا إشي تاني غير اللي على الشاشة.
     const keyOf = (row: (typeof rows)[number]) =>
       by === "name"
-        ? row.name || row.hebrewName
+        ? row.name
         : by === "hebrewName"
-          ? row.hebrewName || row.name
-          : row.hebrewCity || row.city;
+          ? row.hebrewName || hebrewNameFor(row.name)
+          : row.hebrewCity || hebrewTownFor(row.city);
 
     const ordered = rows
       .map((row, at) => ({ row, at, key: (keyOf(row) ?? "").trim() }))
