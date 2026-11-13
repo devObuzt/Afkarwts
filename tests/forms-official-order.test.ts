@@ -68,3 +68,12 @@ test("جدول التقرير بيقرا الترتيب المحفوظ — مش 
     [ids[1], ids[2], ids[0]]
   );
 });
+
+test("البلاد اللي انضافت من دفعات جديدة بتلاقي محلها", async () => {
+  const { placeOf } = await import("@/app/lib/forms/regions");
+  for (const town of ["أم الفحم", "ام الفحم", "عبلين", "אעבלין", "بيت لحم", "كفر كنا", "نابلس", "أبو قويدر"]) {
+    assert.ok(placeOf(town), `«${town}» بلا منطقة — بتنزل بآخر مسار التوصيل`);
+  }
+  assert.equal(placeOf("أم الفحم")?.region, "north");
+  assert.equal(placeOf("عبلين")?.region, "north");
+});
