@@ -510,7 +510,28 @@ export function gridToCsv(grid: SubmissionGrid) {
   const neutralise = (value: string) => (/^[=+\-@\t\r]/.test(value) ? `'${value}` : value);
   const escape = (value: string) => `"${neutralise(String(value ?? "")).replace(/"/g, '""')}"`;
 
-  const header = ["#", "التاريخ", "الحالة", ...grid.columns, ...NOTE_COLUMNS.map((note) => note.label)]
+  // 🔴 **العبري مش عمود بالاستمارة.** الاسم والبلدة بالعبري بينحسبوا
+  // بـ`hebrewFor` (المخزّن، وإلا نقحرة) وبينعرضوا بالجدول وبتنزّلهن
+  // الطباعة — بس التنزيل كان بيكتب `grid.columns` وبس، فبينزل بلاهن.
+  // يعني اللي بيفتح الملف بيلاقي أعمدة أقل من اللي شافها على الشاشة.
+  //
+  // بينحطّوا جنب الاسم العربي بالضبط زي الجدول، مش بآخر الملف: اللي
+  // بيقرا الملف بيقابل الاسمين ببعض.
+  const at = grid.nameColumn === null ? -1 : grid.nameColumn;
+  const withHebrew = <T,>(cells: T[], name: T, city: T) => {
+    if (at === -1) {
+      return [name, city, ...cells];
+    }
+    return [...cells.slice(0, at + 1), name, city, ...cells.slice(at + 1)];
+  };
+
+  const header = [
+    "#",
+    "التاريخ",
+    "الحالة",
+    ...withHebrew(grid.columns, "الاسم بالعبرية", "البلدة بالعبرية"),
+    ...NOTE_COLUMNS.map((note) => note.label)
+  ]
     .map(escape)
     .join(",");
   const lines = grid.rows.map((row, index) =>
@@ -518,7 +539,7 @@ export function gridToCsv(grid: SubmissionGrid) {
       String(index + 1),
       row.submittedAt.slice(0, 16),
       STATE_LABEL[row.state] ?? row.state,
-      ...row.cells,
+      ...withHebrew(row.cells, row.hebrew.name, row.hebrew.city),
       // Afkar's own columns ride along: the file is what gets worked from.
       ...NOTE_COLUMNS.map((note) => row.notes[note.key] ?? "")
     ]
