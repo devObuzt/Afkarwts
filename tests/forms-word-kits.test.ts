@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { crc32, zip } from "../app/lib/forms/docx";
-import { KITS, kitDocx, kitTable, listPhone, roundDate, routeBlocks } from "../app/lib/forms/kits";
+import { KITS, PART_SIZE, kitDoc, kitDocx, listPhone, roundDate, routeBlocks } from "../app/lib/forms/kits";
+import type { WordDoc, WordRow } from "../app/lib/forms/docx";
 import type { SubmissionGrid } from "../app/lib/forms/report";
 
 /** Pull one stored entry back out of a zip, so the test reads the real file. */
@@ -94,20 +95,25 @@ test("the delivery list carries no medical answer at all", () => {
   assert.doesNotMatch(xml, /OCEAN/);
 });
 
+/** Every row of every table, flattened — the file read end to end. */
+function allRows(doc: WordDoc): WordRow[] {
+  return doc.tables.flatMap((table) => table.rows);
+}
+
 /** Only the women's rows, with the region bands dropped. */
-function cellRows(rows: ReturnType<typeof kitTable>["rows"]) {
+function cellRows(rows: WordRow[]) {
   return rows.filter((row): row is string[] => Array.isArray(row));
 }
 
 /** Only the bands, in the order they appear. */
-function bands(rows: ReturnType<typeof kitTable>["rows"]) {
+function bands(rows: WordRow[]) {
   return rows.filter((row): row is { heading: string } => !Array.isArray(row)).map((row) => row.heading);
 }
 
 test("both lists hold every row, numbered straight through", () => {
   for (const kit of ["juices", "delivery"] as const) {
-    const table = kitTable(SAMPLE, kit);
-    const cells = cellRows(table.rows);
+    const doc = kitDoc(SAMPLE, kit);
+    const cells = cellRows(allRows(doc));
     assert.equal(cells.length, 2);
     assert.deepEqual(
       cells.map((row) => row[0]),
@@ -118,7 +124,7 @@ test("both lists hold every row, numbered straight through", () => {
       assert.equal(row.length, KITS[kit].columns.length);
     }
     assert.equal(cells[0][1], "אבתסאם זבארקה");
-    assert.equal(table.subtitle, "ערכות Shad1:");
+    assert.equal(doc.subtitle, "ערכות Shad1:");
   }
 });
 
@@ -134,18 +140,18 @@ test("the file comes out in route order, whatever order the screen is in", () =>
     { hebrew: { name: "כפר קאסם", nameConfirmed: true, city: "כפר קאסם", cityConfirmed: true } }
   ]);
 
-  const table = kitTable(grid, "delivery");
+  const rows = allRows(kitDoc(grid, "delivery"));
 
   assert.deepEqual(
-    cellRows(table.rows).map((row) => row[1]),
+    cellRows(rows).map((row) => row[1]),
     ["סחנין", "כפר קאסם", "רהט", "ירושלים", "רמאללה", "מש בלד"]
   );
   // 🔴 The West Bank is its own band at the end, never a tail on
   // Jerusalem: the driver who works inside the Green Line cannot take it.
-  assert.deepEqual(bands(table.rows), ["הצפון — 1", "המרכז — 1", "הדרום — 1", "ירושלים — 1", "הגדה — 1", "ללא אזור — 1"]);
+  assert.deepEqual(bands(rows), ["הצפון — 1", "המרכז — 1", "הדרום — 1", "ירושלים — 1", "הגדה — 1", "ללא אזור — 1"]);
   // The numbering runs through the bands, so the last number is the count.
   assert.deepEqual(
-    cellRows(table.rows).map((row) => row[0]),
+    cellRows(rows).map((row) => row[0]),
     ["1.", "2.", "3.", "4.", "5.", "6."]
   );
 });
@@ -160,6 +166,88 @@ test("one town's rows keep the order they arrived in", () => {
     blocks[0].rows.map((row) => row.hebrew.name),
     ["ב", "א", "ג"]
   );
+});
+
+test("the list is handed out in fifties, and the remainder is its own table", () => {
+  const grid = gridWith(
+    Array.from({ length: 123 }, () => ({
+      hebrew: { name: "א", nameConfirmed: true, city: "סח'נין", cityConfirmed: true }
+    }))
+  );
+  const doc = kitDoc(grid, "delivery");
+
+  assert.equal(PART_SIZE, 50);
+  assert.equal(doc.tables.length, 3);
+  assert.deepEqual(
+    doc.tables.map((table) => cellRows(table.rows).length),
+    [50, 50, 23]
+  );
+  assert.deepEqual(
+    doc.tables.map((table) => table.note),
+    [
+      "חלק 1 מתוך 3 · שורות 1–50 (50)",
+      "חלק 2 מתוך 3 · שורות 51–100 (50)",
+      "חלק 3 מתוך 3 · שורות 101–123 (23)"
+    ]
+  );
+  // 🔴 The numbering never restarts: row 51 is row 51 on whichever sheet
+  // it lands, and the last number is how many boxes leave.
+  assert.equal(cellRows(doc.tables[1].rows)[0][0], "51.");
+  assert.equal(cellRows(doc.tables[2].rows).at(-1)?.[0], "123.");
+});
+
+test("🔴 the West Bank starts its own table however short it is", () => {
+  const grid = gridWith([
+    ...Array.from({ length: 4 }, () => ({
+      hebrew: { name: "פנים", nameConfirmed: true, city: "סח'נין", cityConfirmed: true }
+    })),
+    ...Array.from({ length: 2 }, () => ({
+      hebrew: { name: "גדה", nameConfirmed: true, city: "רמאללה", cityConfirmed: true }
+    })),
+    { hebrew: { name: "ללא", nameConfirmed: true, city: "עיר שלא קיימת", cityConfirmed: true } }
+  ]);
+  const doc = kitDoc(grid, "delivery");
+
+  // Six rows would fit on one sheet — and that sheet would be handed to a
+  // driver who cannot cross into the West Bank.
+  assert.equal(doc.tables.length, 3);
+  assert.deepEqual(
+    doc.tables.map((table) => table.note),
+    ["חלק 1 מתוך 1 · שורות 1–4 (4)", "הגדה · חלק 1 מתוך 1 · שורות 5–6 (2)", "ללא אזור · חלק 1 מתוך 1 · שורות 7–7 (1)"]
+  );
+  assert.deepEqual(bands(doc.tables[1].rows), ["הגדה — 2"]);
+});
+
+test("a region split over two tables counts itself per table", () => {
+  const grid = gridWith(
+    Array.from({ length: 60 }, (unused, at) => ({
+      hebrew: {
+        name: "א",
+        nameConfirmed: true,
+        // Fifty-five in the north, five in the centre: the north runs over
+        // the end of the first table.
+        city: at < 55 ? "סח'נין" : "כפר קאסם",
+        cityConfirmed: true
+      }
+    }))
+  );
+  const doc = kitDoc(grid, "delivery");
+  assert.deepEqual(bands(doc.tables[0].rows), ["הצפון — 50"]);
+  assert.deepEqual(bands(doc.tables[1].rows), ["הצפון — 5", "המרכז — 5"]);
+});
+
+test("each table starts a page, and every page says what it is", () => {
+  const grid = gridWith(
+    Array.from({ length: 51 }, () => ({
+      hebrew: { name: "א", nameConfirmed: true, city: "סח'נין", cityConfirmed: true }
+    }))
+  );
+  const xml = unzip(kitDocx(grid, "delivery"), "word/document.xml");
+  assert.equal(xml.split('<w:br w:type="page"/>').length - 1, 1);
+  // The cohort and the round are repeated on the second page: a loose
+  // sheet has to say what it is without the first one next to it.
+  assert.equal(xml.split("ערכות Shad1:").length - 1, 2);
+  assert.equal(xml.split("<w:tbl>").length - 1, 2);
 });
 
 test("the band spans the table instead of eating a column", () => {

@@ -1,4 +1,4 @@
-import { buildDocx, type WordRow, type WordTable } from "./docx";
+import { buildDocx, type WordDoc, type WordRow } from "./docx";
 import { REGION_ORDER, placeOf, type Region } from "./regions";
 import type { SubmissionGrid } from "./report";
 
@@ -128,7 +128,18 @@ const REGION_HE: Record<Region, string> = {
 const NO_REGION = "ללא אזור";
 
 /**
- * The rows in route order, in blocks by region.
+ * How many women go on one table.
+ *
+ * 🔑 Afkar hand the round out in fifties — a table is one load, not a
+ * page of a long list. So the count is a working decision, not a layout
+ * one: change it here and the whole file re-splits.
+ */
+export const PART_SIZE = 50;
+
+type Placed = { row: KitRow; region: Region | null };
+
+/**
+ * The rows in route order.
  *
  * 🔑 This is the one list that does **not** follow the screen. The table
  * on screen carries whatever was last dragged into it — an alphabetical
@@ -140,7 +151,7 @@ const NO_REGION = "ללא אזור";
  * Inside one town the incoming order survives, so a hand arrangement
  * within a town is not thrown away.
  */
-export function routeBlocks(grid: SubmissionGrid) {
+export function routeRows(grid: SubmissionGrid): Placed[] {
   const rank = (region: Region | null) => (region ? REGION_ORDER.indexOf(region) : REGION_ORDER.length);
 
   const ranked = grid.rows.map((row, at) => {
@@ -153,8 +164,17 @@ export function routeBlocks(grid: SubmissionGrid) {
 
   ranked.sort((a, b) => rank(a.region) - rank(b.region) || a.order - b.order || a.at - b.at);
 
+  return ranked.map(({ row, region }) => ({ row, region }));
+}
+
+/** The same rows, in blocks by region — what the bands are drawn from. */
+export function routeBlocks(grid: SubmissionGrid) {
+  return blocksOf(routeRows(grid));
+}
+
+function blocksOf(placed: Placed[]) {
   const blocks: Array<{ region: Region | null; label: string; rows: KitRow[] }> = [];
-  for (const item of ranked) {
+  for (const item of placed) {
     const last = blocks[blocks.length - 1];
     if (!last || last.region !== item.region) {
       blocks.push({
@@ -166,33 +186,74 @@ export function routeBlocks(grid: SubmissionGrid) {
     }
     last.rows.push(item.row);
   }
-
   return blocks;
 }
 
-export function kitTable(grid: SubmissionGrid, kit: KitKey, at = new Date()): WordTable {
+/**
+ * The three stacks the round is handed out in.
+ *
+ * 🔴 The West Bank is not the tail of the inside list — it is a separate
+ * carrier with a separate permit. So it starts its own table even when
+ * the last inside table is half empty: filling that table would put
+ * twelve boxes on a sheet handed to a driver who cannot deliver them.
+ *
+ * A town we have not placed yet is its own stack too, for the same
+ * reason in reverse — nobody should be told it is inside until we say so.
+ */
+function stacksOf(placed: Placed[]) {
+  const inside = placed.filter((item) => item.region !== null && item.region !== "westbank");
+  const west = placed.filter((item) => item.region === "westbank");
+  const unknown = placed.filter((item) => item.region === null);
+  return [
+    { name: "", rows: inside },
+    { name: `${REGION_HE.westbank} · `, rows: west },
+    { name: `${NO_REGION} · `, rows: unknown }
+  ].filter((stack) => stack.rows.length > 0);
+}
+
+export function kitDoc(grid: SubmissionGrid, kit: KitKey, at = new Date()): WordDoc {
   const spec = KITS[kit];
-  const rows: WordRow[] = [];
+  const tables: WordDoc["tables"] = [];
   let index = 0;
 
-  for (const block of routeBlocks(grid)) {
-    // The numbering runs 1..N straight through the bands: the count at the
-    // bottom is how many boxes leave, and a per-region restart hides it.
-    rows.push({ heading: `${block.label} — ${block.rows.length}` });
-    for (const row of block.rows) {
-      index += 1;
-      rows.push([`${index}.`, ...spec.cells(row)]);
+  for (const stack of stacksOf(routeRows(grid))) {
+    const parts: Placed[][] = [];
+    for (let from = 0; from < stack.rows.length; from += PART_SIZE) {
+      parts.push(stack.rows.slice(from, from + PART_SIZE));
     }
+
+    parts.forEach((part, at) => {
+      const first = index + 1;
+      const rows: WordRow[] = [];
+
+      for (const block of blocksOf(part)) {
+        // The count on the band is this table's own: a region that runs
+        // over two tables says «50» on one and «24» on the next, and the
+        // two add up to the region. A repeated total would not.
+        rows.push({ heading: `${block.label} — ${block.rows.length}` });
+        for (const row of block.rows) {
+          index += 1;
+          rows.push([`${index}.`, ...spec.cells(row)]);
+        }
+      }
+
+      // The numbering runs 1..N across the whole file, so a loose sheet
+      // still says where it sits and the last number is the box count.
+      tables.push({
+        note: `${stack.name}חלק ${at + 1} מתוך ${parts.length} · שורות ${first}–${index} (${part.length})`,
+        rows
+      });
+    });
   }
 
   return {
     subtitle: `ערכות ${grid.groupName}:`,
     title: `סבב ${roundDate(at)}`,
     columns: [...spec.columns],
-    rows
+    tables
   };
 }
 
 export function kitDocx(grid: SubmissionGrid, kit: KitKey, at = new Date()) {
-  return buildDocx(kitTable(grid, kit, at));
+  return buildDocx(kitDoc(grid, kit, at));
 }

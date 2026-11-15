@@ -179,23 +179,39 @@ function cell(
 export type WordRow = string[] | { heading: string };
 
 export type WordTable = {
-  /** «סבב 18.10.26» — the line over the table. */
-  title: string;
-  /** «ערכות Shad1:» — the line over that, against the right margin. */
-  subtitle: string;
-  columns: Array<{ label: string; width: number }>;
+  /** «חלק 1 מתוך 3 · שורות 1–50» — which part of the list this one is. */
+  note: string;
   rows: WordRow[];
 };
 
+export type WordDoc = {
+  /** «ערכות Shad1:» — the cohort, against the right margin of every page. */
+  subtitle: string;
+  /** «סבב 18.10.26» — the round. The same on every page. */
+  title: string;
+  /** One shape for every table in the file. */
+  columns: Array<{ label: string; width: number }>;
+  /**
+   * The tables, in order, one page each.
+   *
+   * 🔑 Afkar hand these out in fifties — one table is one person's load —
+   * so the file is a stack of tables, not one long one. A part that is
+   * carried by somebody else (the West Bank) starts a table of its own
+   * however short it is, because the point of the split is who drives it.
+   */
+  tables: WordTable[];
+};
+
 /**
- * The table as Afkar's own lists are shaped: right to left, a gold header
- * row, a numbered first column.
+ * The file as Afkar's own lists are shaped: a stack of tables, one to a
+ * page, each right to left with a gold header row and a numbered first
+ * column.
  *
  * `w:bidiVisual` is what puts the first column at the right. Without it
  * the text inside each cell reads right-to-left while the columns march
  * left-to-right, which is how a Hebrew table comes out mirrored.
  */
-export function buildDocx(table: WordTable) {
+export function buildDocx(doc: WordDoc) {
   const borders =
     "<w:tblBorders>" +
     ["top", "left", "bottom", "right", "insideH", "insideV"]
@@ -205,35 +221,65 @@ export function buildDocx(table: WordTable) {
 
   const header =
     '<w:tr><w:trPr><w:tblHeader/></w:trPr>' +
-    table.columns
+    doc.columns
       .map((column) => cell(column.label, { width: column.width, bold: true, fill: "FFC000", align: "center" }))
       .join("") +
     "</w:tr>";
 
-  const span = table.columns.reduce((total, column) => total + column.width, 0);
+  const span = doc.columns.reduce((total, column) => total + column.width, 0);
 
-  const body = table.rows
-    .map((row) =>
-      Array.isArray(row)
-        ? "<w:tr>" +
-          row
-            .map((value, at) =>
-              cell(value, {
-                width: table.columns[at]?.width ?? 10,
-                // The number and the phone are read as values, not as prose —
-                // and laid out left to right, so «1.» keeps its full stop and
-                // a phone does not reverse.
-                align: at === 0 || /^[\d+\-/. ]+$/.test(value.trim()) ? "center" : "right",
-                ltr: at === 0 || /^[\d+\-/. ]+$/.test(value.trim())
-              })
-            )
-            .join("") +
-          "</w:tr>"
-        : "<w:tr>" +
-          // A paler shade of the header gold: it reads as part of the same
-          // table rather than as a second header row.
-          cell(row.heading, { width: span, span: table.columns.length, bold: true, fill: "FFF2CC" }) +
-          "</w:tr>"
+  const grid =
+    "<w:tblGrid>" +
+    doc.columns.map((column) => `<w:gridCol w:w="${Math.round(column.width * 104)}"/>`).join("") +
+    "</w:tblGrid>";
+
+  const body = (rows: WordRow[]) =>
+    rows
+      .map((row) =>
+        Array.isArray(row)
+          ? "<w:tr>" +
+            row
+              .map((value, at) =>
+                cell(value, {
+                  width: doc.columns[at]?.width ?? 10,
+                  // The number and the phone are read as values, not as prose —
+                  // and laid out left to right, so «1.» keeps its full stop and
+                  // a phone does not reverse.
+                  align: at === 0 || /^[\d+\-/. ]+$/.test(value.trim()) ? "center" : "right",
+                  ltr: at === 0 || /^[\d+\-/. ]+$/.test(value.trim())
+                })
+              )
+              .join("") +
+            "</w:tr>"
+          : "<w:tr>" +
+            // A paler shade of the header gold: it reads as part of the same
+            // table rather than as a second header row.
+            cell(row.heading, { width: span, span: doc.columns.length, bold: true, fill: "FFF2CC" }) +
+            "</w:tr>"
+      )
+      .join("");
+
+  const pages = doc.tables
+    .map(
+      (table, at) =>
+        // Every page re-states the cohort and the round: a single sheet
+        // handed to one driver has to say what it is on its own.
+        (at > 0 ? '<w:p><w:r><w:br w:type="page"/></w:r></w:p>' : "") +
+        paragraph(doc.subtitle, { bold: true, size: 11, align: "right" }) +
+        paragraph(doc.title, { bold: true, size: 14, align: "center", after: 40 }) +
+        paragraph(table.note, { bold: true, size: 10, align: "center", after: 160 }) +
+        "<w:tbl><w:tblPr>" +
+        '<w:tblW w:w="5000" w:type="pct"/>' +
+        "<w:bidiVisual/>" +
+        '<w:jc w:val="right"/>' +
+        borders +
+        '<w:tblLayout w:type="fixed"/>' +
+        "</w:tblPr>" +
+        grid +
+        header +
+        body(table.rows) +
+        "</w:tbl>" +
+        paragraph("")
     )
     .join("");
 
@@ -241,22 +287,7 @@ export function buildDocx(table: WordTable) {
     '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
     '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">' +
     "<w:body>" +
-    paragraph(table.subtitle, { bold: true, size: 11, align: "right" }) +
-    paragraph(table.title, { bold: true, size: 14, align: "center", after: 160 }) +
-    "<w:tbl><w:tblPr>" +
-    '<w:tblW w:w="5000" w:type="pct"/>' +
-    "<w:bidiVisual/>" +
-    '<w:jc w:val="right"/>' +
-    borders +
-    '<w:tblLayout w:type="fixed"/>' +
-    "</w:tblPr>" +
-    "<w:tblGrid>" +
-    table.columns.map((column) => `<w:gridCol w:w="${Math.round(column.width * 104)}"/>`).join("") +
-    "</w:tblGrid>" +
-    header +
-    body +
-    "</w:tbl>" +
-    paragraph("") +
+    pages +
     // Portrait, like the lists Afkar already send. The columns are set as
     // percentages, so seven of them share the narrower page rather than
     // spilling off it.
