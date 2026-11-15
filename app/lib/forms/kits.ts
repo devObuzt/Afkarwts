@@ -22,12 +22,21 @@ import type { SubmissionGrid } from "./report";
  * has to re-type.
  */
 export function listPhone(phone: string) {
-  let digits = String(phone ?? "").replace(/\D/g, "");
+  const digits = String(phone ?? "").replace(/\D/g, "");
+  if (!digits) {
+    return "";
+  }
   if (digits.startsWith("972")) {
-    digits = digits.slice(3);
+    return digits.slice(3).replace(/^0/, "");
   }
   if (digits.startsWith("0")) {
-    digits = digits.slice(1);
+    return digits.slice(1);
+  }
+  // A number from outside the country keeps its code, behind a «+». The
+  // Ramallah women's numbers start 970, and bare in a column of nine-digit
+  // numbers «970594183188» reads as somebody's typo rather than a country.
+  if (digits.length > 10) {
+    return `+${digits}`;
   }
   return digits;
 }

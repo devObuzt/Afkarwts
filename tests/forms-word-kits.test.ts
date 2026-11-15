@@ -125,6 +125,10 @@ test("phones print the way the lists carry them", () => {
   assert.equal(listPhone("+972549432146"), "549432146");
   assert.equal(listPhone("972-54-943-2146"), "549432146");
   assert.equal(listPhone(""), "");
+  // Ramallah. A country code is kept and marked, never shaved off into
+  // something that reads like a local number.
+  assert.equal(listPhone("970594183188"), "+970594183188");
+  assert.equal(listPhone("+970 59-418-3188"), "+970594183188");
 });
 
 test("the round is dated the way the paper lists are", () => {
