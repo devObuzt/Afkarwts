@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { crc32, zip } from "../app/lib/forms/docx";
-import { KITS, kitDocx, kitTable, listPhone, roundDate } from "../app/lib/forms/kits";
+import { KITS, kitDocx, kitTable, listPhone, roundDate, routeBlocks } from "../app/lib/forms/kits";
 import type { SubmissionGrid } from "../app/lib/forms/report";
 
 /** Pull one stored entry back out of a zip, so the test reads the real file. */
@@ -94,21 +94,78 @@ test("the delivery list carries no medical answer at all", () => {
   assert.doesNotMatch(xml, /OCEAN/);
 });
 
-test("both lists hold every row, numbered in the table's own order", () => {
+/** Only the women's rows, with the region bands dropped. */
+function cellRows(rows: ReturnType<typeof kitTable>["rows"]) {
+  return rows.filter((row): row is string[] => Array.isArray(row));
+}
+
+/** Only the bands, in the order they appear. */
+function bands(rows: ReturnType<typeof kitTable>["rows"]) {
+  return rows.filter((row): row is { heading: string } => !Array.isArray(row)).map((row) => row.heading);
+}
+
+test("both lists hold every row, numbered straight through", () => {
   for (const kit of ["juices", "delivery"] as const) {
     const table = kitTable(SAMPLE, kit);
-    assert.equal(table.rows.length, 2);
+    const cells = cellRows(table.rows);
+    assert.equal(cells.length, 2);
     assert.deepEqual(
-      table.rows.map((row) => row[0]),
+      cells.map((row) => row[0]),
       ["1.", "2."]
     );
     // Every row is as wide as the header, or the columns slide sideways.
-    for (const row of table.rows) {
+    for (const row of cells) {
       assert.equal(row.length, KITS[kit].columns.length);
     }
-    assert.equal(table.rows[0][1], "אבתסאם זבארקה");
+    assert.equal(cells[0][1], "אבתסאם זבארקה");
     assert.equal(table.subtitle, "ערכות Shad1:");
   }
+});
+
+test("the file comes out in route order, whatever order the screen is in", () => {
+  // Deliberately scrambled, and the West Bank sitting first — the shape a
+  // hand-dragged screen can easily be in.
+  const grid = gridWith([
+    { hebrew: { name: "רמאללה", nameConfirmed: true, city: "רמאללה", cityConfirmed: true } },
+    { hebrew: { name: "רהט", nameConfirmed: true, city: "רהט", cityConfirmed: true } },
+    { hebrew: { name: "ירושלים", nameConfirmed: true, city: "ירושלים", cityConfirmed: true } },
+    { hebrew: { name: "מש בלד", nameConfirmed: true, city: "עיר שלא קיימת", cityConfirmed: true } },
+    { hebrew: { name: "סחנין", nameConfirmed: true, city: "סח'נין", cityConfirmed: true } },
+    { hebrew: { name: "כפר קאסם", nameConfirmed: true, city: "כפר קאסם", cityConfirmed: true } }
+  ]);
+
+  const table = kitTable(grid, "delivery");
+
+  assert.deepEqual(
+    cellRows(table.rows).map((row) => row[1]),
+    ["סחנין", "כפר קאסם", "רהט", "ירושלים", "רמאללה", "מש בלד"]
+  );
+  // 🔴 The West Bank is its own band at the end, never a tail on
+  // Jerusalem: the driver who works inside the Green Line cannot take it.
+  assert.deepEqual(bands(table.rows), ["הצפון — 1", "המרכז — 1", "הדרום — 1", "ירושלים — 1", "הגדה — 1", "ללא אזור — 1"]);
+  // The numbering runs through the bands, so the last number is the count.
+  assert.deepEqual(
+    cellRows(table.rows).map((row) => row[0]),
+    ["1.", "2.", "3.", "4.", "5.", "6."]
+  );
+});
+
+test("one town's rows keep the order they arrived in", () => {
+  const sakhnin = (name: string) => ({
+    hebrew: { name, nameConfirmed: true, city: "סח'נין", cityConfirmed: true }
+  });
+  const blocks = routeBlocks(gridWith([sakhnin("ב"), sakhnin("א"), sakhnin("ג")]));
+  assert.equal(blocks.length, 1);
+  assert.deepEqual(
+    blocks[0].rows.map((row) => row.hebrew.name),
+    ["ב", "א", "ג"]
+  );
+});
+
+test("the band spans the table instead of eating a column", () => {
+  const xml = unzip(kitDocx(SAMPLE, "delivery"), "word/document.xml");
+  assert.match(xml, /<w:gridSpan w:val="7"\/>/);
+  assert.match(xml, /FFF2CC/);
 });
 
 test("the table reads right to left", () => {

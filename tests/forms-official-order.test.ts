@@ -4,7 +4,7 @@ import { useTempDataDir } from "./helpers/data-dir.ts";
 
 useTempDataDir();
 
-test("الترتيب: شمال ← مركز ← جنوب ← القدس والضفة، واللي بلا منطقة بالآخر", async () => {
+test("الترتيب: شمال ← مركز ← جنوب ← القدس ← الضفة، واللي بلا منطقة بالآخر", async () => {
   const { officialOrder } = await import("@/app/lib/forms/regions");
   const plan = officialOrder([
     { id: 1, city: "القدس" },
@@ -12,11 +12,24 @@ test("الترتيب: شمال ← مركز ← جنوب ← القدس والض
     { id: 3, city: "الطيبة" },
     { id: 4, city: "سخنين" },
     { id: 5, city: "بلد ما بنعرفها" },
-    { id: 6, city: "البقيعة" }
+    { id: 6, city: "البقيعة" },
+    { id: 7, city: "رام الله" }
   ]);
-  assert.deepEqual(plan.ids, [6, 4, 3, 2, 1, 5]);
-  assert.equal(plan.placed, 5);
+  assert.deepEqual(plan.ids, [6, 4, 3, 2, 1, 7, 5]);
+  assert.equal(plan.placed, 6);
   assert.deepEqual(plan.unknownTowns, ["بلد ما بنعرفها"]);
+});
+
+test("🔴 الضفة منطقة لحالها — مش ذيل القدس", async () => {
+  const { placeOf } = await import("@/app/lib/forms/regions");
+  // داخل الخط الأخضر.
+  for (const town of ["القدس", "بيت صفافا", "الجديرة", "عين رافا"]) {
+    assert.equal(placeOf(town)?.region, "jerusalem", town);
+  }
+  // برّا — بدها ناقل تاني، فما بتتلمّ مع القدس بنفس الكتلة.
+  for (const town of ["رام الله", "نابلس", "طولكرم", "بيت لحم"]) {
+    assert.equal(placeOf(town)?.region, "westbank", town);
+  }
 });
 
 test("الاسم بينلقط مهما انكتب — بالعبري، بلا «ال»، بهمزة أو بلا", async () => {

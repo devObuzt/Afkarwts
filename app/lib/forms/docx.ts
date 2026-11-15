@@ -153,12 +153,13 @@ function paragraph(
 
 function cell(
   text: string,
-  opts: { width: number; bold?: boolean; fill?: string; align?: "right" | "center"; ltr?: boolean }
+  opts: { width: number; bold?: boolean; fill?: string; align?: "right" | "center"; ltr?: boolean; span?: number }
 ) {
   // Percent widths: 5000 is the full table, so a percent is fifty.
   return (
     "<w:tc><w:tcPr>" +
     `<w:tcW w:w="${Math.round(opts.width * 50)}" w:type="pct"/>` +
+    (opts.span && opts.span > 1 ? `<w:gridSpan w:val="${opts.span}"/>` : "") +
     (opts.fill ? `<w:shd w:val="clear" w:color="auto" w:fill="${opts.fill}"/>` : "") +
     '<w:vAlign w:val="center"/>' +
     "</w:tcPr>" +
@@ -167,13 +168,23 @@ function cell(
   );
 }
 
+/**
+ * A row is either cells, or a band across the whole table.
+ *
+ * The band is what separates one delivery region from the next on the
+ * paper: a driver who works inside the Green Line has to see where his
+ * part of the list ends, and «الضفة» two rows below «القدس» with nothing
+ * between them is a route nobody notices is wrong.
+ */
+export type WordRow = string[] | { heading: string };
+
 export type WordTable = {
   /** «סבב 18.10.26» — the line over the table. */
   title: string;
   /** «ערכות Shad1:» — the line over that, against the right margin. */
   subtitle: string;
   columns: Array<{ label: string; width: number }>;
-  rows: string[][];
+  rows: WordRow[];
 };
 
 /**
@@ -199,23 +210,30 @@ export function buildDocx(table: WordTable) {
       .join("") +
     "</w:tr>";
 
+  const span = table.columns.reduce((total, column) => total + column.width, 0);
+
   const body = table.rows
-    .map(
-      (cells) =>
-        "<w:tr>" +
-        cells
-          .map((value, at) =>
-            cell(value, {
-              width: table.columns[at]?.width ?? 10,
-              // The number and the phone are read as values, not as prose —
-              // and laid out left to right, so «1.» keeps its full stop and
-              // a phone does not reverse.
-              align: at === 0 || /^[\d+\-/. ]+$/.test(value.trim()) ? "center" : "right",
-              ltr: at === 0 || /^[\d+\-/. ]+$/.test(value.trim())
-            })
-          )
-          .join("") +
-        "</w:tr>"
+    .map((row) =>
+      Array.isArray(row)
+        ? "<w:tr>" +
+          row
+            .map((value, at) =>
+              cell(value, {
+                width: table.columns[at]?.width ?? 10,
+                // The number and the phone are read as values, not as prose —
+                // and laid out left to right, so «1.» keeps its full stop and
+                // a phone does not reverse.
+                align: at === 0 || /^[\d+\-/. ]+$/.test(value.trim()) ? "center" : "right",
+                ltr: at === 0 || /^[\d+\-/. ]+$/.test(value.trim())
+              })
+            )
+            .join("") +
+          "</w:tr>"
+        : "<w:tr>" +
+          // A paler shade of the header gold: it reads as part of the same
+          // table rather than as a second header row.
+          cell(row.heading, { width: span, span: table.columns.length, bold: true, fill: "FFF2CC" }) +
+          "</w:tr>"
     )
     .join("");
 

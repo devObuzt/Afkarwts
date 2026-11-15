@@ -1,4 +1,5 @@
-import { buildDocx, type WordTable } from "./docx";
+import { buildDocx, type WordRow, type WordTable } from "./docx";
+import { REGION_ORDER, placeOf, type Region } from "./regions";
 import type { SubmissionGrid } from "./report";
 
 /**
@@ -48,10 +49,12 @@ export const KITS = {
     file: "juices",
     columns: [
       { label: "#", width: 5 },
-      { label: "שם", width: 24 },
+      { label: "שם", width: 23 },
       { label: "ישוב", width: 17 },
-      { label: "טלפון", width: 14 },
-      { label: "הערות", width: 29 },
+      // Wide enough for «+970594183188» on one line. A phone that wraps
+      // mid-number is a number somebody dials wrong.
+      { label: "טלפון", width: 16 },
+      { label: "הערות", width: 28 },
       { label: "OCEAN", width: 11 }
     ],
     // `notes.medical` is what the screen calls «ملاحظات طبية» — the column
@@ -72,10 +75,13 @@ export const KITS = {
       { label: "#", width: 5 },
       { label: "שם", width: 19 },
       { label: "ישוב", width: 14 },
-      { label: "טלפון", width: 13 },
-      { label: "הערות", width: 15 },
+      // See the juices list: a West Bank number has to fit on one line.
+      { label: "טלפון", width: 16 },
+      { label: "הערות", width: 13 },
+      // «صندوق افكار» is on nearly every row: a column too narrow for it
+      // doubles the height of the whole list.
       { label: "SHAPER", width: 12 },
-      { label: "משפחה", width: 22 }
+      { label: "משפחה", width: 21 }
     ],
     // «הערות» here is the sending note — «משלוח חינם» and the like — not
     // the medical one. A driver has no business reading a diagnosis.
@@ -102,15 +108,86 @@ export function roundDate(at = new Date()) {
   return `${pad(at.getDate())}.${pad(at.getMonth() + 1)}.${String(at.getFullYear()).slice(2)}`;
 }
 
+type KitRow = SubmissionGrid["rows"][number];
+
+/**
+ * The region names as the lists carry them — Hebrew, like every column
+ * on them. The reader of this file is the press or the driver, not us.
+ */
+const REGION_HE: Record<Region, string> = {
+  north: "הצפון",
+  center: "המרכז",
+  south: "הדרום",
+  jerusalem: "ירושלים",
+  westbank: "הגדה"
+};
+
+/** A town that is in no region yet. Visible, so it gets placed. */
+const NO_REGION = "ללא אזור";
+
+/**
+ * The rows in route order, in blocks by region.
+ *
+ * 🔑 This is the one list that does **not** follow the screen. The table
+ * on screen carries whatever was last dragged into it — an alphabetical
+ * sort somebody ran, a woman lifted to the top because she collects her
+ * own box — and none of that is a delivery route. The file follows the
+ * geography in `regions.ts`: north down to the south, then Jerusalem,
+ * then the West Bank on its own at the end.
+ *
+ * Inside one town the incoming order survives, so a hand arrangement
+ * within a town is not thrown away.
+ */
+export function routeBlocks(grid: SubmissionGrid) {
+  const rank = (region: Region | null) => (region ? REGION_ORDER.indexOf(region) : REGION_ORDER.length);
+
+  const ranked = grid.rows.map((row, at) => {
+    // The Arabic town is the answer she gave; the Hebrew one is what the
+    // office wrote. Either one names the place, so both are tried.
+    const arabic = grid.cityColumn === null ? "" : (row.cells[grid.cityColumn] ?? "");
+    const place = placeOf(arabic, row.hebrew.city);
+    return { row, at, region: place?.region ?? null, order: place?.order ?? Number.MAX_SAFE_INTEGER };
+  });
+
+  ranked.sort((a, b) => rank(a.region) - rank(b.region) || a.order - b.order || a.at - b.at);
+
+  const blocks: Array<{ region: Region | null; label: string; rows: KitRow[] }> = [];
+  for (const item of ranked) {
+    const last = blocks[blocks.length - 1];
+    if (!last || last.region !== item.region) {
+      blocks.push({
+        region: item.region,
+        label: item.region ? REGION_HE[item.region] : NO_REGION,
+        rows: [item.row]
+      });
+      continue;
+    }
+    last.rows.push(item.row);
+  }
+
+  return blocks;
+}
+
 export function kitTable(grid: SubmissionGrid, kit: KitKey, at = new Date()): WordTable {
   const spec = KITS[kit];
+  const rows: WordRow[] = [];
+  let index = 0;
+
+  for (const block of routeBlocks(grid)) {
+    // The numbering runs 1..N straight through the bands: the count at the
+    // bottom is how many boxes leave, and a per-region restart hides it.
+    rows.push({ heading: `${block.label} — ${block.rows.length}` });
+    for (const row of block.rows) {
+      index += 1;
+      rows.push([`${index}.`, ...spec.cells(row)]);
+    }
+  }
+
   return {
     subtitle: `ערכות ${grid.groupName}:`,
     title: `סבב ${roundDate(at)}`,
     columns: [...spec.columns],
-    // The order is the table's own — official order or a hand-dragged one.
-    // The driver's list and the screen have to agree, or the route is wrong.
-    rows: grid.rows.map((row, index) => [`${index + 1}.`, ...spec.cells(row)])
+    rows
   };
 }
 
