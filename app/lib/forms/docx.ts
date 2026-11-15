@@ -267,7 +267,7 @@ export function buildDocx(doc: WordDoc) {
         (at > 0 ? '<w:p><w:r><w:br w:type="page"/></w:r></w:p>' : "") +
         paragraph(doc.subtitle, { bold: true, size: 11, align: "right" }) +
         paragraph(doc.title, { bold: true, size: 14, align: "center", after: 40 }) +
-        paragraph(table.note, { bold: true, size: 10, align: "center", after: 160 }) +
+        paragraph(table.note, { bold: true, size: 10, align: "center", after: 80 }) +
         "<w:tbl><w:tblPr>" +
         '<w:tblW w:w="5000" w:type="pct"/>' +
         "<w:bidiVisual/>" +
@@ -291,8 +291,13 @@ export function buildDocx(doc: WordDoc) {
     // Portrait, like the lists Afkar already send. The columns are set as
     // percentages, so seven of them share the narrower page rather than
     // spilling off it.
+    //
+    // 🔑 The margins are what make a table of fifty **one** sheet. At 900
+    // twips a full part plus its region bands ran one row over and left a
+    // single woman alone on a page of her own — which is exactly the sheet
+    // somebody forgets on the desk.
     '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/>' +
-    '<w:pgMar w:top="900" w:right="720" w:bottom="900" w:left="720" w:header="360" w:footer="360" w:gutter="0"/>' +
+    '<w:pgMar w:top="567" w:right="720" w:bottom="567" w:left="720" w:header="283" w:footer="283" w:gutter="0"/>' +
     "<w:bidi/></w:sectPr>" +
     "</w:body></w:document>";
 
