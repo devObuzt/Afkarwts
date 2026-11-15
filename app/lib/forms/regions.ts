@@ -38,6 +38,7 @@ type Town = { name: string; region: Region; aliases?: string[] };
 /** البلاد بترتيب المسار جوّا كل منطقة. الإضافة هون وبس. */
 export const TOWNS: Town[] = [
   // ── الشمال: الجليل الأعلى نازل للكرمل ووادي عارة ──
+  { name: "فسوطة", region: "north", aliases: ["פסוטה"] },
   { name: "البقيعة", region: "north", aliases: ["פקיעין"] },
   { name: "كفر ياسيف", region: "north", aliases: ["כפר יאסיף"] },
   { name: "أبو سنان", region: "north", aliases: ["אבו סנאן"] },
@@ -47,13 +48,16 @@ export const TOWNS: Town[] = [
   { name: "البعينة نجيدات", region: "north", aliases: ["בענה", "نجيدات", "البعنة"] },
   { name: "سخنين", region: "north", aliases: ["סח'נין", "סחנין"] },
   { name: "عرابة", region: "north", aliases: ["עראבה"] },
+  { name: "سلامة", region: "north", aliases: ["סלמה", "סלאמה"] },
   { name: "مجد الكروم", region: "north", aliases: ["מג'ד אל כרום"] },
   { name: "كفر مندا", region: "north", aliases: ["כפר מנדא"] },
+  { name: "كوكب أبو الهيجا", region: "north", aliases: ["כוכב אבו אלהיג'אא", "כוכב אבו אל-היג'א", "כוכב", "كوكب"] },
   { name: "بير المكسور", region: "north", aliases: ["ביר אל מכסור"] },
   { name: "عبلين", region: "north", aliases: ["אעבלין", "إعبلين"] },
   { name: "شفاعمرو", region: "north", aliases: ["שפרעם"] },
   { name: "طمرة", region: "north", aliases: ["טמרה"] },
   { name: "المغار", region: "north", aliases: ["מע'אר", "מגאר"] },
+  { name: "الحمام", region: "north", aliases: ["חמאם", "ואדי אל-חמאם", "وادي الحمام"] },
   { name: "عزير", region: "north", aliases: ["עוזייר"] },
   { name: "كفر كنا", region: "north", aliases: ["כפר כנא", "كفركنا"] },
   { name: "الرينة", region: "north", aliases: ["ריינה"] },
@@ -86,6 +90,7 @@ export const TOWNS: Town[] = [
 
   // ── الجنوب: النقب ──
   { name: "رهط", region: "south", aliases: ["רהט"] },
+  { name: "تل السبع", region: "south", aliases: ["תל שבע", "تل سبع"] },
   { name: "شقيب السلام", region: "south", aliases: ["שגב שלום", "سجيب السلام"] },
   { name: "أبو قويدر", region: "south", aliases: ["אבו קוידר", "ابوقويدر"] },
   { name: "أبو تلول", region: "south", aliases: ["אבו תלול"] },
