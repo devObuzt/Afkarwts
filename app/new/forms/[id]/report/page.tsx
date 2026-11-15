@@ -324,6 +324,15 @@ export default async function ReportPage({
               <a className="crmBtn" href={`/api/forms/${form.id}/export${view}`}>
                 تنزيل Excel
               </a>
+              {/* القائمتين اللي بتطلعا برّا كل جولة: وحدة للعصّارة ووحدة
+                  لشركة التوصيل. كل وحدة بأعمدتها هي — قائمة السائق بلا
+                  عمود طبّي أصلاً. */}
+              <a className="crmBtn" href={`/api/forms/${form.id}/word?kit=juices${view ? `&${view.slice(1)}` : ""}`}>
+                وورد · العصائر
+              </a>
+              <a className="crmBtn" href={`/api/forms/${form.id}/word?kit=delivery${view ? `&${view.slice(1)}` : ""}`}>
+                وورد · التوصيل
+              </a>
               <PdfButton
                 formId={form.id}
                 printHref={`/new/forms/${form.id}/report?print=1${view ? `&${view.slice(1)}` : ""}`}
