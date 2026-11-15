@@ -48,8 +48,10 @@ export const KITS = {
     label: "العصائر",
     file: "juices",
     columns: [
-      { label: "#", width: 5 },
-      { label: "שם", width: 23 },
+      // Six, not five: the list runs past a hundred rows and «142.» has
+      // to sit on one line.
+      { label: "#", width: 6 },
+      { label: "שם", width: 22 },
       { label: "ישוב", width: 17 },
       // Wide enough for «+970594183188» on one line. A phone that wraps
       // mid-number is a number somebody dials wrong.
@@ -72,8 +74,8 @@ export const KITS = {
     label: "شركات التوصيل",
     file: "delivery",
     columns: [
-      { label: "#", width: 5 },
-      { label: "שם", width: 19 },
+      { label: "#", width: 6 },
+      { label: "שם", width: 18 },
       { label: "ישוב", width: 14 },
       // See the juices list: a West Bank number has to fit on one line.
       { label: "טלפון", width: 16 },
