@@ -273,6 +273,38 @@
   box-shadow: 0 0 0 3px var(--tone-wash);
 }
 
+/* The app area's own screens, as tabs under the main nav — the library
+   screens used to hide behind cards on /new/app. Scrolls sideways on a phone. */
+.crm .crmSubnav {
+  max-width: 1100px;
+  margin: 0 auto 16px;
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--line);
+  scrollbar-width: none;
+}
+
+.crm .crmSubnav a {
+  padding: 10px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+  text-decoration: none;
+  white-space: nowrap;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+
+.crm .crmSubnav a:hover {
+  color: var(--tone-ink);
+}
+
+.crm .crmSubnav a.current {
+  color: var(--tone-ink);
+  border-bottom-color: var(--tone);
+}
+
 /* Whoever is signed in, and the way out. With one shared login there was
    nobody to name; now the screen says which account is acting. */
 .crm .crmWho {
